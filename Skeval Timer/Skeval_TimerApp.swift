@@ -20,8 +20,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastPillSecond: Int = -1
     private var lastPillPaused: Bool = false
 
-    // Global hotkey monitor (⌘+Shift+C)
+    // Global & local hotkey monitors (⌘+Shift+C)
     private var globalHotkeyMonitor: Any? = nil
+    private var localHotkeyMonitor: Any? = nil
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -37,13 +38,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.animates = true
-        popover.contentSize = NSSize(width: 320, height: 520)
+        updatePopoverSize()
         popover.contentViewController = NSHostingController(
             rootView: PopoverView(vm: vm).preferredColorScheme(.dark)
         )
 
         registerGlobalHotkey()
         observeState()
+        updateStatusItem()
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
@@ -52,10 +54,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         removeGlobalHotkey()
     }
 
-    // MARK: - Popover toggle
+    // MARK: - Popover toggle & sizing
+
+    private func updatePopoverSize() {
+        let hasSprints = !vm.todayLog.completedSprints.isEmpty
+        let height: CGFloat = hasSprints ? 620 : 440
+        popover?.contentSize = NSSize(width: 330, height: height)
+    }
 
     @objc func togglePopover() {
         guard let btn = statusItem.button else { return }
+        updatePopoverSize()
         if popover.isShown {
             popover.performClose(nil)
         } else {
@@ -73,7 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 2. Local monitor (when Skeval Timer popover is active/focused)
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        localHotkeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if self?.handleHotkey(event: event) == true {
                 return nil // Consume event
             }
@@ -102,7 +111,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func removeGlobalHotkey() {
         if let m = globalHotkeyMonitor { NSEvent.removeMonitor(m) }
+        if let m = localHotkeyMonitor { NSEvent.removeMonitor(m) }
         globalHotkeyMonitor = nil
+        localHotkeyMonitor = nil
     }
 
     // MARK: - Observation → status item
@@ -122,6 +133,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusItem() {
+        updatePopoverSize()
         guard let btn = statusItem.button else { return }
         btn.title = ""
         if vm.isRunning {

@@ -60,7 +60,8 @@ struct PopoverView: View {
                 settingsSection
             }
         }
-        .frame(width: 320)
+        .frame(width: 330)
+        .focusEffectDisabled()
     }
 
     // MARK: - Header Row
@@ -129,6 +130,7 @@ struct PopoverView: View {
                     }
                 }
                 .buttonStyle(PillButtonStyle(color: neonTeal))
+                .focusable(false)
 
                 TextField("HH:mm:ss", text: $vm.recoveryEndText)
                     .textFieldStyle(.plain)
@@ -140,11 +142,13 @@ struct PopoverView: View {
                     .background(cardBg)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.orange.opacity(0.5), lineWidth: 1))
+                    .focusable(false)
 
                 Button("Save") {
                     withAnimation { vm.saveRecoveryEndTime() }
                 }
                 .buttonStyle(PillButtonStyle(color: Color(white: 0.7)))
+                .focusable(false)
 
                 Spacer()
 
@@ -154,6 +158,7 @@ struct PopoverView: View {
                         .foregroundColor(textSecondary)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
             
             if let err = vm.recoveryEndError {
@@ -333,6 +338,7 @@ struct PopoverView: View {
                 .shadow(color: (vm.isRunning ? softRed : neonTeal).opacity(0.45), radius: 8, y: 3)
             }
             .buttonStyle(PressedScaleButtonStyle())
+            .focusable(false)
             .disabled(vm.recoveryMode)
 
             if vm.currentSprint != nil {
@@ -342,6 +348,7 @@ struct PopoverView: View {
                         .foregroundColor(textSecondary)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
         }
         .padding(.horizontal, 16)
@@ -410,7 +417,7 @@ struct PopoverView: View {
                     }
                     .padding(.horizontal, 16)
                 }
-                .frame(maxHeight: 220)
+                .frame(maxHeight: 340)
             }
         }
         .padding(.bottom, 12)
@@ -442,6 +449,7 @@ struct PopoverView: View {
                 .padding(.vertical, 10)
             }
             .buttonStyle(.plain)
+            .focusable(false)
 
             if settingsExpanded {
                 VStack(alignment: .leading, spacing: 14) {
@@ -464,6 +472,7 @@ struct PopoverView: View {
                         Slider(value: $vm.goal.dailyGoalHours, in: 1...16, step: 0.5)
                             .tint(neonTeal)
                             .controlSize(.small)
+                            .focusable(false)
                         HStack {
                             Text("1h")
                             Spacer()
@@ -490,6 +499,7 @@ struct PopoverView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                             .tint(neonTeal)
+                            .focusable(false)
                             .onChange(of: launchAtLogin) { _, newValue in
                                 AppDelegate.setLaunchAtLogin(newValue)
                             }
@@ -622,6 +632,7 @@ private struct SprintCardRow: View {
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
+            .focusable(false)
 
             // Delete Button
             Button(action: onDelete) {
@@ -633,6 +644,7 @@ private struct SprintCardRow: View {
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
+            .focusable(false)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -649,6 +661,7 @@ private struct PressedScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .focusable(false)
     }
 }
 
@@ -664,6 +677,7 @@ private struct PillButtonStyle: ButtonStyle {
             .padding(.vertical, 5)
             .background(color.opacity(configuration.isPressed ? 0.7 : 1.0))
             .clipShape(Capsule())
+            .focusable(false)
     }
 }
 

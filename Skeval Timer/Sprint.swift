@@ -43,7 +43,15 @@ struct Sprint: Identifiable, Codable {
 
     var startLabel: String { Sprint.fmt(startTime) }
     var endLabel: String { endTime.map { Sprint.fmt($0) } ?? "--:--:--" }
-    var clipboardText: String { "\(startLabel)\t\(endLabel)" }
+
+    // Effective end = real endTime − pausedDuration
+    // This ensures the spreadsheet computes (effectiveEnd − startTime) == net work duration
+    var effectiveEndLabel: String {
+        guard let end = endTime else { return "--:--:--" }
+        return Sprint.fmt(end.addingTimeInterval(-pausedDuration))
+    }
+
+    var clipboardText: String { "\(startLabel)\t\(effectiveEndLabel)" }
 
     static func fmt(_ date: Date) -> String {
         let f = DateFormatter()
