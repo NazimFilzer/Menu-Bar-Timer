@@ -185,6 +185,45 @@ func testSprintEngine() {
     }
 }
 
+@MainActor
+func testAppThemes() {
+    print("Running AppTheme tests...")
+
+    assertEqual(AppTheme.allCases.count, 8)
+    assertEqual(AppTheme.neon.displayName, "Neon")
+    assertEqual(AppTheme.sepia.displayName, "Sepia")
+    assertEqual(AppTheme.nord.displayName, "Nord")
+    assertEqual(AppTheme.midnight.displayName, "Midnight")
+    assertEqual(AppTheme.matcha.displayName, "Matcha")
+    assertEqual(AppTheme.forest.displayName, "Forest")
+    assertEqual(AppTheme.sunset.displayName, "Sunset")
+    assertEqual(AppTheme.abyss.displayName, "Abyss")
+
+    // Verify Sepia theme attributes
+    let sepia = PopoverTheme.sepia
+    assertEqual(sepia.name, "Sepia")
+    assertEqual(sepia.isLight, false)
+    assertEqual(sepia.neonTeal, sepia.accentColor)
+
+    // Verify Matcha Light theme attributes
+    let matcha = PopoverTheme.matcha
+    assertEqual(matcha.name, "Matcha")
+    assertEqual(matcha.isLight, true)
+    assertEqual(matcha.actionButtonForeground, .white)
+
+    // Verify ThemeManager defaults and updates
+    let manager = ThemeManager.shared
+    manager.current = .matcha
+    assertEqual(manager.current, .matcha)
+    assertEqual(manager.theme.name, "Matcha")
+    assertTrue(manager.theme.isLight)
+
+    manager.current = .neon
+    assertEqual(manager.current, .neon)
+    assertEqual(manager.theme.name, "Neon")
+    assertFalse(manager.theme.isLight)
+}
+
 // MARK: - Main Runner
 
 @main
@@ -198,6 +237,7 @@ struct TestMain {
         testDayLogStoreWithInMemoryStorage()
         await MainActor.run {
             testSprintEngine()
+            testAppThemes()
         }
 
         print("----------------------------------------")

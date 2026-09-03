@@ -25,6 +25,7 @@ class TimerViewModel {
     let store: DayLogStore
 
     private var notifiedMilestones: Set<Int> = []
+    private var lastNotifiedDayKey: String = TimeFormatter.format(dateKey: Date())
 
     // MARK: - Init
 
@@ -38,6 +39,14 @@ class TimerViewModel {
         self.state = effectiveEngine.state
         self.currentElapsed = effectiveEngine.state.currentElapsed
         self.currentPauseElapsed = effectiveEngine.currentPauseElapsed
+
+        let goalSec = goal.dailyGoalSeconds
+        if goalSec > 0 {
+            let initialPct = Int((self.todayLog.accumulatedTotal / goalSec) * 100)
+            for m in [50, 75, 100] where initialPct >= m {
+                self.notifiedMilestones.insert(m)
+            }
+        }
 
         setupEngineCallbacks()
     }
@@ -58,7 +67,9 @@ class TimerViewModel {
         }
 
         engine.onTick = { [weak self] elapsed in
-            self?.currentElapsed = elapsed
+            guard let self else { return }
+            self.currentElapsed = elapsed
+            self.checkMilestoneNotifications()
         }
 
         engine.onPauseTick = { [weak self] pauseElapsed in
@@ -187,18 +198,26 @@ class TimerViewModel {
     private func checkMilestoneNotifications() {
         let goalSec = goal.dailyGoalSeconds
         guard goalSec > 0 else { return }
-        let pct = Int((todayLog.accumulatedTotal / goalSec) * 100)
+
+        let todayKey = TimeFormatter.format(dateKey: Date())
+        if todayKey != lastNotifiedDayKey {
+            lastNotifiedDayKey = todayKey
+            notifiedMilestones.removeAll()
+        }
+
+        let totalElapsed = todayLog.accumulatedTotal + (isRunning ? currentElapsed : 0)
+        let pct = Int((totalElapsed / goalSec) * 100)
         let milestones = [50, 75, 100]
         for m in milestones where pct >= m && !notifiedMilestones.contains(m) {
             notifiedMilestones.insert(m)
-            sendNotification(milestone: m)
+            sendNotification(milestone: m, totalSeconds: totalElapsed)
         }
     }
 
-    private func sendNotification(milestone: Int) {
+    private func sendNotification(milestone: Int, totalSeconds: TimeInterval) {
         let content = UNMutableNotificationContent()
         content.title = milestone == 100 ? "🎉 Daily Goal Reached!" : "Skeval Timer — \(milestone)% of Daily Goal"
-        let acc = todayLog.accumulatedLabel
+        let acc = TimeFormatter.format(clock: totalSeconds)
         let goalLabel = goal.goalLabel
         content.body = milestone == 100
             ? "You've logged \(acc) today. Great work!"

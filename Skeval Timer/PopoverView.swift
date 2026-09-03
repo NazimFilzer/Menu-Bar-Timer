@@ -1,33 +1,14 @@
 import SwiftUI
 import ServiceManagement
 
-// MARK: - Theme
-
-struct PopoverTheme {
-    let bgDark        = Color(red: 0.05, green: 0.06, blue: 0.09)
-    let cardBg        = Color(red: 0.10, green: 0.12, blue: 0.16)
-    let cardBorder    = Color(white: 0.20, opacity: 0.4)
-    let neonTeal      = Color(red: 0.22, green: 0.85, blue: 0.65)
-    let softRed       = Color(red: 0.98, green: 0.35, blue: 0.38)
-    let textPrimary   = Color(white: 0.95)
-    let textSecondary = Color(white: 0.55)
-
-    func statusColor(for state: SprintState) -> Color {
-        switch state {
-        case .recovery: return .orange
-        case .paused: return Color(red: 1.0, green: 0.65, blue: 0.0)
-        case .active: return neonTeal
-        case .idle: return textSecondary
-        }
-    }
-}
-
 // MARK: - Main Popover View
 
 struct PopoverView: View {
     @Bindable var vm: TimerViewModel
     @State private var launchAtLogin = AppDelegate.isLaunchAtLoginEnabled
-    private let theme = PopoverTheme()
+    @State private var themeManager = ThemeManager.shared
+
+    private var theme: PopoverTheme { themeManager.theme }
 
     var body: some View {
         ZStack {
@@ -47,7 +28,7 @@ struct PopoverView: View {
             VStack(spacing: 0) {
                 PopoverHeaderView(vm: vm, theme: theme)
 
-                Divider().background(Color(white: 0.16))
+                Divider().background(theme.dividerColor)
 
                 if vm.recoveryMode {
                     RecoveryBannerView(vm: vm, theme: theme)
@@ -56,29 +37,31 @@ struct PopoverView: View {
 
                 ClockSectionView(vm: vm, theme: theme)
 
-                Divider().background(Color(white: 0.16))
+                Divider().background(theme.dividerColor)
 
                 DailyGoalProgressView(vm: vm, theme: theme)
 
-                Divider().background(Color(white: 0.16))
+                Divider().background(theme.dividerColor)
 
                 ActionSectionView(vm: vm, theme: theme)
 
-                Divider().background(Color(white: 0.16))
+                Divider().background(theme.dividerColor)
 
                 SprintHistorySectionView(vm: vm, theme: theme)
 
-                Divider().background(Color(white: 0.16))
+                Divider().background(theme.dividerColor)
 
                 SettingsSectionView(
                     vm: vm,
                     theme: theme,
-                    launchAtLogin: $launchAtLogin
+                    launchAtLogin: $launchAtLogin,
+                    themeManager: themeManager
                 )
             }
         }
         .frame(width: 330)
         .focusEffectDisabled()
+        .preferredColorScheme(theme.isLight ? .light : .dark)
     }
 }
 
@@ -159,7 +142,7 @@ private struct RecoveryBannerView: View {
                         vm.resumeRecovery()
                     }
                 }
-                .buttonStyle(PillButtonStyle(color: theme.neonTeal))
+                .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
                 .focusable(false)
 
                 TextField("HH:mm:ss", text: $vm.recoveryEndText)
@@ -288,7 +271,7 @@ private struct DailyGoalProgressView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(white: 0.15))
+                        .fill(theme.isLight ? Color(white: 0.85) : Color(white: 0.15))
                         .frame(height: 6)
 
                     RoundedRectangle(cornerRadius: 4)
@@ -396,20 +379,20 @@ private struct ActionSectionView: View {
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .kerning(0.5)
                 }
-                .foregroundColor(.black)
+                .foregroundColor(vm.isRunning ? .white : theme.actionButtonForeground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
                 .background(
                     LinearGradient(
                         colors: vm.isRunning
                             ? [Color(red: 1.0, green: 0.45, blue: 0.45), theme.softRed]
-                            : [Color(red: 0.35, green: 0.95, blue: 0.75), theme.neonTeal],
+                            : [theme.accentColor.opacity(0.85), theme.accentColor],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: (vm.isRunning ? theme.softRed : theme.neonTeal).opacity(0.45), radius: 8, y: 3)
+                .shadow(color: (vm.isRunning ? theme.softRed : theme.accentColor).opacity(0.45), radius: 8, y: 3)
             }
             .buttonStyle(PressedScaleButtonStyle())
             .focusable(false)
@@ -628,6 +611,7 @@ private struct SettingsSectionView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
     @Binding var launchAtLogin: Bool
+    @Bindable var themeManager: ThemeManager
 
     var body: some View {
         VStack(spacing: 0) {
@@ -658,6 +642,59 @@ private struct SettingsSectionView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
+                            Text("Theme")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundColor(theme.textPrimary)
+                            Spacer()
+                            Text(theme.isLight ? "Light Mode" : "Dark Mode")
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .foregroundColor(theme.textSecondary)
+                        }
+
+                        let themeColumns = [
+                            GridItem(.flexible(), spacing: 5),
+                            GridItem(.flexible(), spacing: 5),
+                            GridItem(.flexible(), spacing: 5),
+                            GridItem(.flexible(), spacing: 5)
+                        ]
+
+                        LazyVGrid(columns: themeColumns, spacing: 5) {
+                            ForEach(AppTheme.allCases) { appTheme in
+                                let isSelected = themeManager.current == appTheme
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        themeManager.current = appTheme
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(appTheme.theme.accentColor)
+                                            .frame(width: 6.5, height: 6.5)
+
+                                        Text(appTheme.displayName)
+                                            .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                                            .foregroundColor(isSelected ? theme.textPrimary : theme.textSecondary)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 5.5)
+                                    .background(isSelected ? appTheme.theme.cardBg : theme.cardBg.opacity(0.6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(isSelected ? appTheme.theme.accentColor : theme.cardBorder, lineWidth: isSelected ? 1.5 : 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .focusable(false)
+                            }
+                        }
+                    }
+
+                    Divider().background(theme.dividerColor)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
                             Text("Daily Goal")
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundColor(theme.textPrimary)
@@ -683,7 +720,7 @@ private struct SettingsSectionView: View {
                         .foregroundColor(theme.textSecondary)
                     }
 
-                    Divider().background(Color(white: 0.18))
+                    Divider().background(theme.dividerColor)
 
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -705,7 +742,7 @@ private struct SettingsSectionView: View {
                             }
                     }
 
-                    Divider().background(Color(white: 0.18))
+                    Divider().background(theme.dividerColor)
 
                     HStack(spacing: 6) {
                         Image(systemName: "keyboard")
@@ -729,7 +766,7 @@ private struct SettingsSectionView: View {
                         }
                     }
 
-                    Divider().background(Color(white: 0.18))
+                    Divider().background(theme.dividerColor)
 
                     Button(action: { NSApp.terminate(nil) }) {
                         HStack {
@@ -769,10 +806,11 @@ private struct PressedScaleButtonStyle: ButtonStyle {
 
 private struct PillButtonStyle: ButtonStyle {
     let color: Color
+    var foregroundColor: Color = .black
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundColor(.black)
+            .foregroundColor(foregroundColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(color.opacity(configuration.isPressed ? 0.7 : 1.0))

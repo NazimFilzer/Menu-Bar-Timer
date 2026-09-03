@@ -11,7 +11,7 @@ struct SkevalTimerApp: App {
 }
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     var statusItem: NSStatusItem!
     var popover: NSPopover!
     let vm = TimerViewModel()
@@ -41,7 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover.animates = false
         updatePopoverSize()
         let hostingController = NSHostingController(
-            rootView: PopoverView(vm: vm).preferredColorScheme(.dark)
+            rootView: PopoverView(vm: vm)
         )
         hostingController.sizingOptions = []
         popover.contentViewController = hostingController
@@ -50,7 +50,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStateObservation()
         updateStatusItem(force: true)
 
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -63,7 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let hasSprints = !vm.todayLog.completedSprints.isEmpty
         let height: CGFloat
         if vm.isSettingsExpanded {
-            height = hasSprints ? 640 : 570
+            height = hasSprints ? 725 : 655
         } else {
             height = hasSprints ? 590 : 430
         }
@@ -180,6 +181,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             _ = vm.state
             _ = vm.todayLog.accumulatedTotal
             _ = vm.currentPauseElapsed
+            _ = ThemeManager.shared.current
         } onChange: {
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -208,6 +210,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             state: vm.state,
             accumulatedTotal: vm.todayLog.accumulatedTotal,
             pauseElapsed: vm.currentPauseElapsed,
+            theme: ThemeManager.shared.theme,
             force: force
         )
     }
@@ -229,5 +232,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             print("[LaunchAtLogin] Notice: SMAppService requires app to be in /Applications. \(error)")
         }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
     }
 }
