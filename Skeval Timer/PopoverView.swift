@@ -210,7 +210,7 @@ private struct ClockSectionView: View {
     let theme: PopoverTheme
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             Text(vm.isRunning ? vm.currentElapsedLabel : "00:00:00")
                 .font(.system(size: 44, weight: .light, design: .monospaced))
                 .foregroundColor(vm.isPaused ? Color.orange : (vm.isRunning ? theme.neonTeal : theme.textPrimary))
@@ -218,10 +218,33 @@ private struct ClockSectionView: View {
                 .animation(.easeInOut(duration: 0.2), value: vm.currentElapsedLabel)
 
             if vm.isPaused {
-                Label("Sprint paused", systemImage: "pause.circle.fill")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(.orange)
-                    .transition(.opacity)
+                VStack(spacing: 3) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "pause.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("PAUSED FOR \(vm.currentPauseLabel)")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 1.0, green: 0.75, blue: 0.2), Color.orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(Capsule())
+                    .shadow(color: Color.orange.opacity(0.4), radius: 4, y: 1)
+
+                    if vm.hasMultiplePauses {
+                        Text("Total break this sprint: \(vm.totalSprintPausedLabel)")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(Color.orange.opacity(0.85))
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
             } else if vm.todayLog.accumulatedTotal > 0 {
                 HStack(spacing: 5) {
                     Image(systemName: "sum")
@@ -442,9 +465,24 @@ private struct SprintHistorySectionView: View {
 
                 Spacer()
 
-                Text("\(vm.todayLog.completedSprints.count) completed")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
+                HStack(spacing: 5) {
+                    Text("\(vm.todayLog.completedSprints.count) completed")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+
+                    if vm.todayLog.totalPausedDuration > 0 {
+                        Text("•")
+                            .font(.system(size: 9))
+                            .foregroundColor(theme.textSecondary.opacity(0.5))
+                        HStack(spacing: 3) {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 7))
+                            Text("\(vm.todayLog.totalPausedLabel) breaks")
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                        }
+                        .foregroundColor(Color.orange.opacity(0.85))
+                    }
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)
@@ -466,15 +504,15 @@ private struct SprintHistorySectionView: View {
                 .padding(.horizontal, 16)
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 6) {
-                        ForEach(Array(vm.todayLog.completedSprints.enumerated()), id: \.element.id) { idx, sprint in
+                    VStack(spacing: 5) {
+                        ForEach(vm.todayLog.completedSprintsDescending, id: \.sprint.id) { item in
                             SprintCardRow(
-                                index: idx + 1,
-                                sprint: sprint,
-                                isCopied: vm.lastCopiedId == sprint.id,
+                                index: item.index,
+                                sprint: item.sprint,
+                                isCopied: vm.lastCopiedId == item.sprint.id,
                                 theme: theme,
-                                onCopy: { vm.copy(sprint: sprint) },
-                                onDelete: { withAnimation { vm.delete(sprint: sprint) } }
+                                onCopy: { vm.copy(sprint: item.sprint) },
+                                onDelete: { withAnimation { vm.delete(sprint: item.sprint) } }
                             )
                         }
                     }
@@ -498,63 +536,89 @@ private struct SprintCardRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Text("#\(index)")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(theme.neonTeal)
-                .frame(width: 24, alignment: .center)
-                .padding(.vertical, 4)
-                .background(theme.neonTeal.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .frame(width: 22, height: 22)
+                .background(theme.neonTeal.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 2.5) {
                 HStack(spacing: 4) {
                     Text(sprint.startLabel)
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                         .foregroundColor(theme.textPrimary)
                     Text("→")
-                        .font(.system(size: 10, weight: .regular))
+                        .font(.system(size: 9, weight: .regular))
                         .foregroundColor(theme.textSecondary)
                     Text(sprint.endLabel)
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                         .foregroundColor(theme.textPrimary)
                 }
 
-                Text(sprint.durationLabel)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
+                HStack(spacing: 5) {
+                    Text(sprint.hasPause ? "\(sprint.durationLabel) net" : sprint.durationLabel)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+
+                    if sprint.hasPause {
+                        HStack(spacing: 2.5) {
+                            Image(systemName: "pause.fill")
+                                .font(.system(size: 6))
+                            Text(TimeFormatter.format(shortDuration: sprint.pausedDuration))
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 4.5)
+                        .padding(.vertical, 1)
+                        .background(Color.orange.opacity(0.15))
+                        .clipShape(Capsule())
+
+                        Text("·")
+                            .font(.system(size: 8))
+                            .foregroundColor(theme.textSecondary.opacity(0.5))
+
+                        Text("Copied: \(sprint.effectiveEndLabel)")
+                            .font(.system(size: 9, weight: .regular, design: .monospaced))
+                            .foregroundColor(theme.textSecondary.opacity(0.8))
+                    }
+                }
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
-            Button(action: onCopy) {
-                Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(isCopied ? .black : theme.neonTeal)
-                    .padding(6)
-                    .background(isCopied ? theme.neonTeal : theme.neonTeal.opacity(0.12))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .focusable(false)
-            .help(isCopied ? "Copied" : "Copy")
+            HStack(spacing: 4) {
+                Button(action: onCopy) {
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.clipboard")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(isCopied ? .black : theme.neonTeal)
+                        .frame(width: 22, height: 22)
+                        .background(isCopied ? theme.neonTeal : theme.neonTeal.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .help(isCopied ? "Copied" : (sprint.hasPause ? "Actual end: \(sprint.endLabel) · Spreadsheet end: \(sprint.effectiveEndLabel) (\(sprint.pausedLabel) pause deducted)" : "Copy"))
 
-            Button(action: onDelete) {
-                Image(systemName: "trash.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.softRed.opacity(0.7))
-                    .padding(6)
-                    .background(theme.softRed.opacity(0.1))
-                    .clipShape(Circle())
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.softRed.opacity(0.75))
+                        .frame(width: 22, height: 22)
+                        .background(theme.softRed.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .help("Delete sprint")
             }
-            .buttonStyle(.plain)
-            .focusable(false)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
         .background(theme.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(theme.cardBorder, lineWidth: 1))
     }
 }
 
@@ -717,7 +781,9 @@ private struct PillButtonStyle: ButtonStyle {
     }
 }
 
+#if DEBUG && canImport(PreviewsMacros)
 #Preview {
     PopoverView(vm: TimerViewModel())
         .preferredColorScheme(.dark)
 }
+#endif

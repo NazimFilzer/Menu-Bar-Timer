@@ -16,12 +16,12 @@ final class StatusBarPresenter {
         self.statusItem = statusItem
     }
 
-    func update(state: SprintState, accumulatedTotal: TimeInterval, force: Bool = false) {
+    func update(state: SprintState, accumulatedTotal: TimeInterval, pauseElapsed: TimeInterval = 0, force: Bool = false) {
         guard let button = statusItem.button else { return }
         button.title = ""
 
         if state.isRunning {
-            let elapsed = Int(state.currentElapsed)
+            let elapsed = Int(state.isPaused ? pauseElapsed : state.currentElapsed)
             let pillState: PillState = state.isPaused ? .paused : .running
 
             if !force && elapsed == lastSecond && pillState == lastPillState {
@@ -31,7 +31,9 @@ final class StatusBarPresenter {
             lastSecond = elapsed
             lastPillState = pillState
 
-            let text = TimeFormatter.format(clock: state.currentElapsed)
+            let text = state.isPaused
+                ? TimeFormatter.format(clock: pauseElapsed)
+                : TimeFormatter.format(clock: state.currentElapsed)
             button.image = makePillImage(text: text, state: pillState)
             button.image?.isTemplate = false
         } else {

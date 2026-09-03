@@ -10,6 +10,7 @@ class TimerViewModel {
     // MARK: - Observed state
     private(set) var state: SprintState = .idle
     var currentElapsed: TimeInterval = 0
+    var currentPauseElapsed: TimeInterval = 0
     var todayLog: DayLog = DayLog()
     var lastCopiedId: UUID? = nil
 
@@ -36,6 +37,7 @@ class TimerViewModel {
         self.todayLog = effectiveStore.todayLog()
         self.state = effectiveEngine.state
         self.currentElapsed = effectiveEngine.state.currentElapsed
+        self.currentPauseElapsed = effectiveEngine.currentPauseElapsed
 
         setupEngineCallbacks()
     }
@@ -45,6 +47,9 @@ class TimerViewModel {
             guard let self else { return }
             self.state = newState
             self.currentElapsed = newState.currentElapsed
+            if !newState.isPaused {
+                self.currentPauseElapsed = 0
+            }
             self.todayLog = self.store.todayLog()
             if !newState.isRecovery {
                 self.recoveryEndText = ""
@@ -54,6 +59,10 @@ class TimerViewModel {
 
         engine.onTick = { [weak self] elapsed in
             self?.currentElapsed = elapsed
+        }
+
+        engine.onPauseTick = { [weak self] pauseElapsed in
+            self?.currentPauseElapsed = pauseElapsed
         }
 
         engine.onSprintCompleted = { [weak self] sprint in
@@ -77,7 +86,20 @@ class TimerViewModel {
         TimeFormatter.format(clock: currentElapsed)
     }
 
+    var currentPauseLabel: String {
+        TimeFormatter.format(clock: currentPauseElapsed)
+    }
+
+    var totalSprintPausedLabel: String {
+        TimeFormatter.format(duration: engine.totalCurrentSprintPaused)
+    }
+
+    var hasMultiplePauses: Bool {
+        engine.totalCurrentSprintPaused > currentPauseElapsed + 1
+    }
+
     var menuBarTitle: String {
+        if isPaused { return TimeFormatter.format(shortClock: currentPauseElapsed) }
         if isRunning { return TimeFormatter.format(shortClock: currentElapsed) }
         let acc = todayLog.accumulatedTotal
         return acc > 0 ? todayLog.accumulatedShortLabel : ""

@@ -83,9 +83,28 @@ func testDayLogStoreWithInMemoryStorage() {
     assertEqual(dayLog.completedSprints.count, 2)
     assertEqual(dayLog.openSprint?.id, sOpen.id)
 
+    // Verify pause properties on Sprint
+    assertFalse(s1.hasPause)
+    assertTrue(s2.hasPause)
+    assertEqual(s2.pausedLabel, "5m 00s")
+    assertEqual(s2.grossDuration, 1800)
+    assertEqual(s2.duration, 1500)
+
     // Accumulated total: 1800 + (1800 - 300) = 3300
     assertEqual(dayLog.accumulatedTotal, 3300)
     assertEqual(dayLog.accumulatedLabel, "00:55:00")
+
+    // Daily pause total: 0 + 300 = 300
+    assertEqual(dayLog.totalPausedDuration, 300)
+    assertEqual(dayLog.totalPausedLabel, "5m")
+
+    // Verify descending order: s2 (index 2) first, then s1 (index 1)
+    let desc = dayLog.completedSprintsDescending
+    assertEqual(desc.count, 2)
+    assertEqual(desc[0].index, 2)
+    assertEqual(desc[0].sprint.id, s2.id)
+    assertEqual(desc[1].index, 1)
+    assertEqual(desc[1].sprint.id, s1.id)
 
     // Delete sprint
     store.delete(sprint: sOpen)
@@ -116,12 +135,14 @@ func testSprintEngine() {
     engine.pause(at: t1)
     assertTrue(engine.state.isPaused)
     assertTrue(engine.state.isRunning)
+    assertEqual(engine.currentPauseElapsed, 0)
 
     // Resume
     let t2 = t1.addingTimeInterval(60) // 60 seconds of pause
     engine.resume(at: t2)
     assertFalse(engine.state.isPaused)
     assertTrue(engine.state.isRunning)
+    assertEqual(engine.totalCurrentSprintPaused, 60)
 
     // Clock Out
     let t3 = t2.addingTimeInterval(180) // 180 seconds more active work

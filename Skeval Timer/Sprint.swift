@@ -35,6 +35,18 @@ struct Sprint: Identifiable, Codable, Equatable {
         TimeFormatter.format(duration: duration)
     }
 
+    var hasPause: Bool { pausedDuration > 0 }
+    var pausedLabel: String { TimeFormatter.format(duration: pausedDuration) }
+
+    var grossDuration: TimeInterval? {
+        guard let end = endTime else { return nil }
+        return max(0, end.timeIntervalSince(startTime))
+    }
+
+    var grossDurationLabel: String {
+        TimeFormatter.format(duration: grossDuration)
+    }
+
     var startLabel: String { TimeFormatter.format(time: startTime) }
     var endLabel: String { endTime.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
 

@@ -80,7 +80,14 @@ final class SprintEngine {
 
     var onStateChanged: ((SprintState) -> Void)?
     var onTick: ((TimeInterval) -> Void)?
+    var onPauseTick: ((TimeInterval) -> Void)?
     var onSprintCompleted: ((Sprint) -> Void)?
+
+    private(set) var currentPauseElapsed: TimeInterval = 0
+
+    var totalCurrentSprintPaused: TimeInterval {
+        totalPausedDuration + currentPauseElapsed
+    }
 
     private var ticker: Timer? = nil
     private var elapsedAtPauseStart: TimeInterval = 0
@@ -97,20 +104,17 @@ final class SprintEngine {
         stopTicker()
         let today = store.todayLog()
         if let open = today.openSprint {
-            elapsedAtPauseStart = 0
-            pauseStartedAt = nil
-            totalPausedDuration = 0
+            resetPauseState()
             state = .recovery(sprint: open)
         } else {
+            resetPauseState()
             state = .idle
         }
     }
 
     func clockIn(at now: Date = Date()) {
         let sprint = Sprint(startTime: now)
-        elapsedAtPauseStart = 0
-        pauseStartedAt = nil
-        totalPausedDuration = 0
+        resetPauseState()
         store.save(sprint: sprint)
         state = .active(sprint: sprint, elapsed: 0)
         startTicker(resumedAt: now, baseElapsed: 0)
@@ -140,15 +144,19 @@ final class SprintEngine {
         stopTicker()
         elapsedAtPauseStart = elapsed
         pauseStartedAt = now
+        currentPauseElapsed = 0
         state = .paused(sprint: sprint, elapsed: elapsed)
+        startPauseTicker(startedAt: now)
     }
 
     func resume(at now: Date = Date()) {
         guard case .paused(let sprint, _) = state else { return }
+        stopTicker()
         if let pausedAt = pauseStartedAt {
             totalPausedDuration += now.timeIntervalSince(pausedAt)
         }
         pauseStartedAt = nil
+        currentPauseElapsed = 0
         state = .active(sprint: sprint, elapsed: elapsedAtPauseStart)
         startTicker(resumedAt: now, baseElapsed: elapsedAtPauseStart)
     }
@@ -210,6 +218,20 @@ final class SprintEngine {
         }
     }
 
+    private func startPauseTicker(startedAt: Date) {
+        stopTicker()
+        pauseStartedAt = startedAt
+        ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard case .paused = self.state, let start = self.pauseStartedAt else { return }
+                let pauseElapsed = Date().timeIntervalSince(start)
+                self.currentPauseElapsed = pauseElapsed
+                self.onPauseTick?(pauseElapsed)
+            }
+        }
+    }
+
     private func stopTicker() {
         ticker?.invalidate()
         ticker = nil
@@ -220,5 +242,6 @@ final class SprintEngine {
         elapsedAtPauseStart = 0
         pauseStartedAt = nil
         totalPausedDuration = 0
+        currentPauseElapsed = 0
     }
 }

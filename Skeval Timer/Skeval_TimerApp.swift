@@ -164,6 +164,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.updateStatusItem(force: false)
         }
 
+        let previousPauseTick = vm.engine.onPauseTick
+        vm.engine.onPauseTick = { [weak self] pauseElapsed in
+            previousPauseTick?(pauseElapsed)
+            self?.updateStatusItem(force: false)
+        }
+
         observeState()
         observePopoverSize()
     }
@@ -173,6 +179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         withObservationTracking {
             _ = vm.state
             _ = vm.todayLog.accumulatedTotal
+            _ = vm.currentPauseElapsed
         } onChange: {
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -200,6 +207,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         presenter.update(
             state: vm.state,
             accumulatedTotal: vm.todayLog.accumulatedTotal,
+            pauseElapsed: vm.currentPauseElapsed,
             force: force
         )
     }

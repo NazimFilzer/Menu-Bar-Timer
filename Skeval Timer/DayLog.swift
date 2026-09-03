@@ -15,4 +15,14 @@ struct DayLog {
     var accumulatedLabel: String { TimeFormatter.format(clock: accumulatedTotal) }
 
     var accumulatedShortLabel: String { TimeFormatter.format(shortDuration: accumulatedTotal) }
+
+    var totalPausedDuration: TimeInterval {
+        completedSprints.map(\.pausedDuration).reduce(0, +)
+    }
+
+    var totalPausedLabel: String { TimeFormatter.format(shortDuration: totalPausedDuration) }
+
+    var completedSprintsDescending: [(index: Int, sprint: Sprint)] {
+        completedSprints.enumerated().map { ($0.offset + 1, $0.element) }.reversed()
+    }
 }
