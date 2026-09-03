@@ -1,6 +1,6 @@
 import Foundation
 
-struct Sprint: Identifiable, Codable {
+struct Sprint: Identifiable, Codable, Equatable {
     let id: UUID
     let startTime: Date
     var endTime: Date?
@@ -32,30 +32,29 @@ struct Sprint: Identifiable, Codable {
     }
 
     var durationLabel: String {
-        guard let d = duration else { return "in progress" }
-        let h = Int(d) / 3600
-        let m = (Int(d) % 3600) / 60
-        if h > 0 { return "\(h)h \(String(format: "%02d", m))m" }
-        let s = Int(d) % 60
-        if m > 0 { return "\(m)m \(String(format: "%02d", s))s" }
-        return "\(s)s"
+        TimeFormatter.format(duration: duration)
     }
 
-    var startLabel: String { Sprint.fmt(startTime) }
-    var endLabel: String { endTime.map { Sprint.fmt($0) } ?? "--:--:--" }
+    var startLabel: String { TimeFormatter.format(time: startTime) }
+    var endLabel: String { endTime.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
 
     // Effective end = real endTime − pausedDuration
     // This ensures the spreadsheet computes (effectiveEnd − startTime) == net work duration
-    var effectiveEndLabel: String {
-        guard let end = endTime else { return "--:--:--" }
-        return Sprint.fmt(end.addingTimeInterval(-pausedDuration))
+    var effectiveEnd: Date? {
+        guard let end = endTime else { return nil }
+        return end.addingTimeInterval(-pausedDuration)
     }
 
-    var clipboardText: String { "\(startLabel)\t\(effectiveEndLabel)" }
+    var effectiveEndLabel: String {
+        effectiveEnd.map { TimeFormatter.format(time: $0) } ?? "--:--:--"
+    }
+
+    var clipboardText: String {
+        guard let effEnd = effectiveEnd else { return "\(startLabel)\t--:--:--" }
+        return TimeFormatter.clipboardRow(start: startTime, effectiveEnd: effEnd)
+    }
 
     static func fmt(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f.string(from: date)
+        TimeFormatter.format(time: date)
     }
 }

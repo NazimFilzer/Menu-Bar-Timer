@@ -28,3 +28,24 @@ User action that starts a new Sprint, recording `startTime = now`.
 ## Clock Out
 User action that ends the current Sprint, recording `endTime = now`, then copying
 `startTime\tendTime` (tab-separated, HH:mm:ss) to the system clipboard.
+
+## Paused Duration
+Total duration a sprint spent in a paused state, excluded from net work duration so
+`(endTime - startTime - pausedDuration)` equals net work duration.
+
+## Effective End Time
+The virtual end time `(endTime - pausedDuration)` formatted for clipboard export so
+external spreadsheets compute net work duration directly via simple subtraction.
+
+## Sprint Engine
+The stateful domain engine governing the lifecycle of a Sprint (`idle`, `active`, `paused`, `recovery`),
+handling clock ticks, pause intervals, recovery invariants, and milestone notification triggers.
+
+## Day Log Store
+The persistence module managing day-grouped sprint logs behind a storage seam
+(`DiskDayLogAdapter` for production, `InMemoryDayLogAdapter` for testing).
+
+## Status Presenter
+The menu bar visual presenter responsible for rendering state pills (idle, active, paused)
+and synchronizing with engine ticks.
+
