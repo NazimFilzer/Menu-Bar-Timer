@@ -224,6 +224,115 @@ func testAppThemes() {
     assertFalse(manager.theme.isLight)
 }
 
+@MainActor
+func testRapidPauseResumeCycles() {
+    print("Running Rapid Pause/Resume Cycle tests...")
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+
+    let t0 = Date()
+    engine.clockIn(at: t0)
+    assertTrue(engine.state.isRunning)
+    assertFalse(engine.state.isPaused)
+
+    // Simulate 10 rapid successive pause/resume toggles
+    var cur = t0
+    for i in 1...10 {
+        cur = cur.addingTimeInterval(5)
+        engine.pause(at: cur)
+        assertTrue(engine.state.isPaused, "Should be paused at cycle \(i)")
+
+        cur = cur.addingTimeInterval(2)
+        engine.resume(at: cur)
+        assertTrue(engine.state.isRunning, "Should be running at cycle \(i)")
+        assertFalse(engine.state.isPaused, "Should not be paused at cycle \(i)")
+        assertEqual(engine.totalCurrentSprintPaused, Double(i * 2), "Accumulated paused duration should equal \(i * 2)")
+    }
+
+    // Final clock out
+    cur = cur.addingTimeInterval(10)
+    var finished: Sprint? = nil
+    engine.onSprintCompleted = { s in finished = s }
+    engine.clockOut(at: cur)
+
+    assertEqual(engine.state, .idle)
+    assertTrue(finished != nil)
+    assertEqual(finished?.pausedDuration, 20) // 10 cycles * 2s
+    // Total gross elapsed: 10 * (5 + 2) + 10 = 80s
+    // Net duration: 80 - 20 = 60s
+    assertEqual(finished?.duration, 60)
+}
+
+@MainActor
+func testCrashRecoveryAndPausePersistence() {
+    print("Running Crash Recovery & Pause Persistence tests...")
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine1 = SprintEngine(store: store)
+
+    let t0 = Date()
+    engine1.clockIn(at: t0)
+
+    // Run active for 100s, then pause
+    let t1 = t0.addingTimeInterval(100)
+    engine1.pause(at: t1)
+
+    // Simulate unexpected crash/quit while paused:
+    // Create brand new SprintEngine with the same underlying store
+    let engine2 = SprintEngine(store: store)
+    assertTrue(engine2.state.isRecovery, "Should enter recovery mode after crash")
+    guard case .recovery(let openSprint) = engine2.state else {
+        assertTrue(false, "Engine should be in recovery state")
+        return
+    }
+    assertTrue(openSprint.isPaused, "Recovered sprint should remember it was paused")
+    assertEqual(openSprint.pauseStartedAt, t1, "Recovered sprint should preserve pauseStartedAt")
+    assertEqual(openSprint.pauseCount, 1, "Recovered sprint should preserve pauseCount")
+
+    // Resume from recovery 60s later:
+    let t2 = t1.addingTimeInterval(60)
+    engine2.resumeRecovery(at: t2)
+    assertFalse(engine2.state.isPaused, "Should resume in active state")
+    assertTrue(engine2.state.isRunning, "Should be running after recovery resume")
+    assertEqual(engine2.totalCurrentSprintPaused, 60, "Paused time during crash should be credited as pausedDuration")
+    assertEqual(engine2.state.currentElapsed, 100, "Net active work elapsed should be 100s")
+
+    // Run active for 200s more, then clock out
+    let t3 = t2.addingTimeInterval(200)
+    var finished: Sprint? = nil
+    engine2.onSprintCompleted = { s in finished = s }
+    engine2.clockOut(at: t3)
+
+    assertEqual(finished?.pausedDuration, 60)
+    assertEqual(finished?.duration, 300) // 100s + 200s
+    assertEqual(finished?.effectiveEnd, t3.addingTimeInterval(-60))
+
+    // Cross-midnight recovery test
+    let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date().addingTimeInterval(-86400)
+    let yesterdayOpenSprint = Sprint(startTime: yesterday)
+    store.save(sprint: yesterdayOpenSprint)
+    let engine3 = SprintEngine(store: store)
+    assertTrue(engine3.state.isRecovery, "Should recover open sprint even across midnight")
+    assertEqual(engine3.state.currentSprint?.id, yesterdayOpenSprint.id)
+
+    // Backward-compatibility JSON decode test
+    let legacyJSON = """
+    {
+        "id": "E621E1F8-C36C-495A-93FC-0C247A3E6E5F",
+        "startTime": "2026-09-04T00:00:00Z"
+    }
+    """.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let decoded = try? decoder.decode(Sprint.self, from: legacyJSON)
+    assertTrue(decoded != nil, "Legacy JSON should decode successfully")
+    assertEqual(decoded?.pausedDuration, 0)
+    assertEqual(decoded?.isPaused, false)
+    assertEqual(decoded?.pauseStartedAt, nil)
+    assertEqual(decoded?.pauseCount, 0)
+}
+
 // MARK: - Main Runner
 
 @main
@@ -237,6 +346,8 @@ struct TestMain {
         testDayLogStoreWithInMemoryStorage()
         await MainActor.run {
             testSprintEngine()
+            testRapidPauseResumeCycles()
+            testCrashRecoveryAndPausePersistence()
             testAppThemes()
         }
 

@@ -93,6 +93,7 @@ final class SprintEngine {
     private var elapsedAtPauseStart: TimeInterval = 0
     private var pauseStartedAt: Date? = nil
     private var totalPausedDuration: TimeInterval = 0
+    private var pauseCount: Int = 0
     private var activeResumedAt: Date? = nil
 
     init(store: DayLogStore? = nil) {
@@ -102,9 +103,11 @@ final class SprintEngine {
 
     func reload() {
         stopTicker()
-        let today = store.todayLog()
-        if let open = today.openSprint {
-            resetPauseState()
+        if let (_, open) = store.findOpenSprint() {
+            totalPausedDuration = open.pausedDuration
+            pauseStartedAt = open.pauseStartedAt
+            pauseCount = open.pauseCount
+            currentPauseElapsed = 0
             state = .recovery(sprint: open)
         } else {
             resetPauseState()
@@ -130,6 +133,9 @@ final class SprintEngine {
 
         updated.endTime = now
         updated.pausedDuration = totalPausedDuration
+        updated.isPaused = false
+        updated.pauseStartedAt = nil
+        updated.pauseCount = pauseCount
 
         stopTicker()
         resetPauseState()
@@ -140,23 +146,38 @@ final class SprintEngine {
     }
 
     func pause(at now: Date = Date()) {
-        guard case .active(let sprint, let elapsed) = state else { return }
+        guard case .active(var sprint, let elapsed) = state else { return }
         stopTicker()
         elapsedAtPauseStart = elapsed
         pauseStartedAt = now
         currentPauseElapsed = 0
+        pauseCount += 1
+
+        sprint.isPaused = true
+        sprint.pauseStartedAt = now
+        sprint.pausedDuration = totalPausedDuration
+        sprint.pauseCount = pauseCount
+        store.save(sprint: sprint)
+
         state = .paused(sprint: sprint, elapsed: elapsed)
         startPauseTicker(startedAt: now)
     }
 
     func resume(at now: Date = Date()) {
-        guard case .paused(let sprint, _) = state else { return }
+        guard case .paused(var sprint, _) = state else { return }
         stopTicker()
         if let pausedAt = pauseStartedAt {
             totalPausedDuration += now.timeIntervalSince(pausedAt)
         }
         pauseStartedAt = nil
         currentPauseElapsed = 0
+
+        sprint.isPaused = false
+        sprint.pauseStartedAt = nil
+        sprint.pausedDuration = totalPausedDuration
+        sprint.pauseCount = pauseCount
+        store.save(sprint: sprint)
+
         state = .active(sprint: sprint, elapsed: elapsedAtPauseStart)
         startTicker(resumedAt: now, baseElapsed: elapsedAtPauseStart)
     }
@@ -171,9 +192,21 @@ final class SprintEngine {
     }
 
     func resumeRecovery(at now: Date = Date()) {
-        guard case .recovery(let sprint) = state else { return }
-        resetPauseState()
-        let elapsed = max(0, now.timeIntervalSince(sprint.startTime))
+        guard case .recovery(var sprint) = state else { return }
+        if sprint.isPaused, let pStart = sprint.pauseStartedAt {
+            totalPausedDuration += max(0, now.timeIntervalSince(pStart))
+            sprint.isPaused = false
+            sprint.pauseStartedAt = nil
+        }
+        sprint.pausedDuration = totalPausedDuration
+        sprint.pauseCount = pauseCount
+        store.save(sprint: sprint)
+
+        pauseStartedAt = nil
+        currentPauseElapsed = 0
+
+        let gross = max(0, now.timeIntervalSince(sprint.startTime))
+        let elapsed = max(0, gross - totalPausedDuration)
         state = .active(sprint: sprint, elapsed: elapsed)
         startTicker(resumedAt: now, baseElapsed: elapsed)
     }
@@ -187,7 +220,16 @@ final class SprintEngine {
             throw RecoveryError.mustBeAfterStart(TimeFormatter.format(time: sprint.startTime))
         }
 
+        if sprint.isPaused, let pStart = sprint.pauseStartedAt, end > pStart {
+            totalPausedDuration += end.timeIntervalSince(pStart)
+        }
+
         sprint.endTime = end
+        sprint.pausedDuration = totalPausedDuration
+        sprint.isPaused = false
+        sprint.pauseStartedAt = nil
+        sprint.pauseCount = pauseCount
+
         store.save(sprint: sprint)
         resetPauseState()
         state = .idle
@@ -243,5 +285,6 @@ final class SprintEngine {
         pauseStartedAt = nil
         totalPausedDuration = 0
         currentPauseElapsed = 0
+        pauseCount = 0
     }
 }

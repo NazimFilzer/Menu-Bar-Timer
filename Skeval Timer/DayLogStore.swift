@@ -23,6 +23,17 @@ final class DayLogStore: @unchecked Sendable {
         return DayLog(sprints: logs[key] ?? [])
     }
 
+    func findOpenSprint() -> (dayKey: String, sprint: Sprint)? {
+        lock.lock()
+        defer { lock.unlock() }
+        for (key, bucket) in logs {
+            if let open = bucket.first(where: { $0.isOpen }) {
+                return (key, open)
+            }
+        }
+        return nil
+    }
+
     func save(sprint: Sprint) {
         lock.lock()
         let key = TimeFormatter.format(dateKey: sprint.startTime)

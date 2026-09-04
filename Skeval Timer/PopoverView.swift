@@ -131,16 +131,21 @@ private struct RecoveryBannerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Unfinished sprint from \(vm.currentSprint?.startLabel ?? "")",
-                  systemImage: "exclamationmark.circle.fill")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(.orange)
+            HStack(spacing: 4) {
+                Label("Unfinished sprint from \(vm.currentSprint?.startLabel ?? "")",
+                      systemImage: "exclamationmark.circle.fill")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(.orange)
+                if let sprint = vm.currentSprint, sprint.hasPause {
+                    Text("(\(sprint.pausedLabel) paused)")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                }
+            }
 
             HStack(spacing: 8) {
                 Button("Resume ▶") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        vm.resumeRecovery()
-                    }
+                    vm.resumeRecovery()
                 }
                 .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
                 .focusable(false)
@@ -158,14 +163,14 @@ private struct RecoveryBannerView: View {
                     .focusable(false)
 
                 Button("Save") {
-                    withAnimation { vm.saveRecoveryEndTime() }
+                    vm.saveRecoveryEndTime()
                 }
                 .buttonStyle(PillButtonStyle(color: Color(white: 0.7)))
                 .focusable(false)
 
                 Spacer()
 
-                Button(action: { withAnimation { vm.dismissRecovery() } }) {
+                Button(action: { vm.dismissRecovery() }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(theme.textSecondary)
@@ -399,7 +404,7 @@ private struct ActionSectionView: View {
             .disabled(vm.recoveryMode)
 
             if vm.currentSprint != nil {
-                Button(action: { withAnimation { vm.reset() } }) {
+                Button(action: { vm.reset() }) {
                     Label("Discard current sprint", systemImage: "xmark.circle")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(theme.textSecondary)
@@ -415,15 +420,11 @@ private struct ActionSectionView: View {
     }
 
     private func mainAction() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-            vm.isRunning ? vm.clockOut() : vm.clockIn()
-        }
+        vm.isRunning ? vm.clockOut() : vm.clockIn()
     }
 
     private func pauseResumeAction() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            vm.isPaused ? vm.resumeTimer() : vm.pause()
-        }
+        vm.isPaused ? vm.resumeTimer() : vm.pause()
     }
 }
 

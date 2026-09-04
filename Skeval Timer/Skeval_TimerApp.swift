@@ -180,7 +180,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         withObservationTracking {
             _ = vm.state
             _ = vm.todayLog.accumulatedTotal
-            _ = vm.currentPauseElapsed
             _ = ThemeManager.shared.current
         } onChange: {
             Task { @MainActor [weak self] in
