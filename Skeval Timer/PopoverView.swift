@@ -33,6 +33,9 @@ struct PopoverView: View {
                 if vm.recoveryMode {
                     RecoveryBannerView(vm: vm, theme: theme)
                         .transition(.move(edge: .top).combined(with: .opacity))
+                } else if vm.hasPendingSleepResolution, let interval = vm.pendingSleepInterval {
+                    SleepResolutionBannerView(vm: vm, interval: interval, theme: theme)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 ClockSectionView(vm: vm, theme: theme)
@@ -101,22 +104,43 @@ private struct PopoverHeaderView: View {
             Spacer()
 
             HStack(spacing: 6) {
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: dotColor.opacity(0.9), radius: vm.isRunning ? 8 : 0)
+                Button(action: {
+                    AppDelegate.openDashboard()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "macwindow")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("Dashboard")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(theme.neonTeal.opacity(0.12))
+                    .foregroundColor(theme.neonTeal)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(theme.neonTeal.opacity(0.3), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .help("Open Dashboard Window")
 
-                Text(vm.statusTitle)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(dotColor)
-                    .textCase(.uppercase)
-                    .kerning(0.8)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(dotColor)
+                        .frame(width: 8, height: 8)
+                        .shadow(color: dotColor.opacity(0.9), radius: vm.isRunning ? 8 : 0)
+
+                    Text(vm.statusTitle)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(dotColor)
+                        .textCase(.uppercase)
+                        .kerning(0.8)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(theme.cardBg)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(theme.cardBorder, lineWidth: 1))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(theme.cardBg)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(theme.cardBorder, lineWidth: 1))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -191,6 +215,71 @@ private struct RecoveryBannerView: View {
     }
 }
 
+// MARK: - Sleep Resolution Banner View
+
+private struct SleepResolutionBannerView: View {
+    @Bindable var vm: TimerViewModel
+    let interval: SleepInterval
+    let theme: PopoverTheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 5) {
+                Image(systemName: "powersleep")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color.indigo)
+
+                Text("Mac was asleep: \(interval.formattedWindow)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(theme.textPrimary)
+
+                Spacer()
+
+                Text(interval.formattedDuration)
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.indigo.opacity(0.2))
+                    .foregroundColor(Color.indigo)
+                    .clipShape(Capsule())
+            }
+
+            Text("Count duration as work or paused?")
+                .font(.system(size: 10, weight: .regular, design: .rounded))
+                .foregroundColor(theme.textSecondary)
+
+            HStack(spacing: 8) {
+                Button(action: {
+                    vm.resolveSleep(countAsWork: true)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "briefcase.fill")
+                            .font(.system(size: 9))
+                        Text("Count as Work")
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
+                .focusable(false)
+
+                Button(action: {
+                    vm.resolveSleep(countAsWork: false)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 9))
+                        Text("Count as Paused")
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: Color(white: 0.7), foregroundColor: .black))
+                .focusable(false)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.indigo.opacity(0.12))
+    }
+}
+
 // MARK: - Clock Section View
 
 private struct ClockSectionView: View {
@@ -239,6 +328,14 @@ private struct ClockSectionView: View {
                         .font(.system(size: 10, weight: .bold))
                     Text("Today's Total: \(vm.todayLog.accumulatedLabel)")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
+
+                    if vm.goal.hourlyRate > 0 {
+                        Text("•")
+                            .foregroundColor(theme.textSecondary.opacity(0.5))
+                        Text(vm.todayEarningsLabel)
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(theme.neonTeal)
+                    }
                 }
                 .foregroundColor(theme.textSecondary)
                 .padding(.top, 2)
@@ -328,8 +425,9 @@ private struct TimestampCard: View {
 // MARK: - Action Section View
 
 private struct ActionSectionView: View {
-    let vm: TimerViewModel
+    @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
+    @State private var liveTagInput: String = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -347,6 +445,90 @@ private struct ActionSectionView: View {
                     isHighlighted: false,
                     theme: theme
                 )
+            }
+
+            // Tag Assignment Row
+            if vm.isRunning {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.neonTeal)
+
+                    if let tag = vm.currentTag, !tag.isEmpty {
+                        Text("#\(tag)")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                            .foregroundColor(theme.neonTeal)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2.5)
+                            .background(theme.neonTeal.opacity(0.14))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+
+                        Button(action: {
+                            vm.setTag(nil)
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        TextField("Add sprint tag (e.g. dev, client)...", text: $liveTagInput, onCommit: {
+                            let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            vm.setTag(clean.isEmpty ? nil : clean)
+                            liveTagInput = ""
+                        })
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10.5, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+
+                        if !liveTagInput.isEmpty {
+                            Button(action: {
+                                let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                                vm.setTag(clean.isEmpty ? nil : clean)
+                                liveTagInput = ""
+                            }) {
+                                Text("Set")
+                                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                    .foregroundColor(theme.neonTeal)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.cardBg.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textSecondary)
+                    Text("#")
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(theme.neonTeal)
+                    TextField("Sprint tag (optional)", text: $vm.pendingTag)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10.5, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+
+                    if !vm.pendingTag.isEmpty {
+                        Button(action: { vm.pendingTag = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.cardBg.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
             }
 
             if vm.isRunning {

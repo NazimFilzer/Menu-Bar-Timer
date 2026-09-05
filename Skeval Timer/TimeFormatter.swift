@@ -71,6 +71,12 @@ enum TimeFormatter {
         return dateKeyFormatter.string(from: dateKey)
     }
 
+    static func parseDateKey(_ key: String) -> Date? {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        return dateKeyFormatter.date(from: key)
+    }
+
     static func format(headerDate: Date) -> String {
         formatterLock.lock()
         defer { formatterLock.unlock() }
@@ -94,5 +100,14 @@ enum TimeFormatter {
         c.minute = parts[1]
         c.second = sec
         return Calendar.current.date(from: c)
+    }
+
+    static func combine(date: Date, time: Date, wrapIfBefore: Date? = nil, calendar: Calendar = .current) -> Date {
+        let timeComps = calendar.dateComponents([.hour, .minute, .second], from: time)
+        var result = calendar.date(bySettingHour: timeComps.hour ?? 0, minute: timeComps.minute ?? 0, second: timeComps.second ?? 0, of: date) ?? time
+        if let baseline = wrapIfBefore, result < baseline {
+            result = calendar.date(byAdding: .day, value: 1, to: result) ?? result
+        }
+        return result
     }
 }

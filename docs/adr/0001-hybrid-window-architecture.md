@@ -1,0 +1,3 @@
+# Hybrid Menu Bar and Dashboard Window Architecture
+
+Skeval Timer v1 operates strictly as an accessory (`.accessory`) menu bar application with an NSPopover. For v2, we decided to adopt a dynamic hybrid activation policy where the app runs as an accessory by default in the menu bar, but transitions to a regular (`.regular`) app with Dock and Cmd+Tab presence whenever the full Dashboard window is open. This preserves a lightweight, distraction-free workflow while active in the background, while providing native macOS window management and multi-view navigation when reviewing analytics or editing sprint logs.

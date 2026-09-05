@@ -17,10 +17,20 @@ final class DayLogStore: @unchecked Sendable {
     }
 
     func log(for date: Date) -> DayLog {
+        let key = TimeFormatter.format(dateKey: date)
+        return log(for: key)
+    }
+
+    func log(for dateKey: String) -> DayLog {
         lock.lock()
         defer { lock.unlock() }
-        let key = TimeFormatter.format(dateKey: date)
-        return DayLog(sprints: logs[key] ?? [])
+        return DayLog(sprints: logs[dateKey] ?? [])
+    }
+
+    func allLogs() -> [String: [Sprint]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return logs
     }
 
     func findOpenSprint() -> (dayKey: String, sprint: Sprint)? {
@@ -36,14 +46,26 @@ final class DayLogStore: @unchecked Sendable {
 
     func save(sprint: Sprint) {
         lock.lock()
-        let key = TimeFormatter.format(dateKey: sprint.startTime)
-        var bucket = logs[key] ?? []
-        if let idx = bucket.firstIndex(where: { $0.id == sprint.id }) {
-            bucket[idx] = sprint
-        } else {
-            bucket.append(sprint)
+        let newKey = TimeFormatter.format(dateKey: sprint.startTime)
+        for (key, bucket) in logs where key != newKey {
+            if bucket.contains(where: { $0.id == sprint.id }) {
+                var updatedBucket = bucket
+                updatedBucket.removeAll { $0.id == sprint.id }
+                if updatedBucket.isEmpty {
+                    logs.removeValue(forKey: key)
+                } else {
+                    logs[key] = updatedBucket
+                }
+            }
         }
-        logs[key] = bucket
+        var targetBucket = logs[newKey] ?? []
+        if let idx = targetBucket.firstIndex(where: { $0.id == sprint.id }) {
+            targetBucket[idx] = sprint
+        } else {
+            targetBucket.append(sprint)
+        }
+        targetBucket.sort { $0.startTime < $1.startTime }
+        logs[newKey] = targetBucket
         let snapshot = logs
         lock.unlock()
 
@@ -51,17 +73,37 @@ final class DayLogStore: @unchecked Sendable {
     }
 
     func delete(sprint: Sprint) {
+        delete(sprintId: sprint.id, preferredDate: sprint.startTime)
+    }
+
+    func delete(sprintId: UUID, preferredDate: Date? = nil) {
         lock.lock()
-        let key = TimeFormatter.format(dateKey: sprint.startTime)
-        guard var bucket = logs[key] else {
-            lock.unlock()
-            return
+        var found = false
+        if let pref = preferredDate {
+            let key = TimeFormatter.format(dateKey: pref)
+            if var bucket = logs[key], let idx = bucket.firstIndex(where: { $0.id == sprintId }) {
+                bucket.remove(at: idx)
+                if bucket.isEmpty {
+                    logs.removeValue(forKey: key)
+                } else {
+                    logs[key] = bucket
+                }
+                found = true
+            }
         }
-        bucket.removeAll { $0.id == sprint.id }
-        if bucket.isEmpty {
-            logs.removeValue(forKey: key)
-        } else {
-            logs[key] = bucket
+        if !found {
+            for (key, bucket) in logs {
+                if let idx = bucket.firstIndex(where: { $0.id == sprintId }) {
+                    var updated = bucket
+                    updated.remove(at: idx)
+                    if updated.isEmpty {
+                        logs.removeValue(forKey: key)
+                    } else {
+                        logs[key] = updated
+                    }
+                    break
+                }
+            }
         }
         let snapshot = logs
         lock.unlock()

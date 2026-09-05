@@ -2,15 +2,16 @@ import Foundation
 
 struct Sprint: Identifiable, Codable, Equatable {
     let id: UUID
-    let startTime: Date
+    var startTime: Date
     var endTime: Date?
     // Total seconds the sprint was paused (excluded from net work duration)
     var pausedDuration: TimeInterval
     var isPaused: Bool
     var pauseStartedAt: Date?
     var pauseCount: Int
+    var tag: String?
 
-    init(id: UUID = UUID(), startTime: Date, endTime: Date? = nil, pausedDuration: TimeInterval = 0, isPaused: Bool = false, pauseStartedAt: Date? = nil, pauseCount: Int = 0) {
+    init(id: UUID = UUID(), startTime: Date, endTime: Date? = nil, pausedDuration: TimeInterval = 0, isPaused: Bool = false, pauseStartedAt: Date? = nil, pauseCount: Int = 0, tag: String? = nil) {
         self.id = id
         self.startTime = startTime
         self.endTime = endTime
@@ -18,6 +19,7 @@ struct Sprint: Identifiable, Codable, Equatable {
         self.isPaused = isPaused
         self.pauseStartedAt = pauseStartedAt
         self.pauseCount = pauseCount
+        self.tag = tag
     }
 
     // Backward-compat decode: old JSON has no pausedDuration key → default 0
@@ -30,6 +32,7 @@ struct Sprint: Identifiable, Codable, Equatable {
         isPaused = (try? c.decodeIfPresent(Bool.self, forKey: .isPaused)) ?? false
         pauseStartedAt = try? c.decodeIfPresent(Date.self, forKey: .pauseStartedAt)
         pauseCount = (try? c.decodeIfPresent(Int.self, forKey: .pauseCount)) ?? 0
+        tag = try? c.decodeIfPresent(String.self, forKey: .tag)
     }
 
     var isOpen: Bool { endTime == nil }

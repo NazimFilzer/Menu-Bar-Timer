@@ -4,6 +4,7 @@
 A single, contiguous block of work. Bounded by one Clock In and one Clock Out.
 Has: `id`, `startTime`, `endTime?` (nil if open). Duration is computed (`endTime - startTime`).
 A sprint always belongs to the calendar day of its `startTime`, even if it crosses midnight.
+_Avoid_: Work Log, Session, Task
 
 ## Day Log
 All sprints for one calendar day, keyed by the date of each sprint's `startTime` (`yyyy-MM-dd`).
@@ -21,6 +22,30 @@ Resolved by: **Resume** (timer resumes from original startTime) or **Set End Tim
 ## Daily Goal
 A configurable target for Accumulated Total per day. Default: 8 hours.
 Progress = Accumulated Total ÷ Daily Goal.
+
+## Weekly Goal
+A configurable target for total accumulated work duration across a 7-day calendar week.
+_Avoid_: Week Target
+
+## Monthly Goal
+A configurable target for total accumulated work duration across a calendar month.
+_Avoid_: Month Target
+
+## Hourly Rate
+A configurable monetary rate applied per hour of completed work duration.
+_Avoid_: Wage, Pay Rate
+
+## Earnings
+The monetary value calculated by multiplying completed work duration by the Hourly Rate.
+_Avoid_: Income, Revenue
+
+## Tag
+A lightweight text label assigned to a Sprint to categorize work (e.g., #client, #dev).
+_Avoid_: Category, Project, Kanban Task
+
+## Sleep Interval
+A contiguous period during an active Sprint when macOS was in a system sleep state, bounded by recorded sleep and wake timestamps.
+_Avoid_: System Pause, Idle Gap
 
 ## Clock In
 User action that starts a new Sprint, recording `startTime = now`.
