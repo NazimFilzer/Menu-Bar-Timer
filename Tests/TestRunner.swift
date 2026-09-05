@@ -333,6 +333,52 @@ func testCrashRecoveryAndPausePersistence() {
     assertEqual(decoded?.pauseCount, 0)
 }
 
+import Carbon
+
+@MainActor
+func testGlobalHotkeys() {
+    print("Running Global Hotkey tests...")
+
+    // Verify key codes: C = 8 (0x08), P = 35 (0x23)
+    assertEqual(Int(kVK_ANSI_C), 8, "kVK_ANSI_C must be 8")
+    assertEqual(Int(kVK_ANSI_P), 35, "kVK_ANSI_P must be 35")
+
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+
+    // Simulation of triggerPauseToggle()
+    func simulatePauseToggle() {
+        if case .paused = engine.state {
+            engine.resume()
+        } else if case .active = engine.state {
+            engine.pause()
+        }
+    }
+
+    // Idle state: hotkey has no effect
+    simulatePauseToggle()
+    assertEqual(engine.state, .idle)
+
+    // Start running
+    engine.clockIn()
+    assertTrue(engine.state.isRunning)
+    assertFalse(engine.state.isPaused)
+
+    // Hotkey: Active -> Paused
+    simulatePauseToggle()
+    assertTrue(engine.state.isPaused)
+
+    // Hotkey: Paused -> Active (Resumed)
+    simulatePauseToggle()
+    assertFalse(engine.state.isPaused)
+    assertTrue(engine.state.isRunning)
+
+    // Clean up
+    engine.clockOut()
+    assertEqual(engine.state, .idle)
+}
+
 // MARK: - Main Runner
 
 @main
@@ -349,6 +395,7 @@ struct TestMain {
             testRapidPauseResumeCycles()
             testCrashRecoveryAndPausePersistence()
             testAppThemes()
+            testGlobalHotkeys()
         }
 
         print("----------------------------------------")

@@ -105,6 +105,10 @@ class TimerViewModel {
         TimeFormatter.format(duration: engine.totalCurrentSprintPaused)
     }
 
+    var totalCurrentSprintPaused: TimeInterval {
+        engine.totalCurrentSprintPaused
+    }
+
     var hasMultiplePauses: Bool {
         engine.totalCurrentSprintPaused > currentPauseElapsed + 1
     }

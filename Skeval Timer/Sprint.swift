@@ -58,6 +58,7 @@ struct Sprint: Identifiable, Codable, Equatable {
 
     var startLabel: String { TimeFormatter.format(time: startTime) }
     var endLabel: String { endTime.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
+    var pauseStartedLabel: String { pauseStartedAt.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
 
     // Effective end = real endTime − pausedDuration
     // This ensures the spreadsheet computes (effectiveEnd − startTime) == net work duration

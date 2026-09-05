@@ -305,6 +305,7 @@ private struct TimestampCard: View {
     let title: String
     let value: String
     var isHighlighted: Bool = false
+    var highlightColor: Color? = nil
     let theme: PopoverTheme
 
     var body: some View {
@@ -315,13 +316,16 @@ private struct TimestampCard: View {
                 .kerning(0.6)
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(isHighlighted ? theme.neonTeal : theme.textSecondary)
+                .foregroundColor(isHighlighted ? (highlightColor ?? theme.neonTeal) : theme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(theme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isHighlighted && highlightColor != nil ? highlightColor!.opacity(0.35) : theme.cardBorder, lineWidth: 1)
+        )
     }
 }
 
@@ -334,19 +338,62 @@ private struct ActionSectionView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                TimestampCard(
-                    title: "START TIME",
-                    value: vm.currentSprint?.startLabel ?? "--:--:--",
-                    isHighlighted: vm.currentSprint != nil,
-                    theme: theme
-                )
+                if let sprint = vm.currentSprint {
+                    TimestampCard(
+                        title: "START TIME",
+                        value: sprint.startLabel,
+                        isHighlighted: true,
+                        highlightColor: theme.neonTeal,
+                        theme: theme
+                    )
 
-                TimestampCard(
-                    title: "END TIME",
-                    value: vm.currentSprint?.endLabel ?? "--:--:--",
-                    isHighlighted: false,
-                    theme: theme
-                )
+                    if vm.isPaused {
+                        TimestampCard(
+                            title: "PAUSED AT",
+                            value: sprint.pauseStartedLabel,
+                            isHighlighted: true,
+                            highlightColor: .orange,
+                            theme: theme
+                        )
+                    } else {
+                        TimestampCard(
+                            title: "TOTAL BREAKS",
+                            value: TimeFormatter.format(clock: vm.totalCurrentSprintPaused),
+                            isHighlighted: vm.totalCurrentSprintPaused > 0,
+                            highlightColor: vm.totalCurrentSprintPaused > 0 ? .orange.opacity(0.85) : nil,
+                            theme: theme
+                        )
+                    }
+                } else if let lastSprint = vm.todayLog.completedSprints.last {
+                    TimestampCard(
+                        title: "PREV START",
+                        value: lastSprint.startLabel,
+                        isHighlighted: false,
+                        theme: theme
+                    )
+
+                    TimestampCard(
+                        title: "PREV END",
+                        value: lastSprint.endLabel,
+                        isHighlighted: true,
+                        highlightColor: theme.textPrimary,
+                        theme: theme
+                    )
+                } else {
+                    TimestampCard(
+                        title: "START TIME",
+                        value: "--:--:--",
+                        isHighlighted: false,
+                        theme: theme
+                    )
+
+                    TimestampCard(
+                        title: "TOTAL BREAKS",
+                        value: "--:--:--",
+                        isHighlighted: false,
+                        theme: theme
+                    )
+                }
             }
 
             if vm.isRunning {
@@ -372,6 +419,7 @@ private struct ActionSectionView: View {
                     }
                     .buttonStyle(PressedScaleButtonStyle())
                     .disabled(vm.recoveryMode)
+                    .help("Pause / Resume (⌘⌥⇧P)")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -402,6 +450,7 @@ private struct ActionSectionView: View {
             .buttonStyle(PressedScaleButtonStyle())
             .focusable(false)
             .disabled(vm.recoveryMode)
+            .help(vm.isRunning ? "Clock Out & Copy (⌘⌥⇧C)" : "Clock In (⌘⌥⇧C)")
 
             if vm.currentSprint != nil {
                 Button(action: { vm.reset() }) {
@@ -749,12 +798,34 @@ private struct SettingsSectionView: View {
                         Image(systemName: "keyboard")
                             .font(.system(size: 10))
                             .foregroundColor(theme.textSecondary)
-                        Text("Global hotkey:")
+                        Text("Clock In / Out:")
                             .font(.system(size: 10, weight: .regular, design: .rounded))
                             .foregroundColor(theme.textSecondary)
                         Spacer()
                         HStack(spacing: 3) {
                             ForEach(["⌘", "⌥", "⇧", "C"], id: \.self) { key in
+                                Text(key)
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(theme.textPrimary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(theme.cardBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.cardBorder, lineWidth: 1))
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(theme.textSecondary)
+                        Text("Pause / Resume:")
+                            .font(.system(size: 10, weight: .regular, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                        Spacer()
+                        HStack(spacing: 3) {
+                            ForEach(["⌘", "⌥", "⇧", "P"], id: \.self) { key in
                                 Text(key)
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                                     .foregroundColor(theme.textPrimary)

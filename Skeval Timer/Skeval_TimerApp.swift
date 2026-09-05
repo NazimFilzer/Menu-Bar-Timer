@@ -17,11 +17,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     let vm = TimerViewModel()
     private var presenter: StatusBarPresenter!
 
-    // Global Carbon hotkey & local monitor (⌘+⌥+Shift+C)
-    private var hotKeyRef: EventHotKeyRef?
+    // Global Carbon hotkeys & local monitor:
+    // ⌘+⌥+Shift+C -> Clock In / Out
+    // ⌘+⌥+Shift+P -> Pause / Resume
+    private var clockHotKeyRef: EventHotKeyRef?
+    private var pauseHotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private var localHotkeyMonitor: Any? = nil
-    private var lastHotkeyTriggerTime: Date = .distantPast
+    private var lastClockHotkeyTriggerTime: Date = .distantPast
+    private var lastPauseHotkeyTriggerTime: Date = .distantPast
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -46,7 +50,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         hostingController.sizingOptions = []
         popover.contentViewController = hostingController
 
-        registerGlobalHotkey()
+        registerGlobalHotkeys()
         setupStateObservation()
         updateStatusItem(force: true)
 
@@ -55,7 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        removeGlobalHotkey()
+        removeGlobalHotkeys()
     }
 
     // MARK: - Popover toggle & sizing
@@ -64,7 +68,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let hasSprints = !vm.todayLog.completedSprints.isEmpty
         let height: CGFloat
         if vm.isSettingsExpanded {
-            height = hasSprints ? 725 : 655
+            height = hasSprints ? 750 : 680
         } else {
             height = hasSprints ? 590 : 430
         }
@@ -82,21 +86,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
-    // MARK: - Global & Local Hotkey  ⌘ + ⌥ + Shift + C
+    // MARK: - Global & Local Hotkeys (⌘+⌥+Shift+C & ⌘+⌥+Shift+P)
 
-    private func registerGlobalHotkey() {
-        // 1. Carbon system-wide HotKey (works globally across macOS without Accessibility permissions)
-        let hotKeyID = EventHotKeyID(signature: OSType(0x534B4556), id: 1)
+    private func registerGlobalHotkeys() {
+        // 1. Carbon system-wide HotKeys (works globally across macOS without Accessibility permissions)
+        let clockHotKeyID = EventHotKeyID(signature: OSType(0x534B4556), id: 1)
+        let pauseHotKeyID = EventHotKeyID(signature: OSType(0x534B4556), id: 2)
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
 
         let selfPointer = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         InstallEventHandler(
             GetApplicationEventTarget(),
-            { (_, _, userData) -> OSStatus in
-                guard let userData = userData else { return noErr }
+            { (_, event, userData) -> OSStatus in
+                guard let userData = userData, let event = event else { return noErr }
                 let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
-                DispatchQueue.main.async {
-                    delegate.triggerClockToggle()
+                var hotKeyID = EventHotKeyID()
+                let status = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                if status == noErr {
+                    DispatchQueue.main.async {
+                        if hotKeyID.id == 1 {
+                            delegate.triggerClockToggle()
+                        } else if hotKeyID.id == 2 {
+                            delegate.triggerPauseToggle()
+                        }
+                    }
                 }
                 return noErr
             },
@@ -107,22 +128,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         )
 
         let modifiers = UInt32(cmdKey | optionKey | shiftKey)
+        // ⌘+⌥+Shift+C -> Clock In / Out
         RegisterEventHotKey(
             UInt32(kVK_ANSI_C),
             modifiers,
-            hotKeyID,
+            clockHotKeyID,
             GetApplicationEventTarget(),
             0,
-            &hotKeyRef
+            &clockHotKeyRef
+        )
+
+        // ⌘+⌥+Shift+P -> Pause / Resume
+        RegisterEventHotKey(
+            UInt32(kVK_ANSI_P),
+            modifiers,
+            pauseHotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &pauseHotKeyRef
         )
 
         // 2. Local monitor (when Skeval Timer popover is active/focused)
         localHotkeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            // keyCode 8 = C,  ⌘+⌥+Shift+C
-            if flags == [.command, .option, .shift] && event.keyCode == 8 {
-                self?.triggerClockToggle()
-                return nil // Consume event
+            if flags == [.command, .option, .shift] {
+                if event.keyCode == 8 { // C
+                    self?.triggerClockToggle()
+                    return nil
+                } else if event.keyCode == 35 { // P
+                    self?.triggerPauseToggle()
+                    return nil
+                }
             }
             return event
         }
@@ -130,8 +166,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     func triggerClockToggle() {
         let now = Date()
-        guard now.timeIntervalSince(lastHotkeyTriggerTime) > 0.3 else { return }
-        lastHotkeyTriggerTime = now
+        guard now.timeIntervalSince(lastClockHotkeyTriggerTime) > 0.3 else { return }
+        lastClockHotkeyTriggerTime = now
 
         if vm.recoveryMode { return }
         if vm.isRunning {
@@ -141,14 +177,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
-    private func removeGlobalHotkey() {
-        if let hotKeyRef = hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
+    func triggerPauseToggle() {
+        let now = Date()
+        guard now.timeIntervalSince(lastPauseHotkeyTriggerTime) > 0.3 else { return }
+        lastPauseHotkeyTriggerTime = now
+
+        if vm.recoveryMode { return }
+        if vm.isPaused {
+            vm.resumeTimer()
+        } else if vm.isRunning {
+            vm.pause()
+        }
+    }
+
+    private func removeGlobalHotkeys() {
+        if let clockHotKeyRef = clockHotKeyRef {
+            UnregisterEventHotKey(clockHotKeyRef)
+        }
+        if let pauseHotKeyRef = pauseHotKeyRef {
+            UnregisterEventHotKey(pauseHotKeyRef)
         }
         if let eventHandlerRef = eventHandlerRef {
             RemoveEventHandler(eventHandlerRef)
         }
-        hotKeyRef = nil
+        clockHotKeyRef = nil
+        pauseHotKeyRef = nil
         eventHandlerRef = nil
 
         if let m = localHotkeyMonitor { NSEvent.removeMonitor(m) }
