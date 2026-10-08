@@ -25,4 +25,8 @@ struct DayLog {
     var completedSprintsDescending: [(index: Int, sprint: Sprint)] {
         completedSprints.enumerated().map { ($0.offset + 1, $0.element) }.reversed()
     }
+
+    var clipboardText: String {
+        completedSprints.map(\.clipboardText).joined(separator: "\n")
+    }
 }

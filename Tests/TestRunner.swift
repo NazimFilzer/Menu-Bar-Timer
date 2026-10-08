@@ -69,7 +69,7 @@ func testDayLogStoreWithInMemoryStorage() {
     let inMemory = InMemoryDayLogAdapter()
     let store = DayLogStore(storage: inMemory)
 
-    let now = Date()
+    let now = Date().addingTimeInterval(-7200)
     let s1 = Sprint(startTime: now, endTime: now.addingTimeInterval(1800), pausedDuration: 0)
     let s2 = Sprint(startTime: now.addingTimeInterval(2000), endTime: now.addingTimeInterval(3800), pausedDuration: 300)
     let sOpen = Sprint(startTime: now.addingTimeInterval(4000))
@@ -111,6 +111,25 @@ func testDayLogStoreWithInMemoryStorage() {
     let updatedLog = store.todayLog()
     assertEqual(updatedLog.sprints.count, 2)
     assertTrue(updatedLog.openSprint == nil)
+
+    // Verify dayLog.clipboardText formatting for two-column spreadsheet paste
+    let expectedAllText = "\(s1.clipboardText)\n\(s2.clipboardText)"
+    assertEqual(updatedLog.clipboardText, expectedAllText)
+
+    let rows = updatedLog.clipboardText.components(separatedBy: "\n")
+    assertEqual(rows.count, 2)
+    for (i, row) in rows.enumerated() {
+        let cols = row.components(separatedBy: "\t")
+        assertEqual(cols.count, 2, "Row \(i + 1) must have exactly 2 tab-separated columns (Start and End)")
+    }
+    assertEqual(rows[0].components(separatedBy: "\t")[0], s1.startLabel)
+    assertEqual(rows[0].components(separatedBy: "\t")[1], s1.effectiveEndLabel)
+    assertEqual(rows[1].components(separatedBy: "\t")[0], s2.startLabel)
+    assertEqual(rows[1].components(separatedBy: "\t")[1], s2.effectiveEndLabel)
+
+    // Empty day log
+    let emptyLog = DayLog()
+    assertEqual(emptyLog.clipboardText, "")
 }
 
 @MainActor
@@ -379,6 +398,13 @@ func testGlobalHotkeys() {
     assertEqual(engine.state, .idle)
 }
 
+func testAppVersion() {
+    print("Running AppVersion tests...")
+    assertEqual(AppVersion.current, "v1.1", "App version should be tracked as v1.1")
+    assertEqual(AppVersion.marketingVersion, "1.1", "Marketing version should be 1.1")
+    assertEqual(AppVersion.buildNumber, "2", "Build number should be 2")
+}
+
 // MARK: - Main Runner
 
 @main
@@ -388,6 +414,7 @@ struct TestMain {
         print("Skeval Timer Architecture Verification")
         print("========================================")
 
+        testAppVersion()
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
         await MainActor.run {

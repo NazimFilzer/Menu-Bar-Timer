@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skeval Timer — Today's Earnings UI Prototype</title>
+  <style>
+    :root {
+      --bg-desktop: #0b0f19;
+      --menubar-bg: rgba(22, 27, 34, 0.85);
+      --popover-bg: #0d121d;
+      --card-bg: #141b29;
+      --card-border: #232f48;
+      --text-primary: #f1f5f9;
+      --text-secondary: #8493a8;
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.35);
+      --soft-red: #ff5252;
+      --amber: #ff9f0a;
+      --green: #10b981;
+      --divider: rgba(255, 255, 255, 0.08);
+      --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", -apple-system, sans-serif;
+      --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    body.light-theme {
+      --bg-desktop: #e2e8f0;
+      --menubar-bg: rgba(248, 250, 252, 0.85);
+      --popover-bg: #ffffff;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.25);
+      --divider: rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 20%, #151e33 0%, #080c14 100%);
+      min-height: 100vh;
+      font-family: var(--font-ui);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 110px;
+      user-select: none;
+    }
+    body.light-theme {
+      background: radial-gradient(circle at 50% 20%, #e2e8f0 0%, #cbd5e1 100%);
+    }
+
+    /* Top Simulated macOS Menu Bar */
+    .macos-menubar {
+      width: 100%;
+      height: 30px;
+      background: var(--menubar-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .menubar-left { display: flex; align-items: center; gap: 16px; font-weight: 600; }
+    .menubar-right { display: flex; align-items: center; gap: 12px; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .status-pill.active {
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      color: var(--accent);
+    }
+    .status-pill.paused {
+      background: rgba(255, 159, 10, 0.15);
+      border: 1px solid rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+    }
+    .status-pill.idle {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-secondary);
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Workspace Header */
+    .workspace-banner {
+      margin: 20px 0 12px;
+      text-align: center;
+    }
+    .workspace-banner h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .workspace-banner p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Interactive Simulator Controls */
+    .simulator-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(20, 27, 41, 0.85);
+      padding: 10px 18px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .sim-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .sim-btn-group { display: flex; gap: 5px; }
+    .sim-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sim-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
+    .sim-btn.active {
+      background: rgba(0, 229, 255, 0.18);
+      border-color: rgba(0, 229, 255, 0.45);
+      color: var(--accent);
+    }
+    .rate-input {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 8px;
+      width: 75px;
+      text-align: right;
+    }
+
+    /* Layout Container */
+    .layout-container {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 36px;
+      max-width: 920px;
+      width: 100%;
+      padding: 0 20px;
+    }
+
+    /* Popover Shell */
+    .popover-container {
+      position: relative;
+      width: 330px;
+      background: var(--popover-bg);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .pop-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+    }
+    .pop-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tag-badge {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 5px;
+      background: rgba(0, 229, 255, 0.2);
+      color: var(--accent);
+      border-radius: 10px;
+    }
+    .pop-date {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .pop-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+    }
+    .divider {
+      height: 1px;
+      background: var(--divider);
+      width: 100%;
+    }
+
+    /* Clock Section */
+    .clock-section {
+      padding: 16px;
+      text-align: center;
+    }
+    .big-clock {
+      font-family: var(--font-mono);
+      font-size: 44px;
+      font-weight: 300;
+      letter-spacing: -1px;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .big-clock.running {
+      color: var(--accent);
+      text-shadow: 0 0 20px var(--accent-glow);
+    }
+    .big-clock.paused {
+      color: var(--amber);
+      text-shadow: 0 0 20px rgba(255, 159, 10, 0.4);
+    }
+    .clock-subtitle {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    /* Action Buttons */
+    .action-section {
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn-primary {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #000;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Daily Goal Section */
+    .goal-section {
+      padding: 10px 16px;
+    }
+    .goal-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .goal-value {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-primary);
+    }
+    .goal-bar-bg {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .goal-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(0, 229, 255, 0.8), var(--accent));
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: width 0.3s ease;
+    }
+
+    /* Sprint History Section */
+    .history-section {
+      padding: 12px 16px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    .history-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .sprint-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 7px;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    /* Settings Section */
+    .settings-section {
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.15);
+    }
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .settings-body {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .settings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    /* ============================================================ */
+    /* VARIANT-SPECIFIC STYLES FOR TODAY'S EARNINGS                 */
+    /* ============================================================ */
+
+    /* VARIANT A: Dedicated Hero Stat Row (Dual Cards) */
+    .variant-a-container {
+      padding: 8px 16px 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card.earnings-card {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, var(--card-bg) 100%);
+    }
+    .metric-card-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .metric-card-val {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .metric-card.earnings-card .metric-card-val {
+      color: #34d399;
+      text-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+    }
+
+    /* VARIANT B: Integrated Goal & Revenue Bar */
+    .variant-b-container {
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .goal-dual-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .goal-sub-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .goal-earnings-highlight {
+      font-weight: 700;
+      color: #34d399;
+    }
+
+    /* VARIANT C: Minimalist Clock Subtitle Pill */
+    .variant-c-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      margin-left: 6px;
+    }
+
+    /* Rationale / Explainer Panel */
+    .explainer-panel {
+      flex: 1;
+      max-width: 480px;
+      background: rgba(20, 27, 41, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    }
+    .badge-variant {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      margin-bottom: 12px;
+    }
+    .explainer-panel h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .explainer-panel p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    .pros-cons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12.5px;
+    }
+    .pro-item, .con-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .pro-item span.icon { color: #34d399; font-weight: bold; }
+    .con-item span.icon { color: var(--soft-red); font-weight: bold; }
+
+    /* Floating Switcher Bar (Skill UI.md Requirement) */
+    .floating-switcher {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 229, 255, 0.2);
+      border-radius: 40px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      z-index: 1000;
+    }
+    .switcher-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-primary);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.15s;
+    }
+    .switcher-btn:hover {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+    .switcher-label {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      min-width: 260px;
+      text-align: center;
+    }
+    .switcher-pill-group {
+      display: flex;
+      gap: 4px;
+    }
+    .switcher-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 14px;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .switcher-pill.active {
+      background: rgba(0, 229, 255, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- macOS Top Menu Bar Simulator -->
+  <div class="macos-menubar">
+    <div class="menubar-left">
+      <span></span>
+      <span style="font-weight: 700;">Finder</span>
+      <span style="opacity: 0.7;">File</span>
+      <span style="opacity: 0.7;">Edit</span>
+      <span style="opacity: 0.7;">View</span>
+    </div>
+    <div class="menubar-right">
+      <div id="menubar-status" class="status-pill idle">
+        <span class="pulse-dot"></span>
+        <span id="menubar-clock-text">03h 45m</span>
+      </div>
+      <span style="opacity: 0.8; font-size: 12px;">Thu Oct 8 10:55 PM</span>
+    </div>
+  </div>
+
+  <div class="workspace-banner">
+    <h1>Today's Earnings — UI Layout Prototype</h1>
+    <p>Compare 3 radically different layout placements in the live popover. Arrow keys (← / →) cycle variants.</p>
+  </div>
+
+  <!-- Interactive Controls to drive the simulation -->
+  <div class="simulator-controls">
+    <span class="sim-label">Timer Simulator:</span>
+    <div class="sim-btn-group">
+      <button id="sim-clock-in" class="sim-btn">▶ Clock In</button>
+      <button id="sim-pause" class="sim-btn">⏸ Pause</button>
+      <button id="sim-clock-out" class="sim-btn">⏹ Clock Out</button>
+      <button id="sim-reset" class="sim-btn">↺ Reset Day</button>
+    </div>
+
+    <div style="width: 1px; height: 18px; background: var(--card-border);"></div>
+
+    <span class="sim-label">Hourly Rate:</span>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <span style="font-size: 12px; font-weight: 700; color: #34d399;">₹</span>
+      <input type="number" id="hourly-rate-input" class="rate-input" value="1000" min="0" step="100" />
+      <span style="font-size: 10px; color: var(--text-secondary);">/hr</span>
+    </div>
+
+    <div style="width: 1px; height: 18px; background: var(--card-border);"></div>
+
+    <span class="sim-label">Theme:</span>
+    <div class="sim-btn-group">
+      <button id="theme-dark" class="sim-btn active">Dark</button>
+      <button id="theme-light" class="sim-btn">Light</button>
+    </div>
+  </div>
+
+  <!-- Main Comparison Layout -->
+  <div class="layout-container">
+
+    <!-- Popover Mockup -->
+    <div class="popover-container">
+
+      <!-- Header -->
+      <div class="pop-header">
+        <div>
+          <div class="pop-title">
+            <span>SKEVAL TIMER</span>
+            <span class="tag-badge">V1</span>
+          </div>
+          <div class="pop-date">Thu, Oct 8</div>
+        </div>
+        <div id="pop-status-badge" class="pop-status-badge">
+          <span class="pulse-dot" style="background: var(--text-secondary);"></span>
+          <span id="pop-status-text">IDLE</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Clock Section -->
+      <div class="clock-section">
+        <div id="main-clock" class="big-clock">00:00:00</div>
+        
+        <!-- Subtitle changes depending on Variant C -->
+        <div id="clock-subtitle" class="clock-subtitle">
+          <span>Today's Total: <span id="accum-label">03h 45m</span></span>
+          <span id="variant-c-slot"></span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- SLOT FOR VARIANT A (Metric Cards) -->
+      <div id="variant-a-slot"></div>
+
+      <!-- Daily Goal Progress Section (Modulated in Variant B) -->
+      <div id="goal-section-wrapper">
+        <div class="goal-section">
+          <div class="goal-header">
+            <span>Daily Goal Target</span>
+            <span id="goal-time-label" class="goal-value">03h 45m / 8h</span>
+          </div>
+          <div class="goal-bar-bg">
+            <div id="goal-bar-fill" class="goal-bar-fill" style="width: 46.8%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Action Buttons -->
+      <div class="action-section">
+        <button id="pop-clock-btn" class="btn-primary">Clock In</button>
+        <button id="pop-pause-btn" class="btn-secondary" style="display: none;">Pause</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Sprint History -->
+      <div class="history-section">
+        <div class="history-title">Today's Sprints (2)</div>
+        <div class="sprint-row">
+          <div>
+            <span style="font-weight: 700; color: var(--accent); margin-right: 6px;">#1</span>
+            <span style="font-family: var(--font-mono);">09:00 → 11:30</span>
+          </div>
+          <span style="color: var(--text-secondary); font-family: var(--font-mono);">02h 30m</span>
+        </div>
+        <div class="sprint-row">
+          <div>
+            <span style="font-weight: 700; color: var(--accent); margin-right: 6px;">#2</span>
+            <span style="font-family: var(--font-mono);">14:00 → 15:15</span>
+          </div>
+          <span style="color: var(--text-secondary); font-family: var(--font-mono);">01h 15m</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Settings Section Preview -->
+      <div class="settings-section">
+        <div class="settings-header">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>⚙️</span>
+            <span>SETTINGS</span>
+          </div>
+          <span style="font-size: 9px; color: var(--text-secondary);">EXPANDED</span>
+        </div>
+        <div class="settings-body">
+          <div class="settings-row">
+            <span style="color: var(--text-secondary);">Daily Goal</span>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent);">8h</span>
+          </div>
+          <div class="settings-row" style="background: rgba(16, 185, 129, 0.08); padding: 5px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">
+            <span style="font-weight: 600; color: #34d399;">Hourly Rate</span>
+            <span style="font-family: var(--font-mono); font-weight: 700; color: #34d399;" id="settings-rate-display">₹1,000 / hr</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Explainer and Tradeoff Review -->
+    <div class="explainer-panel">
+      <div id="explainer-badge" class="badge-variant">VARIANT A</div>
+      <h2 id="explainer-title">Dual Metric Cards (Work & Revenue)</h2>
+      <p id="explainer-desc">Places a dedicated high-visibility 2-column card row directly between the digital clock and the daily progress bar. Left card shows total time logged today; right card highlights today's earned revenue.</p>
+
+      <div class="pros-cons">
+        <div class="pro-item">
+          <span class="icon">✓</span>
+          <span id="explainer-pro-1"><strong>Instant Financial Focus</strong>: Freelancers see both hours and rupees side-by-side with unmistakable hierarchy.</span>
+        </div>
+        <div class="pro-item">
+          <span class="icon">✓</span>
+          <span id="explainer-pro-2"><strong>Uncluttered Clock</strong>: Keeps the main digital clock clean and unencumbered by secondary metrics.</span>
+        </div>
+        <div class="con-item">
+          <span class="icon">✕</span>
+          <span id="explainer-con"><strong>Vertical Height</strong>: Adds ~45px of vertical space to the popover window.</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--card-border); font-size: 12px; color: var(--text-secondary);">
+        <strong>Pro-tip:</strong> Hit <strong>▶ Clock In</strong> in the simulator bar above to watch the earnings figure tick upwards live in real time based on your configured hourly rate!
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Floating Switcher Bar (Skill UI.md Requirement) -->
+  <div class="floating-switcher">
+    <button id="prev-variant" class="switcher-btn" title="Previous variant (Left arrow)">←</button>
+    <div class="switcher-pill-group">
+      <button class="switcher-pill active" data-variant="A">A: Dual Cards</button>
+      <button class="switcher-pill" data-variant="B">B: Integrated Goal</button>
+      <button class="switcher-pill" data-variant="C">C: Clock Pill</button>
+    </div>
+    <div id="active-variant-name" class="switcher-label">Variant A — Dual Cards</div>
+    <button id="next-variant" class="switcher-btn" title="Next variant (Right arrow)">→</button>
+  </div>
+
+  <script>
+    // State Model
+    const state = {
+      variant: 'A',
+      hourlyRate: 1000,
+      baseAccumulatedSeconds: 13500, // 3h 45m
+      currentElapsedSeconds: 0,
+      isRunning: false,
+      isPaused: false,
+      timerInterval: null
+    };
+
+    // Formatters
+    function formatTime(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function formatShortDuration(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return m === 0 ? `${h}h` : `${h}h ${String(m).padStart(2, '0')}m`;
+    }
+
+    function formatCurrency(amount) {
+      return '₹' + Math.round(amount).toLocaleString('en-IN');
+    }
+
+    // Calculations
+    function getTotalSeconds() {
+      return state.baseAccumulatedSeconds + (state.isRunning ? state.currentElapsedSeconds : 0);
+    }
+
+    function getTodayEarnings() {
+      const hours = getTotalSeconds() / 3600;
+      return hours * state.hourlyRate;
+    }
+
+    function getGoalProgress() {
+      const goalSeconds = 8 * 3600;
+      return Math.min(1.0, getTotalSeconds() / goalSeconds);
+    }
+
+    // Render Variants
+    function renderVariant() {
+      const totalSec = getTotalSeconds();
+      const earnings = getTodayEarnings();
+      const progressPct = (getGoalProgress() * 100).toFixed(1);
+      const goalTargetMoney = 8 * state.hourlyRate;
+
+      const slotA = document.getElementById('variant-a-slot');
+      const slotC = document.getElementById('variant-c-slot');
+      const goalWrapper = document.getElementById('goal-section-wrapper');
+
+      // Clear existing
+      slotA.innerHTML = '';
+      slotC.innerHTML = '';
+
+      if (state.variant === 'A') {
+        slotA.innerHTML = `
+          <div class="variant-a-container">
+            <div class="metric-card">
+              <span class="metric-card-label">⏱ Today's Work</span>
+              <span class="metric-card-val">${formatShortDuration(totalSec)}</span>
+            </div>
+            <div class="metric-card earnings-card">
+              <span class="metric-card-label" style="color: #34d399;">💰 Today's Earned</span>
+              <span class="metric-card-val">${formatCurrency(earnings)}</span>
+            </div>
+          </div>
+        `;
+        goalWrapper.innerHTML = `
+          <div class="goal-section">
+            <div class="goal-header">
+              <span>Daily Goal Target</span>
+              <span class="goal-value">${formatShortDuration(totalSec)} / 8h</span>
+            </div>
+            <div class="goal-bar-bg">
+              <div class="goal-bar-fill" style="width: ${progressPct}%;"></div>
+            </div>
+          </div>
+        `;
+        updateExplainer(
+          'VARIANT A',
+          'Dual Metric Cards (Work & Revenue)',
+          'Places a dedicated high-visibility 2-column card row directly between the digital clock and the daily progress bar. Left card shows total time logged today; right card highlights today\'s earned revenue.',
+          '<strong>Instant Financial Focus</strong>: Freelancers see both hours and rupees side-by-side with unmistakable hierarchy.',
+          '<strong>Uncluttered Clock</strong>: Keeps the main digital clock clean and unencumbered by secondary metrics.',
+          '<strong>Vertical Space</strong>: Adds ~45px of height to the popover window.'
+        );
+      } else if (state.variant === 'B') {
+        goalWrapper.innerHTML = `
+          <div class="variant-b-container">
+            <div class="goal-dual-header">
+              <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary);">Daily Target</span>
+              <span class="goal-earnings-highlight">${formatCurrency(earnings)} <span style="color: var(--text-secondary); font-size: 9px; font-weight: normal;">/ ${formatCurrency(goalTargetMoney)}</span></span>
+            </div>
+            <div class="goal-bar-bg">
+              <div class="goal-bar-fill" style="width: ${progressPct}%;"></div>
+            </div>
+            <div class="goal-sub-row">
+              <span>Logged: ${formatShortDuration(totalSec)} / 8h</span>
+              <span>${progressPct}% achieved</span>
+            </div>
+          </div>
+        `;
+        updateExplainer(
+          'VARIANT B',
+          'Integrated Goal & Revenue Target Bar',
+          'Merges hours and monetary revenue directly inside the existing Daily Goal section. Shows both time progress (03h 45m / 8h) and financial progress (₹3,750 / ₹8,000) using a single dual-purpose bar.',
+          '<strong>Financial Benchmark</strong>: Direct comparison between actual earnings and daily income potential (e.g. ₹8,000 for 8 hours).',
+          '<strong>Zero Vertical Overhead</strong>: Consumes essentially the same vertical space as current v1 layout.',
+          '<strong>Information Density</strong>: Combines time and rupees in one spot, which may feel denser for minimalist users.'
+        );
+      } else if (state.variant === 'C') {
+        slotC.innerHTML = `
+          <span class="variant-c-pill">💰 ${formatCurrency(earnings)}</span>
+        `;
+        goalWrapper.innerHTML = `
+          <div class="goal-section">
+            <div class="goal-header">
+              <span>Daily Goal Target</span>
+              <span class="goal-value">${formatShortDuration(totalSec)} / 8h</span>
+            </div>
+            <div class="goal-bar-bg">
+              <div class="goal-bar-fill" style="width: ${progressPct}%;"></div>
+            </div>
+          </div>
+        `;
+        updateExplainer(
+          'VARIANT C',
+          'Clock Subtitle Pill (Ultra-Minimalist)',
+          'Tucks today\'s earnings right alongside the accumulated time text directly underneath the digital clock (e.g. Today\'s Total: 03h 45m · [₹3,750]).',
+          '<strong>Zero Extra Space</strong>: Adds literally 0 pixels to popover height; fits seamlessly into the current layout.',
+          '<strong>Subtle & Discrete</strong>: Money is glanceable without looking like an overbearing sales dashboard.',
+          '<strong>Smaller Font Size</strong>: Earnings are presented at 11px font instead of a bold card display.'
+        );
+      }
+
+      // Update switcher UI
+      document.querySelectorAll('.switcher-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.variant === state.variant);
+      });
+      document.getElementById('active-variant-name').textContent =
+        state.variant === 'A' ? 'Variant A — Dual Cards' :
+        state.variant === 'B' ? 'Variant B — Integrated Goal' :
+        'Variant C — Clock Subtitle Pill';
+
+      // Update live clock and settings display
+      document.getElementById('main-clock').textContent = formatTime(state.currentElapsedSeconds);
+      document.getElementById('accum-label').textContent = formatShortDuration(totalSec);
+      document.getElementById('settings-rate-display').textContent = `₹${Number(state.hourlyRate).toLocaleString('en-IN')} / hr`;
+    }
+
+    function updateExplainer(badge, title, desc, pro1, pro2, con) {
+      document.getElementById('explainer-badge').textContent = badge;
+      document.getElementById('explainer-title').textContent = title;
+      document.getElementById('explainer-desc').textContent = desc;
+      document.getElementById('explainer-pro-1').innerHTML = pro1;
+      document.getElementById('explainer-pro-2').innerHTML = pro2;
+      document.getElementById('explainer-con').innerHTML = con;
+    }
+
+    function setVariant(v) {
+      state.variant = v;
+      const url = new URL(window.location);
+      url.searchParams.set('variant', v);
+      window.history.replaceState({}, '', url);
+      renderVariant();
+    }
+
+    // Timer Logic
+    function startTimer() {
+      if (state.isRunning) return;
+      state.isRunning = true;
+      state.isPaused = false;
+      document.getElementById('main-clock').classList.add('running');
+      document.getElementById('main-clock').classList.remove('paused');
+      document.getElementById('pop-status-text').textContent = 'ACTIVE';
+      document.getElementById('pop-status-badge').style.borderColor = 'rgba(0, 229, 255, 0.4)';
+      document.getElementById('pop-status-badge').querySelector('.pulse-dot').style.background = 'var(--accent)';
+      document.getElementById('pop-clock-btn').textContent = 'Clock Out';
+      document.getElementById('pop-pause-btn').style.display = 'block';
+
+      document.getElementById('menubar-status').className = 'status-pill active';
+      document.getElementById('sim-clock-in').classList.add('active');
+      document.getElementById('sim-pause').classList.remove('active');
+
+      state.timerInterval = setInterval(() => {
+        state.currentElapsedSeconds++;
+        document.getElementById('menubar-clock-text').textContent = formatTime(state.currentElapsedSeconds);
+        renderVariant();
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      if (!state.isRunning) return;
+      if (!state.isPaused) {
+        state.isPaused = true;
+        clearInterval(state.timerInterval);
+        document.getElementById('main-clock').classList.remove('running');
+        document.getElementById('main-clock').classList.add('paused');
+        document.getElementById('pop-status-text').textContent = 'PAUSED';
+        document.getElementById('pop-status-badge').style.borderColor = 'rgba(255, 159, 10, 0.4)';
+        document.getElementById('pop-status-badge').querySelector('.pulse-dot').style.background = 'var(--amber)';
+        document.getElementById('pop-pause-btn').textContent = 'Resume';
+        document.getElementById('menubar-status').className = 'status-pill paused';
+        document.getElementById('sim-pause').classList.add('active');
+      } else {
+        state.isPaused = false;
+        document.getElementById('pop-pause-btn').textContent = 'Pause';
+        startTimer();
+      }
+    }
+
+    function stopTimer() {
+      if (!state.isRunning) return;
+      clearInterval(state.timerInterval);
+      state.baseAccumulatedSeconds += state.currentElapsedSeconds;
+      state.currentElapsedSeconds = 0;
+      state.isRunning = false;
+      state.isPaused = false;
+
+      document.getElementById('main-clock').classList.remove('running', 'paused');
+      document.getElementById('pop-status-text').textContent = 'IDLE';
+      document.getElementById('pop-status-badge').style.borderColor = 'var(--card-border)';
+      document.getElementById('pop-status-badge').querySelector('.pulse-dot').style.background = 'var(--text-secondary)';
+      document.getElementById('pop-clock-btn').textContent = 'Clock In';
+      document.getElementById('pop-pause-btn').style.display = 'none';
+
+      document.getElementById('menubar-status').className = 'status-pill idle';
+      document.getElementById('menubar-clock-text').textContent = formatShortDuration(state.baseAccumulatedSeconds);
+      document.getElementById('sim-clock-in').classList.remove('active');
+      document.getElementById('sim-pause').classList.remove('active');
+      renderVariant();
+    }
+
+    function resetDay() {
+      clearInterval(state.timerInterval);
+      state.baseAccumulatedSeconds = 0;
+      state.currentElapsedSeconds = 0;
+      state.isRunning = false;
+      state.isPaused = false;
+      document.getElementById('main-clock').classList.remove('running', 'paused');
+      document.getElementById('pop-status-text').textContent = 'IDLE';
+      document.getElementById('pop-status-badge').style.borderColor = 'var(--card-border)';
+      document.getElementById('pop-clock-btn').textContent = 'Clock In';
+      document.getElementById('pop-pause-btn').style.display = 'none';
+      document.getElementById('menubar-status').className = 'status-pill idle';
+      document.getElementById('menubar-clock-text').textContent = '00:00:00';
+      document.getElementById('sim-clock-in').classList.remove('active');
+      document.getElementById('sim-pause').classList.remove('active');
+      renderVariant();
+    }
+
+    // Event Listeners
+    document.getElementById('sim-clock-in').addEventListener('click', startTimer);
+    document.getElementById('sim-pause').addEventListener('click', pauseTimer);
+    document.getElementById('sim-clock-out').addEventListener('click', stopTimer);
+    document.getElementById('sim-reset').addEventListener('click', resetDay);
+
+    document.getElementById('pop-clock-btn').addEventListener('click', () => {
+      if (state.isRunning) stopTimer(); else startTimer();
+    });
+    document.getElementById('pop-pause-btn').addEventListener('click', pauseTimer);
+
+    document.getElementById('hourly-rate-input').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) || 0;
+      state.hourlyRate = val;
+      renderVariant();
+    });
+
+    // Theme toggling
+    document.getElementById('theme-dark').addEventListener('click', () => {
+      document.body.classList.remove('light-theme');
+      document.getElementById('theme-dark').classList.add('active');
+      document.getElementById('theme-light').classList.remove('active');
+    });
+    document.getElementById('theme-light').addEventListener('click', () => {
+      document.body.classList.add('light-theme');
+      document.getElementById('theme-light').classList.add('active');
+      document.getElementById('theme-dark').classList.remove('active');
+    });
+
+    // Variant Switching
+    const variants = ['A', 'B', 'C'];
+    document.querySelectorAll('.switcher-pill').forEach(pill => {
+      pill.addEventListener('click', () => setVariant(pill.dataset.variant));
+    });
+    document.getElementById('prev-variant').addEventListener('click', () => {
+      let idx = variants.indexOf(state.variant);
+      setVariant(variants[(idx - 1 + variants.length) % variants.length]);
+    });
+    document.getElementById('next-variant').addEventListener('click', () => {
+      let idx = variants.indexOf(state.variant);
+      setVariant(variants[(idx + 1) % variants.length]);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
+      if (e.key === 'ArrowLeft') document.getElementById('prev-variant').click();
+      if (e.key === 'ArrowRight') document.getElementById('next-variant').click();
+    });
+
+    // Init from URL param if present
+    const params = new URLSearchParams(window.location.search);
+    const initialVariant = params.get('variant');
+    if (variants.includes(initialVariant)) state.variant = initialVariant;
+    renderVariant();
+  </script>
+</body>
+</html>

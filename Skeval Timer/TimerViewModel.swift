@@ -3,6 +3,14 @@ import AppKit
 import Observation
 import UserNotifications
 
+// MARK: - Version Tracking
+
+enum AppVersion {
+    static let current = "v1.1"
+    static let marketingVersion = "1.1"
+    static let buildNumber = "2"
+}
+
 @Observable
 @MainActor
 class TimerViewModel {
@@ -13,6 +21,7 @@ class TimerViewModel {
     var currentPauseElapsed: TimeInterval = 0
     var todayLog: DayLog = DayLog()
     var lastCopiedId: UUID? = nil
+    var isAllCopied: Bool = false
 
     // Recovery inputs
     var recoveryEndText: String = ""
@@ -134,6 +143,7 @@ class TimerViewModel {
 
     func clockIn() {
         lastCopiedId = nil
+        isAllCopied = false
         engine.clockIn()
         todayLog = store.todayLog()
     }
@@ -156,6 +166,7 @@ class TimerViewModel {
         recoveryEndText = ""
         recoveryEndError = nil
         notifiedMilestones = []
+        isAllCopied = false
         todayLog = store.todayLog()
     }
 
@@ -185,10 +196,25 @@ class TimerViewModel {
     func copy(sprint: Sprint) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(sprint.clipboardText, forType: .string)
+        isAllCopied = false
         lastCopiedId = sprint.id
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2))
             if self?.lastCopiedId == sprint.id { self?.lastCopiedId = nil }
+        }
+    }
+
+    func copyAllTodaySprints() {
+        guard !todayLog.completedSprints.isEmpty else { return }
+        let text = todayLog.clipboardText
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        lastCopiedId = nil
+        isAllCopied = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            self?.isAllCopied = false
         }
     }
 

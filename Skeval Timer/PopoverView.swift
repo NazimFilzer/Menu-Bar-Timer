@@ -494,26 +494,49 @@ private struct SprintHistorySectionView: View {
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
                         .kerning(0.8)
+
+                    if !vm.todayLog.completedSprints.isEmpty {
+                        Text("(\(vm.todayLog.completedSprints.count))")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textSecondary)
+                    }
                 }
 
                 Spacer()
 
-                HStack(spacing: 5) {
-                    Text("\(vm.todayLog.completedSprints.count) completed")
+                if vm.todayLog.completedSprints.isEmpty {
+                    Text("0 completed")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundColor(theme.textSecondary)
-
-                    if vm.todayLog.totalPausedDuration > 0 {
-                        Text("•")
-                            .font(.system(size: 9))
-                            .foregroundColor(theme.textSecondary.opacity(0.5))
-                        HStack(spacing: 3) {
-                            Image(systemName: "pause.fill")
-                                .font(.system(size: 7))
-                            Text("\(vm.todayLog.totalPausedLabel) breaks")
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                } else {
+                    HStack(spacing: 6) {
+                        if vm.todayLog.totalPausedDuration > 0 {
+                            HStack(spacing: 3) {
+                                Image(systemName: "pause.fill")
+                                    .font(.system(size: 7))
+                                Text(vm.todayLog.totalPausedLabel)
+                                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            }
+                            .foregroundColor(Color.orange.opacity(0.85))
                         }
-                        .foregroundColor(Color.orange.opacity(0.85))
+
+                        Button(action: { vm.copyAllTodaySprints() }) {
+                            HStack(spacing: 3.5) {
+                                Image(systemName: vm.isAllCopied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                Text(vm.isAllCopied ? "COPIED" : "COPY ALL")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(vm.isAllCopied ? .black : theme.neonTeal)
+                            .padding(.horizontal, 6.5)
+                            .padding(.vertical, 3)
+                            .background(vm.isAllCopied ? theme.neonTeal : theme.neonTeal.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+                        }
+                        .buttonStyle(PressedScaleButtonStyle())
+                        .focusable(false)
+                        .help("Copy all today's sprints to clipboard (Start & End columns for spreadsheets)")
                     }
                 }
             }
@@ -552,6 +575,11 @@ private struct SprintHistorySectionView: View {
                     .padding(.horizontal, 16)
                 }
                 .frame(maxHeight: 340)
+                .contextMenu {
+                    Button("Copy All Today's Sprints") {
+                        vm.copyAllTodaySprints()
+                    }
+                }
             }
         }
         .padding(.bottom, 12)

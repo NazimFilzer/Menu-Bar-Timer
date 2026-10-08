@@ -49,3 +49,7 @@ The persistence module managing day-grouped sprint logs behind a storage seam
 The menu bar visual presenter responsible for rendering state pills (idle, active, paused)
 and synchronizing with engine ticks.
 
+## Version Tracking
+- **v1.1 (Current)**: Menu Bar Timer featuring active sprint lifecycle (`idle`, `active`, `paused`, `recovery`), daily goal tracking, sprint clipboard copy & copy-all export, effective end-time spreadsheet format, global Carbon hotkeys, and multi-theme styling.
+- **v2 (Roadmap)**: Native Dashboard window, weekly/monthly analytics, billable earnings tracking, tag categorization, and zero-battery sleep/wake gap resolution (see `.scratch/v2-dashboard-and-analytics/spec.md`).
+
