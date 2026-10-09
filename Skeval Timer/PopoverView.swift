@@ -248,7 +248,7 @@ private struct ClockSectionView: View {
                     .foregroundColor(theme.textSecondary)
             }
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
         .animation(.easeInOut(duration: 0.25), value: vm.isPaused)
     }
 }
@@ -259,18 +259,41 @@ private struct DailyGoalProgressView: View {
     let vm: TimerViewModel
     let theme: PopoverTheme
 
+    private var earningsColor: Color {
+        theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Daily Goal Target")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
-                    .textCase(.uppercase)
-                    .kerning(0.8)
-                Spacer()
-                Text(vm.progressLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(vm.progressFraction >= 1.0 ? theme.neonTeal : theme.textPrimary)
+            if vm.goal.hasHourlyRate {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Daily Target")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .textCase(.uppercase)
+                        .kerning(0.8)
+                    Spacer()
+                    HStack(spacing: 3) {
+                        Text(vm.todayEarningsLabel)
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(earningsColor)
+                        Text("/ \(vm.targetEarningsLabel)")
+                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                }
+            } else {
+                HStack {
+                    Text("Daily Goal Target")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .textCase(.uppercase)
+                        .kerning(0.8)
+                    Spacer()
+                    Text(vm.progressLabel)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(vm.progressFraction >= 1.0 ? theme.neonTeal : theme.textPrimary)
+                }
             }
 
             GeometryReader { geo in
@@ -293,6 +316,20 @@ private struct DailyGoalProgressView: View {
                 }
             }
             .frame(height: 6)
+
+            if vm.goal.hasHourlyRate {
+                HStack {
+                    Text("Logged: \(vm.totalTodayShortLabel) / \(vm.goal.goalLabel)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(theme.textSecondary)
+                    Spacer()
+                    let pct = Int(round(vm.progressFraction * 100))
+                    Text("\(pct)% achieved")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundColor(vm.progressFraction >= 1.0 ? earningsColor : theme.textSecondary)
+                }
+                .padding(.top, 1)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -399,7 +436,7 @@ private struct ActionSectionView: View {
             if vm.isRunning {
                 HStack(spacing: 8) {
                     Button(action: pauseResumeAction) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: vm.isPaused ? "play.fill" : "pause.fill")
                                 .font(.system(size: 11, weight: .bold))
                             Text(vm.isPaused ? "RESUME" : "PAUSE")
@@ -408,7 +445,7 @@ private struct ActionSectionView: View {
                         }
                         .foregroundColor(vm.isPaused ? .black : .orange)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
                         .background(
                             vm.isPaused
                                 ? LinearGradient(colors: [Color.orange.opacity(0.9), Color.orange], startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -420,50 +457,80 @@ private struct ActionSectionView: View {
                     .buttonStyle(PressedScaleButtonStyle())
                     .disabled(vm.recoveryMode)
                     .help("Pause / Resume (⌘⌥⇧P)")
+
+                    Button(action: mainAction) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 11, weight: .black))
+                            Text("CLOCK OUT")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .kerning(0.4)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.9)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 1.0, green: 0.45, blue: 0.45), theme.softRed],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .shadow(color: theme.softRed.opacity(0.45), radius: 6, y: 2)
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .focusable(false)
+                    .disabled(vm.recoveryMode)
+                    .help("Clock Out & Copy (⌘⌥⇧C)")
+
+                    Button(action: { vm.reset() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(theme.textSecondary)
+                            .frame(width: 34, height: 34)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .focusable(false)
+                    .disabled(vm.recoveryMode)
+                    .help("Discard current sprint")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            Button(action: mainAction) {
-                HStack(spacing: 8) {
-                    Image(systemName: vm.isRunning ? "stop.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .black))
-                    Text(vm.isRunning ? "CLOCK OUT & COPY" : "CLOCK IN")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .kerning(0.5)
-                }
-                .foregroundColor(vm.isRunning ? .white : theme.actionButtonForeground)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(
-                    LinearGradient(
-                        colors: vm.isRunning
-                            ? [Color(red: 1.0, green: 0.45, blue: 0.45), theme.softRed]
-                            : [theme.accentColor.opacity(0.85), theme.accentColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            } else {
+                Button(action: mainAction) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 13, weight: .black))
+                        Text("CLOCK IN")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .kerning(0.5)
+                    }
+                    .foregroundColor(theme.actionButtonForeground)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [theme.accentColor.opacity(0.85), theme.accentColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: (vm.isRunning ? theme.softRed : theme.accentColor).opacity(0.45), radius: 8, y: 3)
-            }
-            .buttonStyle(PressedScaleButtonStyle())
-            .focusable(false)
-            .disabled(vm.recoveryMode)
-            .help(vm.isRunning ? "Clock Out & Copy (⌘⌥⇧C)" : "Clock In (⌘⌥⇧C)")
-
-            if vm.currentSprint != nil {
-                Button(action: { vm.reset() }) {
-                    Label("Discard current sprint", systemImage: "xmark.circle")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: theme.accentColor.opacity(0.45), radius: 8, y: 3)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressedScaleButtonStyle())
                 .focusable(false)
+                .disabled(vm.recoveryMode)
+                .help("Clock In (⌘⌥⇧C)")
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: vm.isRunning)
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: vm.isPaused)
     }
@@ -690,6 +757,7 @@ private struct SettingsSectionView: View {
     let theme: PopoverTheme
     @Binding var launchAtLogin: Bool
     @Bindable var themeManager: ThemeManager
+    @State private var rateInput: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -796,6 +864,59 @@ private struct SettingsSectionView: View {
                         }
                         .font(.system(size: 9, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
+                    }
+
+                    Divider().background(theme.dividerColor)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hourly Rate")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundColor(theme.textPrimary)
+                                Text("Earned money tracker")
+                                    .font(.system(size: 9.5, weight: .regular, design: .rounded))
+                                    .foregroundColor(theme.textSecondary)
+                            }
+                            Spacer()
+                            HStack(spacing: 3) {
+                                Text("₹")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundColor(theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5))
+                                TextField("0", text: $rateInput)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .foregroundColor(theme.textPrimary)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 55)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(theme.cardBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .stroke(theme.cardBorder, lineWidth: 1)
+                                    )
+                                    .focusable(false)
+                                    .onChange(of: rateInput) { _, newValue in
+                                        let filtered = newValue.filter { $0.isNumber }
+                                        if filtered != newValue {
+                                            rateInput = filtered
+                                        }
+                                        if let val = Double(filtered) {
+                                            vm.goal.hourlyRate = val
+                                        } else {
+                                            vm.goal.hourlyRate = 0.0
+                                        }
+                                    }
+                                Text("/hr")
+                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                    .foregroundColor(theme.textSecondary)
+                            }
+                        }
+                    }
+                    .onAppear {
+                        rateInput = vm.goal.hourlyRate > 0 ? String(Int(vm.goal.hourlyRate)) : ""
                     }
 
                     Divider().background(theme.dividerColor)

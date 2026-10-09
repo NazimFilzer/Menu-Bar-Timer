@@ -19,7 +19,23 @@ enum TimeFormatter {
         return f
     }()
 
+    private static let rupeeFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencySymbol = "₹"
+        f.maximumFractionDigits = 0
+        f.locale = Locale(identifier: "en_IN")
+        return f
+    }()
+
     private static let formatterLock = NSLock()
+
+    static func format(rupees amount: Double) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        let rounded = round(amount)
+        return rupeeFormatter.string(from: NSNumber(value: rounded)) ?? "₹\(Int(rounded))"
+    }
 
     static func format(duration: TimeInterval?) -> String {
         guard let d = duration else { return "in progress" }

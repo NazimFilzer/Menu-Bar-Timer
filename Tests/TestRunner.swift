@@ -405,6 +405,78 @@ func testAppVersion() {
     assertEqual(AppVersion.buildNumber, "2", "Build number should be 2")
 }
 
+@MainActor
+func testEarningsTracking() {
+    print("Running Today's Earnings & Hourly Rate tests...")
+
+    // 1. TimeFormatter rupee formatting
+    assertEqual(TimeFormatter.format(rupees: 0), "₹0", "Zero rupees should format as ₹0")
+    assertEqual(TimeFormatter.format(rupees: 1000), "₹1,000", "1000 should format with comma")
+    assertEqual(TimeFormatter.format(rupees: 3750.2), "₹3,750", "Decimal should round to nearest whole rupee")
+    assertEqual(TimeFormatter.format(rupees: 3750.8), "₹3,751", "Decimal .8 should round up")
+    assertEqual(TimeFormatter.format(rupees: 100000), "₹1,00,000", "Lakh formatting should use Indian grouping")
+
+    // 2. GoalSettings rates & targets
+    let goal = GoalSettings.shared
+    let savedRate = goal.hourlyRate
+    let savedHours = goal.dailyGoalHours
+    defer {
+        goal.hourlyRate = savedRate
+        goal.dailyGoalHours = savedHours
+    }
+
+    goal.dailyGoalHours = 8.0
+    goal.hourlyRate = 0.0
+    assertFalse(goal.hasHourlyRate, "hasHourlyRate must be false when hourlyRate is 0")
+    assertEqual(goal.targetEarnings, 0.0, "targetEarnings must be 0 when rate is 0")
+
+    goal.hourlyRate = 1500.0
+    assertTrue(goal.hasHourlyRate, "hasHourlyRate must be true when hourlyRate > 0")
+    assertEqual(goal.targetEarnings, 12000.0, "8 hours at 1500/hr = 12000 target earnings")
+    assertEqual(goal.targetEarningsLabel, "₹12,000")
+
+    // 3. TimerViewModel calculations with completed + live elapsed
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    // Save a completed sprint of 2 hours (7200 seconds)
+    let t0 = Date().addingTimeInterval(-7200)
+    let completedSprint = Sprint(startTime: t0, endTime: t0.addingTimeInterval(7200), pausedDuration: 0)
+    store.save(sprint: completedSprint)
+    vm.todayLog = store.todayLog()
+
+    assertEqual(vm.todayLog.accumulatedTotal, 7200, "Accumulated total should be 2 hours")
+    // With rate = 1500: 2h * 1500 = 3000
+    assertEqual(vm.todayEarnings, 3000.0, "2 hours at 1500/hr must equal 3000")
+    assertEqual(vm.todayEarningsLabel, "₹3,000")
+
+    // Simulate clock in: live running sprint adds 1800s (30m)
+    vm.clockIn()
+    vm.currentElapsed = 1800 // 30 minutes
+    // Total time = 2.5 hours -> 2.5 * 1500 = 3750
+    assertEqual(vm.totalTodayElapsed, 9000)
+    assertEqual(vm.todayEarnings, 3750.0, "2.5 hours with live ticking must equal 3750")
+    assertEqual(vm.todayEarningsLabel, "₹3,750")
+
+    // Overtime test: simulate 10 hours logged (36000s) on 8h goal
+    vm.currentElapsed = 28800 // 8h live + 2h completed = 10h total
+    assertEqual(vm.totalTodayElapsed, 36000)
+    assertEqual(vm.todayEarnings, 15000.0, "10 hours at 1500/hr must equal 15000")
+    assertEqual(vm.todayEarningsLabel, "₹15,000")
+    assertEqual(vm.progressFraction, 1.0, "Progress fraction must cap at 1.0 on overtime")
+    assertTrue(vm.isDailyGoalReached, "Goal must be marked reached")
+
+    // Clean up sprint
+    vm.clockOut()
+
+    // Clearing rate reverts to 0 and disables tracking
+    goal.hourlyRate = 0.0
+    assertFalse(goal.hasHourlyRate)
+    assertEqual(vm.todayEarnings, 0.0, "todayEarnings must be 0 when rate is cleared")
+}
+
 // MARK: - Main Runner
 
 @main
@@ -423,6 +495,7 @@ struct TestMain {
             testCrashRecoveryAndPausePersistence()
             testAppThemes()
             testGlobalHotkeys()
+            testEarningsTracking()
         }
 
         print("----------------------------------------")

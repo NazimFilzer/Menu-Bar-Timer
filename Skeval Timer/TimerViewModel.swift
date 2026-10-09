@@ -129,14 +129,41 @@ class TimerViewModel {
         return acc > 0 ? todayLog.accumulatedShortLabel : ""
     }
 
+    var totalTodayElapsed: TimeInterval {
+        todayLog.accumulatedTotal + (isRunning ? currentElapsed : 0)
+    }
+
+    var totalTodayShortLabel: String {
+        TimeFormatter.format(shortDuration: totalTodayElapsed)
+    }
+
     var progressFraction: Double {
         let g = goal.dailyGoalSeconds
         guard g > 0 else { return 0 }
-        return min(todayLog.accumulatedTotal / g, 1.0)
+        return min(totalTodayElapsed / g, 1.0)
     }
 
     var progressLabel: String {
-        "\(todayLog.accumulatedShortLabel) / \(goal.goalLabel)"
+        "\(totalTodayShortLabel) / \(goal.goalLabel)"
+    }
+
+    var todayEarnings: Double {
+        guard goal.hasHourlyRate else { return 0.0 }
+        let hours = totalTodayElapsed / 3600.0
+        return hours * goal.hourlyRate
+    }
+
+    var todayEarningsLabel: String {
+        TimeFormatter.format(rupees: todayEarnings)
+    }
+
+    var targetEarningsLabel: String {
+        goal.targetEarningsLabel
+    }
+
+    var isDailyGoalReached: Bool {
+        let g = goal.dailyGoalSeconds
+        return g > 0 && totalTodayElapsed >= g
     }
 
     // MARK: - Actions
