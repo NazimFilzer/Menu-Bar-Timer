@@ -27,6 +27,13 @@ class TimerViewModel {
     var recoveryEndText: String = ""
     var recoveryEndError: String? = nil
 
+    // Manual sprint entry inputs
+    var isManualEntryPresented: Bool = false
+    var manualStartText: String = ""
+    var manualEndText: String = ""
+    var manualBreakMinutesText: String = "0"
+    var manualEntryError: String? = nil
+
     var goal = GoalSettings.shared
     var isSettingsExpanded: Bool = false
 
@@ -248,6 +255,103 @@ class TimerViewModel {
     func delete(sprint: Sprint) {
         store.delete(sprint: sprint)
         todayLog = store.todayLog()
+    }
+
+    // MARK: - Manual Sprint Entry
+
+    func openManualEntry() {
+        let now = Date()
+        if manualEndText.isEmpty {
+            manualEndText = TimeFormatter.format(time: now)
+        }
+        if manualStartText.isEmpty {
+            if let last = todayLog.completedSprints.last {
+                manualStartText = last.endLabel
+            } else {
+                manualStartText = TimeFormatter.format(time: now.addingTimeInterval(-3600))
+            }
+        }
+        manualBreakMinutesText = "0"
+        manualEntryError = nil
+        isManualEntryPresented = true
+    }
+
+    func dismissManualEntry() {
+        isManualEntryPresented = false
+        manualEntryError = nil
+    }
+
+    func stepManualTime(isStart: Bool, minutes: Int) {
+        let reference = Date()
+        let currentText = isStart ? manualStartText : manualEndText
+        let baseDate = TimeFormatter.parseTime(currentText, on: reference) ?? reference
+        let newDate = baseDate.addingTimeInterval(TimeInterval(minutes * 60))
+        let formatted = TimeFormatter.format(time: newDate)
+        if isStart {
+            manualStartText = formatted
+        } else {
+            manualEndText = formatted
+        }
+        manualEntryError = nil
+    }
+
+    var manualComputedNetDuration: TimeInterval? {
+        let reference = Date()
+        guard let start = TimeFormatter.parseTime(manualStartText, on: reference),
+              let end = TimeFormatter.parseTime(manualEndText, on: reference) else {
+            return nil
+        }
+        let breakMin = Double(manualBreakMinutesText.trimmingCharacters(in: .whitespaces)) ?? 0
+        let net = end.timeIntervalSince(start) - (breakMin * 60)
+        guard net > 0 else { return nil }
+        return net
+    }
+
+    var manualComputedEarningsDelta: Double {
+        guard let net = manualComputedNetDuration, goal.hasHourlyRate else { return 0 }
+        return (net / 3600.0) * goal.hourlyRate
+    }
+
+    @discardableResult
+    func saveManualSprint() -> Bool {
+        let reference = Date()
+        guard let start = TimeFormatter.parseTime(manualStartText, on: reference) else {
+            manualEntryError = "Invalid start time (HH:mm:ss)"
+            return false
+        }
+        guard let end = TimeFormatter.parseTime(manualEndText, on: reference) else {
+            manualEntryError = "Invalid end time (HH:mm:ss)"
+            return false
+        }
+        guard end > start else {
+            manualEntryError = "End time must be after start time"
+            return false
+        }
+
+        let breakMin = max(0, Double(manualBreakMinutesText.trimmingCharacters(in: .whitespaces)) ?? 0)
+        let pausedDuration = breakMin * 60
+        guard end.timeIntervalSince(start) > pausedDuration else {
+            manualEntryError = "Break duration exceeds sprint time"
+            return false
+        }
+
+        let sprint = Sprint(
+            startTime: start,
+            endTime: end,
+            pausedDuration: pausedDuration
+        )
+
+        store.save(sprint: sprint)
+        todayLog = store.todayLog()
+        copy(sprint: sprint)
+        checkMilestoneNotifications()
+
+        isManualEntryPresented = false
+        manualStartText = ""
+        manualEndText = ""
+        manualBreakMinutesText = "0"
+        manualEntryError = nil
+        return true
     }
 
     // MARK: - Milestone Notifications

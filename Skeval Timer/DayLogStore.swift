@@ -43,6 +43,7 @@ final class DayLogStore: @unchecked Sendable {
         } else {
             bucket.append(sprint)
         }
+        bucket.sort { $0.startTime < $1.startTime }
         logs[key] = bucket
         let snapshot = logs
         lock.unlock()

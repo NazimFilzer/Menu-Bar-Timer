@@ -58,6 +58,24 @@ struct PopoverView: View {
                     themeManager: themeManager
                 )
             }
+
+            if vm.isManualEntryPresented {
+                Color.black.opacity(0.6)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            vm.dismissManualEntry()
+                        }
+                    }
+                    .transition(.opacity)
+
+                VStack {
+                    Spacer()
+                    ManualSprintSheetView(vm: vm, theme: theme)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(100)
+            }
         }
         .frame(width: 330)
         .focusEffectDisabled()
@@ -571,12 +589,12 @@ private struct SprintHistorySectionView: View {
 
                 Spacer()
 
-                if vm.todayLog.completedSprints.isEmpty {
-                    Text("0 completed")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-                } else {
-                    HStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    if vm.todayLog.completedSprints.isEmpty {
+                        Text("0 completed")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                    } else {
                         if vm.todayLog.totalPausedDuration > 0 {
                             HStack(spacing: 3) {
                                 Image(systemName: "pause.fill")
@@ -605,6 +623,23 @@ private struct SprintHistorySectionView: View {
                         .focusable(false)
                         .help("Copy all today's sprints to clipboard (Start & End columns for spreadsheets)")
                     }
+
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            vm.openManualEntry()
+                        }
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundColor(theme.neonTeal)
+                            .frame(width: 20, height: 20)
+                            .background(theme.neonTeal.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                    .focusable(false)
+                    .help("Add sprint manually (+)")
                 }
             }
             .padding(.horizontal, 16)
@@ -1037,6 +1072,223 @@ private struct PillButtonStyle: ButtonStyle {
             .background(color.opacity(configuration.isPressed ? 0.7 : 1.0))
             .clipShape(Capsule())
             .focusable(false)
+    }
+}
+
+// MARK: - Manual Sprint Sheet View (Type C Native Modal)
+
+private struct ManualSprintSheetView: View {
+    @Bindable var vm: TimerViewModel
+    let theme: PopoverTheme
+
+    private var earningsDeltaColor: Color {
+        theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5)
+    }
+
+    var body: some View {
+        VStack(spacing: 9) {
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 32, height: 3.5)
+                .padding(.top, 1)
+
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.badge.plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(theme.neonTeal)
+                    Text("MANUAL SPRINT")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+                        .kerning(0.8)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.dismissManualEntry()
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 20, height: 20)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+            }
+
+            VStack(spacing: 7) {
+                HStack {
+                    Text("START")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 44, alignment: .leading)
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        Button("-15m") { vm.stepManualTime(isStart: true, minutes: -15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+
+                        TextField("HH:mm:ss", text: $vm.manualStartText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 76)
+                            .padding(.vertical, 3.5)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
+
+                        Button("+15m") { vm.stepManualTime(isStart: true, minutes: 15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+                    }
+                }
+
+                HStack {
+                    Text("END")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 44, alignment: .leading)
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        Button("-15m") { vm.stepManualTime(isStart: false, minutes: -15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+
+                        TextField("HH:mm:ss", text: $vm.manualEndText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 76)
+                            .padding(.vertical, 3.5)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
+
+                        Button("+15m") { vm.stepManualTime(isStart: false, minutes: 15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+                    }
+                }
+
+                HStack {
+                    Text("BREAK")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 44, alignment: .leading)
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        TextField("0", text: $vm.manualBreakMinutesText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 36)
+                            .padding(.vertical, 3)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
+
+                        Text("mins pause")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                }
+            }
+            .padding(8)
+            .background(theme.cardBg.opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+
+            if let netDuration = vm.manualComputedNetDuration {
+                HStack {
+                    HStack(spacing: 4) {
+                        Text("Net:")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                        Text(TimeFormatter.format(clock: netDuration))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(earningsDeltaColor)
+                    }
+
+                    Spacer()
+
+                    if vm.goal.hasHourlyRate {
+                        Text("+\(TimeFormatter.format(rupees: vm.manualComputedEarningsDelta))")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(earningsDeltaColor)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(earningsDeltaColor.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(earningsDeltaColor.opacity(0.25), lineWidth: 1))
+            } else if let error = vm.manualEntryError {
+                Text(error)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(theme.softRed)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
+
+            HStack(spacing: 8) {
+                Button("Cancel") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.dismissManualEntry()
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: theme.cardBg, foregroundColor: theme.textSecondary))
+                .frame(maxWidth: .infinity)
+                .focusable(false)
+
+                Button("Log Sprint") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        _ = vm.saveManualSprint()
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
+                .frame(maxWidth: .infinity)
+                .focusable(false)
+                .disabled(vm.manualComputedNetDuration == nil)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(theme.bgDark)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(theme.cardBorder, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.6), radius: 20, y: -4)
+        )
+    }
+}
+
+private struct StepperChipButtonStyle: ButtonStyle {
+    let theme: PopoverTheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+            .foregroundColor(theme.textSecondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3.5)
+            .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.cardBorder, lineWidth: 1))
     }
 }
 

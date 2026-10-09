@@ -477,6 +477,116 @@ func testEarningsTracking() {
     assertEqual(vm.todayEarnings, 0.0, "todayEarnings must be 0 when rate is cleared")
 }
 
+@MainActor
+func testManualSprintEntry() {
+    print("Running Manual Sprint Entry tests...")
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    assertFalse(vm.isManualEntryPresented)
+
+    // Open manual entry
+    vm.openManualEntry()
+    assertTrue(vm.isManualEntryPresented)
+
+    // Test invalid format validation
+    vm.manualStartText = "invalid"
+    vm.manualEndText = "10:00:00"
+    let success1 = vm.saveManualSprint()
+    assertFalse(success1)
+    assertEqual(vm.manualEntryError, "Invalid start time (HH:mm:ss)")
+    assertTrue(vm.isManualEntryPresented)
+
+    // Test end before start validation
+    vm.manualStartText = "11:00:00"
+    vm.manualEndText = "10:00:00"
+    let success2 = vm.saveManualSprint()
+    assertFalse(success2)
+    assertEqual(vm.manualEntryError, "End time must be after start time")
+
+    // Test break duration exceeding total time
+    vm.manualStartText = "10:00:00"
+    vm.manualEndText = "10:30:00"
+    vm.manualBreakMinutesText = "45"
+    let success3 = vm.saveManualSprint()
+    assertFalse(success3)
+    assertEqual(vm.manualEntryError, "Break duration exceeds sprint time")
+
+    // Test stepper buttons
+    vm.manualStartText = "10:00:00"
+    vm.stepManualTime(isStart: true, minutes: 15)
+    assertEqual(vm.manualStartText, "10:15:00")
+    vm.stepManualTime(isStart: true, minutes: -30)
+    assertEqual(vm.manualStartText, "09:45:00")
+
+    // Test valid manual sprint saving with 10 min break
+    vm.manualStartText = "09:00:00"
+    vm.manualEndText = "10:30:00" // 90 min gross
+    vm.manualBreakMinutesText = "10" // 10 min break -> 80 min net (4800s)
+    let net = vm.manualComputedNetDuration
+    assertEqual(net, 4800.0)
+
+    let success4 = vm.saveManualSprint()
+    assertTrue(success4)
+    assertFalse(vm.isManualEntryPresented)
+    assertEqual(vm.todayLog.completedSprints.count, 1)
+
+    let saved = vm.todayLog.completedSprints.first!
+    assertEqual(saved.startLabel, "09:00:00")
+    assertEqual(saved.endLabel, "10:30:00")
+    assertEqual(saved.pausedDuration, 600.0)
+    assertEqual(saved.duration, 4800.0)
+    assertEqual(saved.effectiveEndLabel, "10:20:00")
+    assertEqual(vm.todayLog.accumulatedTotal, 4800.0)
+
+    // Test clipboard text of manual sprint
+    assertEqual(saved.clipboardText, "09:00:00\t10:20:00")
+
+    // Test out-of-order sprint insertion & chronological sorting:
+    // Existing sprint: 09:00:00 - 10:30:00 (#1)
+    // Now add a later sprint: 14:00:00 - 15:00:00
+    vm.manualStartText = "14:00:00"
+    vm.manualEndText = "15:00:00"
+    vm.manualBreakMinutesText = "0"
+    assertTrue(vm.saveManualSprint())
+
+    // Now add an earlier sprint (retroactive): 07:00:00 - 08:00:00
+    vm.manualStartText = "07:00:00"
+    vm.manualEndText = "08:00:00"
+    vm.manualBreakMinutesText = "0"
+    assertTrue(vm.saveManualSprint())
+
+    // Sprints must be sorted chronologically in completedSprints:
+    // Index 0: 07:00 - 08:00
+    // Index 1: 09:00 - 10:30
+    // Index 2: 14:00 - 15:00
+    assertEqual(vm.todayLog.completedSprints.count, 3)
+    assertEqual(vm.todayLog.completedSprints[0].startLabel, "07:00:00")
+    assertEqual(vm.todayLog.completedSprints[1].startLabel, "09:00:00")
+    assertEqual(vm.todayLog.completedSprints[2].startLabel, "14:00:00")
+
+    // In the UI view (completedSprintsDescending):
+    // Top card should be #3 (14:00:00)
+    // Middle card should be #2 (09:00:00)
+    // Bottom card should be #1 (07:00:00)
+    let descending = vm.todayLog.completedSprintsDescending
+    assertEqual(descending.count, 3)
+    assertEqual(descending[0].index, 3)
+    assertEqual(descending[0].sprint.startLabel, "14:00:00")
+    assertEqual(descending[1].index, 2)
+    assertEqual(descending[1].sprint.startLabel, "09:00:00")
+    assertEqual(descending[2].index, 1)
+    assertEqual(descending[2].sprint.startLabel, "07:00:00")
+
+    // Test dismiss
+    vm.openManualEntry()
+    assertTrue(vm.isManualEntryPresented)
+    vm.dismissManualEntry()
+    assertFalse(vm.isManualEntryPresented)
+}
+
 // MARK: - Main Runner
 
 @main
@@ -496,6 +606,7 @@ struct TestMain {
             testAppThemes()
             testGlobalHotkeys()
             testEarningsTracking()
+            testManualSprintEntry()
         }
 
         print("----------------------------------------")
