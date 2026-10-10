@@ -6,9 +6,9 @@ import UserNotifications
 // MARK: - Version Tracking
 
 enum AppVersion {
-    static let current = "v1.1"
-    static let marketingVersion = "1.1"
-    static let buildNumber = "2"
+    static let current = "v1.2"
+    static let marketingVersion = "1.2"
+    static let buildNumber = "3"
 }
 
 @Observable
@@ -20,6 +20,8 @@ class TimerViewModel {
     var currentElapsed: TimeInterval = 0
     var currentPauseElapsed: TimeInterval = 0
     var todayLog: DayLog = DayLog()
+    var selectedDate: Date = Date()
+    var selectedDayLog: DayLog = DayLog()
     var lastCopiedId: UUID? = nil
     var isAllCopied: Bool = false
 
@@ -52,6 +54,7 @@ class TimerViewModel {
         self.engine = effectiveEngine
 
         self.todayLog = effectiveStore.todayLog()
+        self.selectedDayLog = self.todayLog
         self.state = effectiveEngine.state
         self.currentElapsed = effectiveEngine.state.currentElapsed
         self.currentPauseElapsed = effectiveEngine.currentPauseElapsed
@@ -76,6 +79,9 @@ class TimerViewModel {
                 self.currentPauseElapsed = 0
             }
             self.todayLog = self.store.todayLog()
+            if self.isViewingToday {
+                self.selectedDayLog = self.todayLog
+            }
             if !newState.isRecovery {
                 self.recoveryEndText = ""
                 self.recoveryEndError = nil
@@ -95,6 +101,9 @@ class TimerViewModel {
         engine.onSprintCompleted = { [weak self] sprint in
             guard let self else { return }
             self.todayLog = self.store.todayLog()
+            if self.isViewingToday {
+                self.selectedDayLog = self.todayLog
+            }
             self.copy(sprint: sprint)
             self.checkMilestoneNotifications()
         }
@@ -173,6 +182,122 @@ class TimerViewModel {
         return g > 0 && totalTodayElapsed >= g
     }
 
+    // MARK: - Past Days History Navigation
+
+    var isViewingToday: Bool {
+        Calendar.current.isDateInToday(selectedDate)
+    }
+
+    var selectedDayShortTitle: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(selectedDate) {
+            return "Today"
+        } else if cal.isDateInYesterday(selectedDate) {
+            return "Yesterday"
+        } else {
+            return TimeFormatter.format(shortDayTitle: selectedDate)
+        }
+    }
+
+    var headerDateSubtitle: String {
+        TimeFormatter.format(relativeHeaderDate: selectedDate)
+    }
+
+    var sprintsSectionTitle: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(selectedDate) {
+            return "TODAY'S SPRINTS"
+        } else if cal.isDateInYesterday(selectedDate) {
+            return "YESTERDAY'S SPRINTS"
+        } else {
+            return "\(TimeFormatter.format(shortDayTitle: selectedDate).uppercased())'S SPRINTS"
+        }
+    }
+
+    var displayedCompletedSprints: [Sprint] {
+        selectedDayLog.completedSprints
+    }
+
+    var displayedCompletedSprintsDescending: [(index: Int, sprint: Sprint)] {
+        selectedDayLog.completedSprintsDescending
+    }
+
+    var availablePastDates: [Date] {
+        let cal = Calendar.current
+        let today = Date()
+        return (0..<7).compactMap { offset in
+            cal.date(byAdding: .day, value: -offset, to: today)
+        }
+    }
+
+    func menuItemTitle(for date: Date) -> String {
+        let title = TimeFormatter.format(menuItemTitle: date)
+        let count = store.log(for: date).completedSprints.count
+        return count > 0 ? "\(title) (\(count))" : title
+    }
+
+    func selectDate(_ date: Date) {
+        selectedDate = date
+        todayLog = store.todayLog()
+        if isViewingToday {
+            selectedDayLog = todayLog
+        } else {
+            selectedDayLog = store.log(for: date)
+        }
+    }
+
+    func jumpToToday() {
+        selectDate(Date())
+    }
+
+    var displayedAccumulatedTotal: TimeInterval {
+        if isViewingToday {
+            return totalTodayElapsed
+        } else {
+            return selectedDayLog.accumulatedTotal
+        }
+    }
+
+    var displayedTotalShortLabel: String {
+        TimeFormatter.format(shortDuration: displayedAccumulatedTotal)
+    }
+
+    var displayedProgressFraction: Double {
+        let g = goal.dailyGoalSeconds
+        guard g > 0 else { return 0 }
+        return min(displayedAccumulatedTotal / g, 1.0)
+    }
+
+    var displayedProgressLabel: String {
+        "\(displayedTotalShortLabel) / \(goal.goalLabel)"
+    }
+
+    var displayedEarnings: Double {
+        guard goal.hasHourlyRate else { return 0.0 }
+        let hours = displayedAccumulatedTotal / 3600.0
+        return hours * goal.hourlyRate
+    }
+
+    var displayedEarningsLabel: String {
+        TimeFormatter.format(rupees: displayedEarnings)
+    }
+
+    var displayedGoalTitle: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(selectedDate) {
+            return "Daily Target"
+        } else if cal.isDateInYesterday(selectedDate) {
+            return "Yesterday's Target"
+        } else {
+            return "\(TimeFormatter.format(shortDayTitle: selectedDate)) Target"
+        }
+    }
+
+    var isDisplayedGoalReached: Bool {
+        let g = goal.dailyGoalSeconds
+        return g > 0 && displayedAccumulatedTotal >= g
+    }
+
     // MARK: - Actions
 
     func clockIn() {
@@ -238,9 +363,9 @@ class TimerViewModel {
         }
     }
 
-    func copyAllTodaySprints() {
-        guard !todayLog.completedSprints.isEmpty else { return }
-        let text = todayLog.clipboardText
+    func copyAllDisplayedSprints() {
+        guard !selectedDayLog.completedSprints.isEmpty else { return }
+        let text = selectedDayLog.clipboardText
         guard !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -252,23 +377,39 @@ class TimerViewModel {
         }
     }
 
+    func copyAllTodaySprints() {
+        copyAllDisplayedSprints()
+    }
+
     func delete(sprint: Sprint) {
         store.delete(sprint: sprint)
         todayLog = store.todayLog()
+        if isViewingToday {
+            selectedDayLog = todayLog
+        } else {
+            selectedDayLog = store.log(for: selectedDate)
+        }
     }
 
     // MARK: - Manual Sprint Entry
 
     func openManualEntry() {
-        let now = Date()
         if manualEndText.isEmpty {
-            manualEndText = TimeFormatter.format(time: now)
+            if isViewingToday {
+                manualEndText = TimeFormatter.format(time: Date())
+            } else if let last = selectedDayLog.completedSprints.last, let end = last.endTime {
+                manualEndText = TimeFormatter.format(time: end)
+            } else {
+                manualEndText = "10:00:00"
+            }
         }
         if manualStartText.isEmpty {
-            if let last = todayLog.completedSprints.last {
+            if let last = selectedDayLog.completedSprints.last {
                 manualStartText = last.endLabel
+            } else if isViewingToday {
+                manualStartText = TimeFormatter.format(time: Date().addingTimeInterval(-3600))
             } else {
-                manualStartText = TimeFormatter.format(time: now.addingTimeInterval(-3600))
+                manualStartText = "09:00:00"
             }
         }
         manualBreakMinutesText = "0"
@@ -282,7 +423,7 @@ class TimerViewModel {
     }
 
     func stepManualTime(isStart: Bool, minutes: Int) {
-        let reference = Date()
+        let reference = selectedDate
         let currentText = isStart ? manualStartText : manualEndText
         let baseDate = TimeFormatter.parseTime(currentText, on: reference) ?? reference
         let newDate = baseDate.addingTimeInterval(TimeInterval(minutes * 60))
@@ -296,7 +437,7 @@ class TimerViewModel {
     }
 
     var manualComputedNetDuration: TimeInterval? {
-        let reference = Date()
+        let reference = selectedDate
         guard let start = TimeFormatter.parseTime(manualStartText, on: reference),
               let end = TimeFormatter.parseTime(manualEndText, on: reference) else {
             return nil
@@ -314,7 +455,7 @@ class TimerViewModel {
 
     @discardableResult
     func saveManualSprint() -> Bool {
-        let reference = Date()
+        let reference = selectedDate
         guard let start = TimeFormatter.parseTime(manualStartText, on: reference) else {
             manualEntryError = "Invalid start time (HH:mm:ss)"
             return false
@@ -343,8 +484,13 @@ class TimerViewModel {
 
         store.save(sprint: sprint)
         todayLog = store.todayLog()
+        if isViewingToday {
+            selectedDayLog = todayLog
+            checkMilestoneNotifications()
+        } else {
+            selectedDayLog = store.log(for: selectedDate)
+        }
         copy(sprint: sprint)
-        checkMilestoneNotifications()
 
         isManualEntryPresented = false
         manualStartText = ""

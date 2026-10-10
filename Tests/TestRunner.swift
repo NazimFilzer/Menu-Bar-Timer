@@ -400,9 +400,9 @@ func testGlobalHotkeys() {
 
 func testAppVersion() {
     print("Running AppVersion tests...")
-    assertEqual(AppVersion.current, "v1.1", "App version should be tracked as v1.1")
-    assertEqual(AppVersion.marketingVersion, "1.1", "Marketing version should be 1.1")
-    assertEqual(AppVersion.buildNumber, "2", "Build number should be 2")
+    assertEqual(AppVersion.current, "v1.2", "App version should be tracked as v1.2")
+    assertEqual(AppVersion.marketingVersion, "1.2", "Marketing version should be 1.2")
+    assertEqual(AppVersion.buildNumber, "3", "Build number should be 3")
 }
 
 @MainActor
@@ -587,6 +587,101 @@ func testManualSprintEntry() {
     assertFalse(vm.isManualEntryPresented)
 }
 
+@MainActor
+func testPastDaysHistory() {
+    print("Running Past Days History & Navigation tests...")
+
+    let inMemory = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: inMemory)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    // Initial state: Viewing today
+    assertTrue(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Today")
+    assertEqual(vm.sprintsSectionTitle, "TODAY'S SPRINTS")
+    assertEqual(vm.availablePastDates.count, 7)
+
+    // Verify availablePastDates starts today and goes back 6 days
+    let cal = Calendar.current
+    for (i, d) in vm.availablePastDates.enumerated() {
+        let diff = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: cal.startOfDay(for: Date())).day ?? 0
+        assertEqual(diff, i, "Day at index \(i) should be \(i) days ago")
+    }
+
+    // Set hourly rate
+    vm.goal.hourlyRate = 500.0
+
+    // Setup: 1 sprint today (1 hour: 3600s), 2 sprints yesterday (2 hours each: 7200s total)
+    let today = Date()
+    let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+
+    // Today's sprint
+    let sTodayStart = cal.date(bySettingHour: 10, minute: 0, second: 0, of: today)!
+    let sTodayEnd = cal.date(bySettingHour: 11, minute: 0, second: 0, of: today)!
+    let sToday = Sprint(startTime: sTodayStart, endTime: sTodayEnd, pausedDuration: 0)
+    store.save(sprint: sToday)
+
+    // Yesterday's sprints
+    let sYest1Start = cal.date(bySettingHour: 9, minute: 0, second: 0, of: yesterday)!
+    let sYest1End = cal.date(bySettingHour: 11, minute: 0, second: 0, of: yesterday)!
+    let sYest1 = Sprint(startTime: sYest1Start, endTime: sYest1End, pausedDuration: 0) // 2h (7200s)
+
+    let sYest2Start = cal.date(bySettingHour: 14, minute: 0, second: 0, of: yesterday)!
+    let sYest2End = cal.date(bySettingHour: 16, minute: 0, second: 0, of: yesterday)!
+    let sYest2 = Sprint(startTime: sYest2Start, endTime: sYest2End, pausedDuration: 0) // 2h (7200s)
+
+    store.save(sprint: sYest1)
+    store.save(sprint: sYest2)
+
+    // Refresh vm today log
+    vm.selectDate(today)
+    assertEqual(vm.displayedCompletedSprints.count, 1)
+    assertEqual(vm.displayedAccumulatedTotal, 3600.0)
+    assertEqual(vm.displayedEarnings, 500.0)
+    assertEqual(vm.displayedGoalTitle, "Daily Target")
+
+    // Test menu item title
+    let yestMenuItem = vm.menuItemTitle(for: yesterday)
+    assertTrue(yestMenuItem.contains("Yesterday") && yestMenuItem.contains("(2)"))
+
+    // Navigate to Yesterday
+    vm.selectDate(yesterday)
+    assertFalse(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Yesterday")
+    assertEqual(vm.sprintsSectionTitle, "YESTERDAY'S SPRINTS")
+    assertEqual(vm.displayedCompletedSprints.count, 2)
+    assertEqual(vm.displayedAccumulatedTotal, 14400.0) // 4h
+    assertEqual(vm.displayedEarnings, 2000.0) // 4h * 500
+    assertEqual(vm.displayedGoalTitle, "Yesterday's Target")
+    assertEqual(vm.displayedTotalShortLabel, "4h 0m")
+
+    // Verify copy all displayed sprints copies yesterday's 2 sprints
+    let yestClipboard = vm.selectedDayLog.clipboardText
+    assertEqual(yestClipboard, "\(sYest1.clipboardText)\n\(sYest2.clipboardText)")
+
+    // Test saving manual sprint while viewing yesterday
+    vm.manualStartText = "17:00:00"
+    vm.manualEndText = "18:00:00"
+    vm.manualBreakMinutesText = "0"
+    let savedYest = vm.saveManualSprint()
+    assertTrue(savedYest)
+
+    // Yesterday now has 3 sprints, today still has 1 sprint
+    assertEqual(vm.displayedCompletedSprints.count, 3)
+    assertEqual(vm.todayLog.completedSprints.count, 1)
+
+    // Test jump to today
+    vm.jumpToToday()
+    assertTrue(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Today")
+    assertEqual(vm.sprintsSectionTitle, "TODAY'S SPRINTS")
+    assertEqual(vm.displayedCompletedSprints.count, 1)
+    assertEqual(vm.displayedAccumulatedTotal, 3600.0)
+    assertEqual(vm.displayedEarnings, 500.0)
+    assertEqual(vm.displayedGoalTitle, "Daily Target")
+}
+
 // MARK: - Main Runner
 
 @main
@@ -607,6 +702,7 @@ struct TestMain {
             testGlobalHotkeys()
             testEarningsTracking()
             testManualSprintEntry()
+            testPastDaysHistory()
         }
 
         print("----------------------------------------")

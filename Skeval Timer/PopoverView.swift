@@ -102,7 +102,7 @@ private struct PopoverHeaderView: View {
                         .foregroundColor(theme.textPrimary)
                         .kerning(1.2)
 
-                    Text("MVP")
+                    Text(AppVersion.current)
                         .font(.system(size: 9, weight: .heavy, design: .rounded))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -111,9 +111,36 @@ private struct PopoverHeaderView: View {
                         .clipShape(Capsule())
                 }
 
-                Text(TimeFormatter.format(headerDate: Date()))
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
+                Menu {
+                    ForEach(vm.availablePastDates, id: \.self) { date in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                vm.selectDate(date)
+                            }
+                        }) {
+                            if Calendar.current.isDate(date, inSameDayAs: vm.selectedDate) {
+                                Text("✓ " + vm.menuItemTitle(for: date))
+                            } else {
+                                Text(vm.menuItemTitle(for: date))
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(vm.headerDateSubtitle)
+                            .font(.system(size: 11, weight: vm.isViewingToday ? .regular : .semibold, design: .rounded))
+                            .foregroundColor(vm.isViewingToday ? theme.textSecondary : .orange)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 7.5, weight: .bold))
+                            .foregroundColor(vm.isViewingToday ? theme.textSecondary.opacity(0.7) : .orange)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .fixedSize()
+                .focusable(false)
+                .focusEffectDisabled()
             }
 
             Spacer()
@@ -285,14 +312,14 @@ private struct DailyGoalProgressView: View {
         VStack(alignment: .leading, spacing: 6) {
             if vm.goal.hasHourlyRate {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Daily Target")
+                    Text(vm.displayedGoalTitle)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
+                        .foregroundColor(vm.isViewingToday ? theme.textSecondary : .orange)
                         .textCase(.uppercase)
                         .kerning(0.8)
                     Spacer()
                     HStack(spacing: 3) {
-                        Text(vm.todayEarningsLabel)
+                        Text(vm.displayedEarningsLabel)
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .foregroundColor(earningsColor)
                         Text("/ \(vm.targetEarningsLabel)")
@@ -302,15 +329,15 @@ private struct DailyGoalProgressView: View {
                 }
             } else {
                 HStack {
-                    Text("Daily Goal Target")
+                    Text(vm.displayedGoalTitle)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
+                        .foregroundColor(vm.isViewingToday ? theme.textSecondary : .orange)
                         .textCase(.uppercase)
                         .kerning(0.8)
                     Spacer()
-                    Text(vm.progressLabel)
+                    Text(vm.displayedProgressLabel)
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(vm.progressFraction >= 1.0 ? theme.neonTeal : theme.textPrimary)
+                        .foregroundColor(vm.displayedProgressFraction >= 1.0 ? theme.neonTeal : theme.textPrimary)
                 }
             }
 
@@ -328,23 +355,23 @@ private struct DailyGoalProgressView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: geo.size.width * CGFloat(vm.progressFraction), height: 6)
+                        .frame(width: geo.size.width * CGFloat(vm.displayedProgressFraction), height: 6)
                         .shadow(color: theme.neonTeal.opacity(0.6), radius: 4)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: vm.progressFraction)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: vm.displayedProgressFraction)
                 }
             }
             .frame(height: 6)
 
             if vm.goal.hasHourlyRate {
                 HStack {
-                    Text("Logged: \(vm.totalTodayShortLabel) / \(vm.goal.goalLabel)")
+                    Text("Logged: \(vm.displayedTotalShortLabel) / \(vm.goal.goalLabel)")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(theme.textSecondary)
                     Spacer()
-                    let pct = Int(round(vm.progressFraction * 100))
+                    let pct = Int(round(vm.displayedProgressFraction * 100))
                     Text("\(pct)% achieved")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundColor(vm.progressFraction >= 1.0 ? earningsColor : theme.textSecondary)
+                        .foregroundColor(vm.displayedProgressFraction >= 1.0 ? earningsColor : theme.textSecondary)
                 }
                 .padding(.top, 1)
             }
@@ -575,13 +602,13 @@ private struct SprintHistorySectionView: View {
                     Image(systemName: "list.bullet.rectangle.fill")
                         .font(.system(size: 11))
                         .foregroundColor(theme.neonTeal)
-                    Text("TODAY'S SPRINTS")
+                    Text(vm.sprintsSectionTitle)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
                         .kerning(0.8)
 
-                    if !vm.todayLog.completedSprints.isEmpty {
-                        Text("(\(vm.todayLog.completedSprints.count))")
+                    if !vm.displayedCompletedSprints.isEmpty {
+                        Text("(\(vm.displayedCompletedSprints.count))")
                             .font(.system(size: 10, weight: .semibold, design: .monospaced))
                             .foregroundColor(theme.textSecondary)
                     }
@@ -590,22 +617,22 @@ private struct SprintHistorySectionView: View {
                 Spacer()
 
                 HStack(spacing: 6) {
-                    if vm.todayLog.completedSprints.isEmpty {
+                    if vm.displayedCompletedSprints.isEmpty {
                         Text("0 completed")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundColor(theme.textSecondary)
                     } else {
-                        if vm.todayLog.totalPausedDuration > 0 {
+                        if vm.selectedDayLog.totalPausedDuration > 0 {
                             HStack(spacing: 3) {
                                 Image(systemName: "pause.fill")
                                     .font(.system(size: 7))
-                                Text(vm.todayLog.totalPausedLabel)
+                                Text(vm.selectedDayLog.totalPausedLabel)
                                     .font(.system(size: 9.5, weight: .medium, design: .rounded))
                             }
                             .foregroundColor(Color.orange.opacity(0.85))
                         }
 
-                        Button(action: { vm.copyAllTodaySprints() }) {
+                        Button(action: { vm.copyAllDisplayedSprints() }) {
                             HStack(spacing: 3.5) {
                                 Image(systemName: vm.isAllCopied ? "checkmark" : "doc.on.doc")
                                     .font(.system(size: 8.5, weight: .bold))
@@ -621,7 +648,7 @@ private struct SprintHistorySectionView: View {
                         }
                         .buttonStyle(PressedScaleButtonStyle())
                         .focusable(false)
-                        .help("Copy all today's sprints to clipboard (Start & End columns for spreadsheets)")
+                        .help("Copy all sprints for this day to clipboard (Start & End columns for spreadsheets)")
                     }
 
                     Button(action: {
@@ -646,12 +673,12 @@ private struct SprintHistorySectionView: View {
             .padding(.top, 10)
             .padding(.bottom, 8)
 
-            if vm.todayLog.completedSprints.isEmpty {
+            if vm.displayedCompletedSprints.isEmpty {
                 VStack(spacing: 4) {
                     Image(systemName: "clock.badge.checkmark")
                         .font(.system(size: 20))
                         .foregroundColor(theme.textSecondary.opacity(0.5))
-                    Text("No sprints logged for today yet")
+                    Text(vm.isViewingToday ? "No sprints logged for today yet" : "No sprints logged for \(vm.selectedDayShortTitle)")
                         .font(.system(size: 11, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                 }
@@ -663,7 +690,7 @@ private struct SprintHistorySectionView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 5) {
-                        ForEach(vm.todayLog.completedSprintsDescending, id: \.sprint.id) { item in
+                        ForEach(vm.displayedCompletedSprintsDescending, id: \.sprint.id) { item in
                             SprintCardRow(
                                 index: item.index,
                                 sprint: item.sprint,
@@ -678,8 +705,8 @@ private struct SprintHistorySectionView: View {
                 }
                 .frame(maxHeight: 340)
                 .contextMenu {
-                    Button("Copy All Today's Sprints") {
-                        vm.copyAllTodaySprints()
+                    Button(vm.isViewingToday ? "Copy All Today's Sprints" : "Copy All \(vm.selectedDayShortTitle)'s Sprints") {
+                        vm.copyAllDisplayedSprints()
                     }
                 }
             }
@@ -1097,7 +1124,7 @@ private struct ManualSprintSheetView: View {
                     Image(systemName: "clock.badge.plus")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(theme.neonTeal)
-                    Text("MANUAL SPRINT")
+                    Text(vm.isViewingToday ? "MANUAL SPRINT" : "MANUAL SPRINT (\(vm.selectedDayShortTitle.uppercased()))")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
                         .kerning(0.8)

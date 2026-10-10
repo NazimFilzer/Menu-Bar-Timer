@@ -19,6 +19,18 @@ enum TimeFormatter {
         return f
     }()
 
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    private static let shortDayTitleFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, d MMM"
+        return f
+    }()
+
     private static let rupeeFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .currency
@@ -91,6 +103,40 @@ enum TimeFormatter {
         formatterLock.lock()
         defer { formatterLock.unlock() }
         return headerDateFormatter.string(from: headerDate)
+    }
+
+    static func format(shortDate: Date) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        return shortDateFormatter.string(from: shortDate)
+    }
+
+    static func format(shortDayTitle: Date) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        return shortDayTitleFormatter.string(from: shortDayTitle)
+    }
+
+    static func format(relativeHeaderDate: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(relativeHeaderDate) {
+            return format(headerDate: relativeHeaderDate)
+        } else if cal.isDateInYesterday(relativeHeaderDate) {
+            return "Yesterday (\(format(shortDayTitle: relativeHeaderDate)))"
+        } else {
+            return format(headerDate: relativeHeaderDate)
+        }
+    }
+
+    static func format(menuItemTitle: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(menuItemTitle) {
+            return "Today (\(format(shortDate: menuItemTitle)))"
+        } else if cal.isDateInYesterday(menuItemTitle) {
+            return "Yesterday (\(format(shortDate: menuItemTitle)))"
+        } else {
+            return format(shortDayTitle: menuItemTitle)
+        }
     }
 
     static func clipboardRow(start: Date, effectiveEnd: Date) -> String {
