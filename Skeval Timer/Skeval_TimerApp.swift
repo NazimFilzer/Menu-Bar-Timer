@@ -44,10 +44,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         popover.behavior = .transient
         popover.animates = false
         updatePopoverSize()
-        let hostingController = NSHostingController(
+        let hostingController = PopoverHostingController(
             rootView: PopoverView(vm: vm)
         )
-        hostingController.sizingOptions = []
         popover.contentViewController = hostingController
 
         registerGlobalHotkeys()
@@ -65,14 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // MARK: - Popover toggle & sizing
 
     func updatePopoverSize() {
-        let hasSprints = !vm.todayLog.completedSprints.isEmpty
-        let height: CGFloat
-        if vm.isSettingsExpanded {
-            height = hasSprints ? 750 : 680
-        } else {
-            height = hasSprints ? 590 : 430
-        }
-        popover?.contentSize = NSSize(width: 330, height: height)
+        popover?.contentSize = NSSize(width: 330, height: vm.desiredPopoverHeight)
     }
 
     @objc func togglePopover() {
@@ -246,8 +238,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private func observePopoverSize() {
         // Only tracks things that affect POPOVER HEIGHT (not status bar)
         withObservationTracking {
-            _ = vm.todayLog.completedSprints.count
-            _ = vm.isSettingsExpanded
+            _ = vm.desiredPopoverHeight
         } onChange: {
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -294,5 +285,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+}
+
+// MARK: - Popover Container View Controller
+
+@MainActor
+final class PopoverHostingController: NSViewController {
+    let hostingController: NSHostingController<PopoverView>
+
+    init(rootView: PopoverView) {
+        self.hostingController = NSHostingController(rootView: rootView)
+        self.hostingController.sizingOptions = []
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func loadView() {
+        let container = NSView()
+        container.autoresizingMask = [.width, .height]
+        addChild(hostingController)
+        hostingController.view.autoresizingMask = [.width, .height]
+        container.addSubview(hostingController.view)
+        self.view = container
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        hostingController.view.frame = view.bounds
     }
 }

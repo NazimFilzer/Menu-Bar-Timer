@@ -250,6 +250,20 @@ class TimerViewModel {
         selectDate(Date())
     }
 
+    var desiredPopoverHeight: CGFloat {
+        let hasSprints = !displayedCompletedSprints.isEmpty
+        var height: CGFloat
+        if isSettingsExpanded {
+            height = hasSprints ? 750 : 680
+        } else {
+            height = hasSprints ? 590 : 430
+        }
+        if recoveryMode {
+            height += 70
+        }
+        return height
+    }
+
     var displayedAccumulatedTotal: TimeInterval {
         if isViewingToday {
             return totalTodayElapsed

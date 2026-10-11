@@ -114,9 +114,7 @@ private struct PopoverHeaderView: View {
                 Menu {
                     ForEach(vm.availablePastDates, id: \.self) { date in
                         Button(action: {
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                vm.selectDate(date)
-                            }
+                            vm.selectDate(date)
                         }) {
                             if Calendar.current.isDate(date, inSameDayAs: vm.selectedDate) {
                                 Text("✓ " + vm.menuItemTitle(for: date))
