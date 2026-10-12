@@ -757,6 +757,95 @@ func testAutomaticDayRollover() {
     assertEqual(TimeFormatter.format(dateKey: vm.selectedDate), TimeFormatter.format(dateKey: tomorrow), "Advancing to tomorrow must update selectedDate")
 }
 
+@MainActor
+func testTimeAndPauseMathVerification() {
+    print("Running Time, Pause, and Break Math Invariant tests...")
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+
+    // 1. Exact fractional-second pause and zero-drift verification
+    let t0 = Date()
+    engine.clockIn(at: t0)
+
+    let t1 = t0.addingTimeInterval(10.75) // Active: 10.75s
+    engine.pause(at: t1)
+    assertEqual(engine.state.currentElapsed, 10.75, "Elapsed at pause must match exact fractional work time")
+    assertEqual(engine.totalCurrentSprintPaused, 0.0, "Pause just started, accumulated pause is 0")
+
+    let t2 = t1.addingTimeInterval(2.50) // Pause 1: 2.50s
+    engine.resume(at: t2)
+    assertEqual(engine.totalCurrentSprintPaused, 2.50, "Paused duration must record exact 2.50s")
+    assertEqual(engine.state.currentElapsed, 10.75, "Elapsed after resume must equal active time before pause")
+
+    let t3 = t2.addingTimeInterval(7.15) // Active 2: 7.15s (gross 10.75 + 2.50 + 7.15 = 20.40s)
+    engine.pause(at: t3)
+    let expectedElapsedAtPause2 = 10.75 + 7.15
+    assertEqual(round(engine.state.currentElapsed * 100) / 100, round(expectedElapsedAtPause2 * 100) / 100, "Second pause must preserve exact sum of active intervals (17.90s)")
+
+    let t4 = t3.addingTimeInterval(3.70) // Pause 2: 3.70s (total pause 2.50 + 3.70 = 6.20s)
+    engine.resume(at: t4)
+    assertEqual(round(engine.totalCurrentSprintPaused * 100) / 100, 6.20, "Total paused duration must equal sum of pauses (6.20s)")
+
+    let t5 = t4.addingTimeInterval(5.90) // Active 3: 5.90s (total wall clock: 30.00s)
+    var completed: Sprint? = nil
+    engine.onSprintCompleted = { completed = $0 }
+    engine.clockOut(at: t5)
+
+    assertTrue(completed != nil)
+    // Gross: 30.0s. Paused: 6.2s. Net work: 23.8s.
+    assertEqual(round((completed?.pausedDuration ?? 0) * 100) / 100, 6.20)
+    assertEqual(round((completed?.duration ?? 0) * 100) / 100, 23.80)
+    let expectedEffectiveEnd = t5.addingTimeInterval(-6.20)
+    assertEqual(completed?.effectiveEnd, expectedEffectiveEnd)
+
+    // 2. EffectiveEnd clamping invariant: effectiveEnd never precedes startTime
+    let clampedSprint = Sprint(startTime: t0, endTime: t0.addingTimeInterval(100), pausedDuration: 150)
+    assertEqual(clampedSprint.duration, 0.0, "Duration must clamp to 0 when pause exceeds gross duration")
+    assertEqual(clampedSprint.effectiveEnd, t0, "EffectiveEnd must clamp to startTime when pause exceeds duration")
+
+    // 3. Recovery validation: break duration exceeding sprint time must throw
+    let openSprintWithPauses = Sprint(startTime: t0, pausedDuration: 600)
+    store.save(sprint: openSprintWithPauses)
+    engine.reload()
+    guard case .recovery = engine.state else {
+        assertTrue(false, "Engine must be in recovery")
+        return
+    }
+    // Enter end time only 300s after start (5 min end, but 10 min pauses recorded)
+    let invalidRecoveryEnd = TimeFormatter.format(time: t0.addingTimeInterval(300))
+    var threwExpectedError = false
+    do {
+        try engine.saveRecoveryEndTime(invalidRecoveryEnd)
+    } catch RecoveryError.breakExceedsSprintTime {
+        threwExpectedError = true
+    } catch {
+        // other error
+    }
+    assertTrue(threwExpectedError, "Recovery must throw breakExceedsSprintTime when end time <= pause duration")
+    engine.dismissRecovery()
+
+    // 4. Manual entry validation: invalid break minutes text
+    let vm = TimerViewModel(engine: engine, store: store)
+    vm.openManualEntry()
+    vm.manualStartText = "10:00:00"
+    vm.manualEndText = "11:00:00"
+    vm.manualBreakMinutesText = "-10" // negative break minutes
+    assertFalse(vm.saveManualSprint(), "Negative break minutes must fail save")
+    assertEqual(vm.manualEntryError, "Invalid break minutes")
+
+    vm.manualBreakMinutesText = "abc" // non-numeric
+    assertFalse(vm.saveManualSprint(), "Non-numeric break minutes must fail save")
+    assertEqual(vm.manualEntryError, "Invalid break minutes")
+
+    vm.manualBreakMinutesText = "15" // valid 15 min
+    assertTrue(vm.saveManualSprint(), "Valid 15 min break must succeed")
+    let savedManual = vm.todayLog.completedSprints.first { $0.startLabel == "10:00:00" }
+    assertEqual(savedManual?.pausedDuration, 900.0)
+    assertEqual(savedManual?.pauseCount, 1)
+    assertEqual(savedManual?.duration, 2700.0)
+}
+
 // MARK: - Main Runner
 
 @main
@@ -780,6 +869,7 @@ struct TestMain {
             testPastDaysHistory()
             testPopoverHeightAndSizing()
             testAutomaticDayRollover()
+            testTimeAndPauseMathVerification()
         }
 
         print("----------------------------------------")

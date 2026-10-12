@@ -64,7 +64,8 @@ struct Sprint: Identifiable, Codable, Equatable {
     // This ensures the spreadsheet computes (effectiveEnd − startTime) == net work duration
     var effectiveEnd: Date? {
         guard let end = endTime else { return nil }
-        return end.addingTimeInterval(-pausedDuration)
+        let calculated = end.addingTimeInterval(-pausedDuration)
+        return max(startTime, calculated)
     }
 
     var effectiveEndLabel: String {

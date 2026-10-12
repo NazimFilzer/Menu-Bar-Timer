@@ -474,7 +474,8 @@ class TimerViewModel {
               let end = TimeFormatter.parseTime(manualEndText, on: reference) else {
             return nil
         }
-        let breakMin = Double(manualBreakMinutesText.trimmingCharacters(in: .whitespaces)) ?? 0
+        let breakMin = max(0, Double(manualBreakMinutesText.trimmingCharacters(in: .whitespaces)) ?? 0)
+        guard breakMin.isFinite else { return nil }
         let net = end.timeIntervalSince(start) - (breakMin * 60)
         guard net > 0 else { return nil }
         return net
@@ -501,7 +502,12 @@ class TimerViewModel {
             return false
         }
 
-        let breakMin = max(0, Double(manualBreakMinutesText.trimmingCharacters(in: .whitespaces)) ?? 0)
+        let trimmedBreak = manualBreakMinutesText.trimmingCharacters(in: .whitespaces)
+        guard let parsedBreak = Double(trimmedBreak), parsedBreak >= 0, parsedBreak.isFinite else {
+            manualEntryError = "Invalid break minutes"
+            return false
+        }
+        let breakMin = parsedBreak
         let pausedDuration = breakMin * 60
         guard end.timeIntervalSince(start) > pausedDuration else {
             manualEntryError = "Break duration exceeds sprint time"
@@ -511,7 +517,8 @@ class TimerViewModel {
         let sprint = Sprint(
             startTime: start,
             endTime: end,
-            pausedDuration: pausedDuration
+            pausedDuration: pausedDuration,
+            pauseCount: pausedDuration > 0 ? 1 : 0
         )
 
         store.save(sprint: sprint)
