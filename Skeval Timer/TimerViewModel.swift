@@ -44,6 +44,18 @@ class TimerViewModel {
 
     private var notifiedMilestones: Set<Int> = []
     private var lastNotifiedDayKey: String = TimeFormatter.format(dateKey: Date())
+    private var lastActiveDayKey: String = TimeFormatter.format(dateKey: Date())
+
+    func checkAndHandleDayChange(now: Date = Date()) {
+        let currentDayKey = TimeFormatter.format(dateKey: now)
+        if currentDayKey != lastActiveDayKey {
+            lastActiveDayKey = currentDayKey
+            lastNotifiedDayKey = currentDayKey
+            notifiedMilestones.removeAll()
+            todayLog = store.log(for: now)
+            jumpToToday(now: now)
+        }
+    }
 
     // MARK: - Init
 
@@ -91,6 +103,7 @@ class TimerViewModel {
         engine.onTick = { [weak self] elapsed in
             guard let self else { return }
             self.currentElapsed = elapsed
+            self.checkAndHandleDayChange()
             self.checkMilestoneNotifications()
         }
 
@@ -100,6 +113,7 @@ class TimerViewModel {
 
         engine.onSprintCompleted = { [weak self] sprint in
             guard let self else { return }
+            self.checkAndHandleDayChange()
             self.todayLog = self.store.todayLog()
             if self.isViewingToday {
                 self.selectedDayLog = self.todayLog
@@ -246,17 +260,16 @@ class TimerViewModel {
         }
     }
 
-    func jumpToToday() {
-        selectDate(Date())
+    func jumpToToday(now: Date = Date()) {
+        selectDate(now)
     }
 
     var desiredPopoverHeight: CGFloat {
-        let hasSprints = !displayedCompletedSprints.isEmpty
         var height: CGFloat
         if isSettingsExpanded {
-            height = hasSprints ? 750 : 680
+            height = 780
         } else {
-            height = hasSprints ? 590 : 430
+            height = 590
         }
         if recoveryMode {
             height += 70
@@ -315,10 +328,15 @@ class TimerViewModel {
     // MARK: - Actions
 
     func clockIn() {
+        checkAndHandleDayChange()
+        jumpToToday()
         lastCopiedId = nil
         isAllCopied = false
         engine.clockIn()
         todayLog = store.todayLog()
+        if isViewingToday {
+            selectedDayLog = todayLog
+        }
     }
 
     func clockOut() {

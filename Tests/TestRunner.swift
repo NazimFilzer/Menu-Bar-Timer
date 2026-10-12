@@ -690,18 +690,18 @@ func testPopoverHeightAndSizing() {
     let engine = SprintEngine(store: store)
     let vm = TimerViewModel(engine: engine, store: store)
 
-    // 1. Initial empty state: no sprints, not expanded, no recovery
+    // 1. Initial empty state: no sprints, not expanded, no recovery -> stable 590 to prevent UI compaction
     assertEqual(vm.displayedCompletedSprints.count, 0)
     assertFalse(vm.isSettingsExpanded)
     assertFalse(vm.recoveryMode)
-    assertEqual(vm.desiredPopoverHeight, 430.0, "Empty state without sprints should be 430")
+    assertEqual(vm.desiredPopoverHeight, 590.0, "Empty state without sprints should be 590 to prevent UI compaction")
 
-    // 2. Settings expanded without sprints
+    // 2. Settings expanded without sprints -> 780
     vm.isSettingsExpanded = true
-    assertEqual(vm.desiredPopoverHeight, 680.0, "Empty state with settings expanded should be 680")
+    assertEqual(vm.desiredPopoverHeight, 780.0, "Empty state with settings expanded should be 780")
     vm.isSettingsExpanded = false
 
-    // 3. Add sprint today
+    // 3. Add sprint today -> stable 590
     let today = Date()
     let sToday = Sprint(startTime: today, endTime: today.addingTimeInterval(3600), pausedDuration: 0)
     store.save(sprint: sToday)
@@ -711,9 +711,9 @@ func testPopoverHeightAndSizing() {
     assertEqual(vm.displayedCompletedSprints.count, 1)
     assertEqual(vm.desiredPopoverHeight, 590.0, "State with completed sprints should be 590")
 
-    // 4. Settings expanded with sprints
+    // 4. Settings expanded with sprints -> 780
     vm.isSettingsExpanded = true
-    assertEqual(vm.desiredPopoverHeight, 750.0, "State with sprints and settings expanded should be 750")
+    assertEqual(vm.desiredPopoverHeight, 780.0, "State with sprints and settings expanded should be 780")
     vm.isSettingsExpanded = false
 
     // 5. Past days navigation sizing test
@@ -721,11 +721,40 @@ func testPopoverHeightAndSizing() {
     let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
     vm.selectDate(yesterday)
     assertEqual(vm.displayedCompletedSprints.count, 0)
-    assertEqual(vm.desiredPopoverHeight, 430.0, "Viewing yesterday with 0 sprints should size to 430")
+    assertEqual(vm.desiredPopoverHeight, 590.0, "Viewing yesterday with 0 sprints should size stably to 590")
 
     vm.selectDate(today)
     assertEqual(vm.displayedCompletedSprints.count, 1)
     assertEqual(vm.desiredPopoverHeight, 590.0, "Returning to today with 1 sprint should size to 590")
+}
+
+@MainActor
+func testAutomaticDayRollover() {
+    print("Running Automatic Day Rollover tests...")
+    let inMemory = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: inMemory)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    let today = Date()
+    let cal = Calendar.current
+    let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+
+    // 1. User was viewing yesterday
+    vm.selectDate(yesterday)
+    assertFalse(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Yesterday")
+
+    // 2. Starting timer via clockIn() must automatically advance view to Today
+    vm.clockIn()
+    assertTrue(vm.isViewingToday, "Clocking in must automatically switch view to today")
+    assertTrue(vm.isRunning)
+    vm.clockOut()
+
+    // 3. Day rollover detection via checkAndHandleDayChange
+    let tomorrow = cal.date(byAdding: .day, value: 1, to: today)!
+    vm.checkAndHandleDayChange(now: tomorrow)
+    assertEqual(TimeFormatter.format(dateKey: vm.selectedDate), TimeFormatter.format(dateKey: tomorrow), "Advancing to tomorrow must update selectedDate")
 }
 
 // MARK: - Main Runner
@@ -750,6 +779,7 @@ struct TestMain {
             testManualSprintEntry()
             testPastDaysHistory()
             testPopoverHeightAndSizing()
+            testAutomaticDayRollover()
         }
 
         print("----------------------------------------")

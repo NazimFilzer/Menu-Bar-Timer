@@ -51,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         registerGlobalHotkeys()
         setupStateObservation()
+        setupDayChangeObservers()
         updateStatusItem(force: true)
 
         UNUserNotificationCenter.current().delegate = self
@@ -69,6 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     @objc func togglePopover() {
         guard let btn = statusItem.button else { return }
+        vm.checkAndHandleDayChange()
         updatePopoverSize()
         if popover.isShown {
             popover.performClose(nil)
@@ -76,6 +78,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
+    }
+
+    private func setupDayChangeObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleDayChange),
+            name: .NSCalendarDayChanged,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleDayChange),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleDayChange() {
+        vm.checkAndHandleDayChange()
+        updatePopoverSize()
+        updateStatusItem(force: true)
     }
 
     // MARK: - Global & Local Hotkeys (⌘+⌥+Shift+C & ⌘+⌥+Shift+P)
@@ -161,6 +184,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         guard now.timeIntervalSince(lastClockHotkeyTriggerTime) > 0.3 else { return }
         lastClockHotkeyTriggerTime = now
 
+        vm.checkAndHandleDayChange(now: now)
         if vm.recoveryMode { return }
         if vm.isRunning {
             vm.clockOut()
@@ -174,6 +198,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         guard now.timeIntervalSince(lastPauseHotkeyTriggerTime) > 0.3 else { return }
         lastPauseHotkeyTriggerTime = now
 
+        vm.checkAndHandleDayChange(now: now)
         if vm.recoveryMode { return }
         if vm.isPaused {
             vm.resumeTimer()

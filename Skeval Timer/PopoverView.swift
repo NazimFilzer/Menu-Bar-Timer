@@ -11,7 +11,7 @@ struct PopoverView: View {
     private var theme: PopoverTheme { themeManager.theme }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             theme.bgDark.ignoresSafeArea()
 
             if vm.isRunning {
@@ -48,6 +48,8 @@ struct PopoverView: View {
                 Divider().background(theme.dividerColor)
 
                 SprintHistorySectionView(vm: vm, theme: theme)
+
+                Spacer(minLength: 0)
 
                 Divider().background(theme.dividerColor)
 
@@ -100,7 +102,8 @@ private struct PopoverHeaderView: View {
                     Text("SKEVAL TIMER")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
-                        .kerning(1.2)
+                        .kerning(1.0)
+                        .lineLimit(1)
 
                     Text(AppVersion.current)
                         .font(.system(size: 9, weight: .heavy, design: .rounded))
@@ -109,7 +112,9 @@ private struct PopoverHeaderView: View {
                         .background(theme.neonTeal.opacity(0.2))
                         .foregroundColor(theme.neonTeal)
                         .clipShape(Capsule())
+                        .lineLimit(1)
                 }
+                .fixedSize(horizontal: true, vertical: false)
 
                 Menu {
                     ForEach(vm.availablePastDates, id: \.self) { date in
@@ -701,7 +706,7 @@ private struct SprintHistorySectionView: View {
                     }
                     .padding(.horizontal, 16)
                 }
-                .frame(maxHeight: 340)
+                .frame(maxHeight: vm.isSettingsExpanded ? 160 : 340)
                 .contextMenu {
                     Button(vm.isViewingToday ? "Copy All Today's Sprints" : "Copy All \(vm.selectedDayShortTitle)'s Sprints") {
                         vm.copyAllDisplayedSprints()
@@ -845,7 +850,7 @@ private struct SettingsSectionView: View {
             .focusable(false)
 
             if vm.isSettingsExpanded {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("Theme")
