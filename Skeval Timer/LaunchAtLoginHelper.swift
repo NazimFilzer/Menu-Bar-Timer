@@ -7,15 +7,23 @@ enum LaunchAtLoginHelper {
         return SMAppService.mainApp.status == .enabled
     }
 
-    static func setEnabled(_ enabled: Bool) {
+    @discardableResult
+    static func setEnabled(_ enabled: Bool) -> String? {
+        guard Bundle.main.bundlePath.hasPrefix("/Applications/") else {
+            return "Move Skeval Timer to Applications to enable launch at login."
+        }
         do {
             if enabled {
                 try SMAppService.mainApp.register()
             } else {
                 try SMAppService.mainApp.unregister()
             }
+            if SMAppService.mainApp.status == .requiresApproval {
+                return "Allow Skeval Timer in System Settings > General > Login Items."
+            }
+            return nil
         } catch {
-            print("[LaunchAtLogin] Notice: SMAppService requires app to be in /Applications. \(error)")
+            return "Launch at login could not be changed: \(error.localizedDescription)"
         }
     }
 }

@@ -9,6 +9,8 @@ enum TimeFormatter {
 
     private static let dateKeyFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -66,7 +68,7 @@ enum TimeFormatter {
         let m = (totalSeconds % 3600) / 60
         if h > 0 { return "\(h)h \(m)m" }
         if m > 0 { return "\(m)m" }
-        return "0m"
+        return totalSeconds > 0 ? "\(totalSeconds)s" : "0m"
     }
 
     static func format(clock: TimeInterval) -> String {
@@ -93,16 +95,25 @@ enum TimeFormatter {
         return timeFormatter.string(from: time)
     }
 
-    static func format(dateKey: Date) -> String {
+    static func format(dateKey: Date, calendar: Calendar = Calendar(identifier: .gregorian)) -> String {
         formatterLock.lock()
         defer { formatterLock.unlock() }
+        configureDateKeyCalendar(calendar)
         return dateKeyFormatter.string(from: dateKey)
     }
 
-    static func parseDateKey(_ key: String) -> Date? {
+    static func parseDateKey(_ key: String, calendar: Calendar = Calendar(identifier: .gregorian)) -> Date? {
         formatterLock.lock()
         defer { formatterLock.unlock() }
-        return dateKeyFormatter.date(from: key)
+        configureDateKeyCalendar(calendar)
+        guard let date = dateKeyFormatter.date(from: key), dateKeyFormatter.string(from: date) == key else { return nil }
+        return date
+    }
+
+    private static func configureDateKeyCalendar(_ calendar: Calendar) {
+        guard dateKeyFormatter.calendar.identifier != calendar.identifier || dateKeyFormatter.timeZone != calendar.timeZone else { return }
+        dateKeyFormatter.calendar = calendar
+        dateKeyFormatter.timeZone = calendar.timeZone
     }
 
     static func format(headerDate: Date) -> String {
@@ -146,29 +157,39 @@ enum TimeFormatter {
     }
 
     static func clipboardRow(start: Date, effectiveEnd: Date) -> String {
-        "\(format(time: start))\t\(format(time: effectiveEnd))"
+        let roundedStart = Date(timeIntervalSinceReferenceDate: floor(start.timeIntervalSinceReferenceDate))
+        let netSeconds = floor(max(0, effectiveEnd.timeIntervalSince(start)))
+        let roundedEnd = roundedStart.addingTimeInterval(netSeconds)
+        return "\(format(time: roundedStart))\t\(format(time: roundedEnd))"
     }
 
-    static func parseTime(_ text: String, on reference: Date) -> Date? {
-        let pieces = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: ":", omittingEmptySubsequences: false)
-        guard pieces.count == 2 || pieces.count == 3 else { return nil }
-        let parts = pieces.compactMap { Int($0) }
-        guard parts.count == pieces.count else { return nil }
-        guard (0..<24).contains(parts[0]), (0..<60).contains(parts[1]) else { return nil }
-        let sec = parts.count == 3 ? parts[2] : 0
-        guard (0..<60).contains(sec) else { return nil }
-
-        var c = Calendar.current.dateComponents([.year, .month, .day], from: reference)
+    static func parseTime(_ text: String, on reference: Date, calendar: Calendar = .current) -> Date? {
+        guard let parts = clockComponents(text) else { return nil }
+        var c = calendar.dateComponents([.year, .month, .day], from: reference)
         c.hour = parts[0]
         c.minute = parts[1]
-        c.second = sec
-        return Calendar.current.date(from: c)
+        c.second = parts[2]
+        guard let date = calendar.date(from: c),
+              calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date) == c else { return nil }
+        return date
+    }
+
+    private static func clockComponents(_ text: String) -> [Int]? {
+        let pieces = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ":", omittingEmptySubsequences: false)
+        guard (2...3).contains(pieces.count) else { return nil }
+        var parts = pieces.compactMap { Int($0) }
+        guard parts.count == pieces.count else { return nil }
+        if parts.count == 2 { parts.append(0) }
+        guard zip(parts, [24, 60, 60]).allSatisfy({ (0..<$0.1).contains($0.0) }) else { return nil }
+        return parts
     }
 
     static func combine(date: Date, time: Date, wrapIfBefore: Date? = nil, calendar: Calendar = .current) -> Date {
         let timeComps = calendar.dateComponents([.hour, .minute, .second], from: time)
         var result = calendar.date(bySettingHour: timeComps.hour ?? 0, minute: timeComps.minute ?? 0, second: timeComps.second ?? 0, of: date) ?? time
+        let referenceSeconds = time.timeIntervalSinceReferenceDate
+        result = result.addingTimeInterval(referenceSeconds - floor(referenceSeconds))
         if let baseline = wrapIfBefore, result < baseline {
             result = calendar.date(byAdding: .day, value: 1, to: result) ?? result
         }

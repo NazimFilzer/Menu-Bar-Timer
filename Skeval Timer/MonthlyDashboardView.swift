@@ -40,19 +40,20 @@ struct MonthlyDashboardView: View {
     }
 
     var body: some View {
+        let summary = monthlySummary
         VStack(spacing: 18) {
             // Personal Greeting Card with Month-over-Month Pill
-            monthlyGreetingCardView
+            monthlyGreetingCardView(summary: summary)
 
             // 3 Key Metric Cards Row (MTD Total Hours, MTD Earnings, Daily Average)
-            metricsRowView
+            metricsRowView(summary: summary)
 
             // Monthly Goal Progress Bar Card
-            monthlyGoalProgressCardView
+            monthlyGoalProgressCardView(summary: summary)
 
             // 28–31 Day Interactive Bar Chart
             MonthlyChartView(
-                summary: monthlySummary,
+                summary: summary,
                 dailyGoalHours: vm.goal.dailyGoalHours,
                 dailyGoalLabel: vm.goal.goalLabel,
                 theme: theme,
@@ -60,12 +61,12 @@ struct MonthlyDashboardView: View {
             )
 
             // Tag Breakdown Distribution Card
-            tagBreakdownCardView
+            tagBreakdownCardView(summary: summary)
 
             // Monthly Sprints Log Table
             SprintLogTableView(
                 vm: vm,
-                monthlySummary: monthlySummary,
+                monthlySummary: summary,
                 theme: theme,
                 title: "MONTHLY SPRINT LOGS"
             )
@@ -74,14 +75,14 @@ struct MonthlyDashboardView: View {
 
     // MARK: - Greeting Card & MoM Pill
 
-    private var monthlyGreetingCardView: some View {
+    private func monthlyGreetingCardView(summary: MonthlySummary) -> some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(greetingText)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(theme.textPrimary)
 
-                Text(monthlySubtitle)
+                Text(monthlySubtitle(summary: summary))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
             }
@@ -89,7 +90,7 @@ struct MonthlyDashboardView: View {
             Spacer()
 
             // Month-over-Month Comparison Pill
-            monthOverMonthPillView
+            monthOverMonthPillView(summary: summary)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -101,18 +102,18 @@ struct MonthlyDashboardView: View {
         )
     }
 
-    private var monthlySubtitle: String {
-        if monthlySummary.monthlyGoalPercent >= 100 {
-            return "🎉 Outstanding milestone! You've achieved 100% of your monthly goal for \(monthlySummary.monthTitle)."
-        } else if monthlySummary.totalSeconds > 0 {
-            return "You've logged \(monthlySummary.formattedTotalHours) in \(monthlySummary.monthTitle) (\(monthlySummary.monthlyGoalPercent)% of target)."
+    private func monthlySubtitle(summary: MonthlySummary) -> String {
+        if summary.monthlyGoalPercent >= 100 {
+            return "🎉 Outstanding milestone! You've achieved 100% of your monthly goal for \(summary.monthTitle)."
+        } else if summary.totalSeconds > 0 {
+            return "You've logged \(summary.formattedTotalHours) in \(summary.monthTitle) (\(summary.monthlyGoalPercent)% of target)."
         } else {
             return "Start a sprint to track progress toward your \(vm.goal.monthlyGoalLabel) monthly goal."
         }
     }
 
-    private var monthOverMonthPillView: some View {
-        let mom = monthlySummary.monthOverMonth
+    private func monthOverMonthPillView(summary: MonthlySummary) -> some View {
+        let mom = summary.monthOverMonth
         let tintColor: Color = mom.isPositive ? Color.green : (mom.isNeutral ? theme.textSecondary : Color.orange)
         let iconName: String = mom.isPositive ? "arrow.up.right" : (mom.isNeutral ? "equal" : "arrow.down.right")
 
@@ -138,12 +139,12 @@ struct MonthlyDashboardView: View {
 
     // MARK: - Metric Cards Row
 
-    private var metricsRowView: some View {
+    private func metricsRowView(summary: MonthlySummary) -> some View {
         HStack(spacing: 16) {
             // 1. MTD Total Hours
             MetricCardView(
                 title: "MTD TOTAL HOURS",
-                value: monthlySummary.formattedTotalHours,
+                value: summary.formattedTotalHours,
                 subtitle: "Monthly Target: \(vm.goal.monthlyGoalLabel)",
                 icon: "clock.fill",
                 theme: theme
@@ -152,8 +153,8 @@ struct MonthlyDashboardView: View {
             // 2. MTD Calculated Earnings
             MetricCardView(
                 title: "MTD EARNINGS",
-                value: monthlySummary.formattedTotalEarnings,
-                subtitle: "\(monthlySummary.allMonthSprints.count) sprint\(monthlySummary.allMonthSprints.count == 1 ? "" : "s") in \(monthlySummary.monthTitle)",
+                value: summary.formattedTotalEarnings,
+                subtitle: "\(summary.allMonthSprints.count) sprint\(summary.allMonthSprints.count == 1 ? "" : "s") in \(summary.monthTitle)",
                 icon: "banknote.fill",
                 theme: theme
             )
@@ -161,8 +162,8 @@ struct MonthlyDashboardView: View {
             // 3. Daily Average for Month
             MetricCardView(
                 title: "DAILY AVERAGE",
-                value: monthlySummary.formattedDailyAverage,
-                subtitle: monthlySummary.isCurrentMonth ? "Month-to-date average" : "Full month average",
+                value: summary.formattedDailyAverage,
+                subtitle: summary.isCurrentMonth ? "Month-to-date average" : "Full month average",
                 icon: "chart.line.uptrend.xyaxis",
                 theme: theme
             )
@@ -171,7 +172,7 @@ struct MonthlyDashboardView: View {
 
     // MARK: - Monthly Goal Progress Bar Card
 
-    private var monthlyGoalProgressCardView: some View {
+    private func monthlyGoalProgressCardView(summary: MonthlySummary) -> some View {
         VStack(spacing: 12) {
             HStack {
                 HStack(spacing: 6) {
@@ -188,20 +189,20 @@ struct MonthlyDashboardView: View {
                 Spacer()
 
                 HStack(spacing: 4) {
-                    Text("\(monthlySummary.monthlyGoalPercent)%")
+                    Text("\(summary.monthlyGoalPercent)%")
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                     Text("of \(vm.goal.monthlyGoalLabel) goal")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3.5)
-                .background(monthlySummary.monthlyGoalPercent >= 100 ? Color.green.opacity(0.18) : theme.neonTeal.opacity(0.15))
-                .foregroundColor(monthlySummary.monthlyGoalPercent >= 100 ? Color.green : theme.neonTeal)
+                .background(summary.monthlyGoalPercent >= 100 ? Color.green.opacity(0.18) : theme.neonTeal.opacity(0.15))
+                .foregroundColor(summary.monthlyGoalPercent >= 100 ? Color.green : theme.neonTeal)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
                         .stroke(
-                            monthlySummary.monthlyGoalPercent >= 100 ? Color.green.opacity(0.4) : theme.neonTeal.opacity(0.3),
+                            summary.monthlyGoalPercent >= 100 ? Color.green.opacity(0.4) : theme.neonTeal.opacity(0.3),
                             lineWidth: 1
                         )
                 )
@@ -216,7 +217,7 @@ struct MonthlyDashboardView: View {
                         .kerning(0.6)
 
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(monthlySummary.formattedTotalHours)
+                        Text(summary.formattedTotalHours)
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.textPrimary)
                         Text("/ \(vm.goal.monthlyGoalLabel)")
@@ -233,7 +234,7 @@ struct MonthlyDashboardView: View {
                         .foregroundColor(theme.textSecondary)
                         .kerning(0.6)
 
-                    Text(monthlySummary.earningsProgressLabel)
+                    Text(summary.earningsProgressLabel)
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.neonTeal)
                 }
@@ -242,7 +243,7 @@ struct MonthlyDashboardView: View {
             // Dual Gradient Progress Bar
             GeometryReader { proxy in
                 let width = proxy.size.width
-                let progressWidth = width * CGFloat(monthlySummary.monthlyGoalProgress)
+                let progressWidth = width * CGFloat(summary.monthlyGoalProgress)
 
                 ZStack(alignment: .leading) {
                     Capsule()
@@ -252,16 +253,16 @@ struct MonthlyDashboardView: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: monthlySummary.monthlyGoalPercent >= 100
+                                colors: summary.monthlyGoalPercent >= 100
                                     ? [Color(red: 0.15, green: 0.82, blue: 0.65), Color(red: 0.08, green: 0.58, blue: 0.45)]
                                     : [theme.neonTeal, theme.neonTeal.opacity(0.7)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(progressWidth, monthlySummary.totalSeconds > 0 ? 10 : 0), height: 10)
+                        .frame(width: max(progressWidth, summary.totalSeconds > 0 ? 10 : 0), height: 10)
                         .shadow(
-                            color: theme.neonTeal.opacity(monthlySummary.monthlyGoalPercent >= 100 ? 0.6 : 0.3),
+                            color: theme.neonTeal.opacity(summary.monthlyGoalPercent >= 100 ? 0.6 : 0.3),
                             radius: 4,
                             x: 0,
                             y: 0
@@ -272,7 +273,7 @@ struct MonthlyDashboardView: View {
 
             // Bottom status footnote
             HStack {
-                if monthlySummary.monthlyGoalPercent >= 100 {
+                if summary.monthlyGoalPercent >= 100 {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 10))
@@ -281,7 +282,7 @@ struct MonthlyDashboardView: View {
                     }
                     .foregroundColor(Color.green)
                 } else {
-                    let remainingSec = max(monthlySummary.monthlyGoalSeconds - monthlySummary.totalSeconds, 0)
+                    let remainingSec = max(summary.monthlyGoalSeconds - summary.totalSeconds, 0)
                     Text("\(TimeFormatter.format(shortDuration: remainingSec)) remaining to hit monthly goal")
                         .font(.system(size: 10, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
@@ -307,7 +308,7 @@ struct MonthlyDashboardView: View {
 
     // MARK: - Tag Breakdown Card
 
-    private var tagBreakdownCardView: some View {
+    private func tagBreakdownCardView(summary: MonthlySummary) -> some View {
         VStack(spacing: 14) {
             // Header
             HStack {
@@ -324,19 +325,19 @@ struct MonthlyDashboardView: View {
 
                 Spacer()
 
-                Text("\(monthlySummary.tagBreakdowns.count) tag\(monthlySummary.tagBreakdowns.count == 1 ? "" : "s")")
+                Text("\(summary.tagBreakdowns.count) tag\(summary.tagBreakdowns.count == 1 ? "" : "s")")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundColor(theme.textSecondary)
             }
 
-            if monthlySummary.tagBreakdowns.isEmpty {
+            if summary.tagBreakdowns.isEmpty {
                 HStack {
                     Spacer()
                     VStack(spacing: 6) {
                         Image(systemName: "tag.slash")
                             .font(.system(size: 24))
                             .foregroundColor(theme.textSecondary.opacity(0.4))
-                        Text("No tagged sprints in \(monthlySummary.monthTitle)")
+                        Text("No tagged sprints in \(summary.monthTitle)")
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundColor(theme.textSecondary)
                     }
@@ -345,11 +346,11 @@ struct MonthlyDashboardView: View {
                 }
             } else {
                 // Proportional Multi-Color Segmented Bar
-                proportionalTagStatusBar
+                proportionalTagStatusBar(summary: summary)
 
                 // Tag List Rows
                 VStack(spacing: 8) {
-                    ForEach(Array(monthlySummary.tagBreakdowns.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(summary.tagBreakdowns.enumerated()), id: \.element.id) { index, item in
                         tagRowView(item: item, color: tagPaletteColor(index: index))
                     }
                 }
@@ -364,15 +365,15 @@ struct MonthlyDashboardView: View {
         )
     }
 
-    private var proportionalTagStatusBar: some View {
+    private func proportionalTagStatusBar(summary: MonthlySummary) -> some View {
         GeometryReader { proxy in
             let totalWidth = proxy.size.width
-            let totalSec = max(monthlySummary.totalSeconds, 1.0)
+            let totalSec = max(summary.totalSeconds, 1.0)
 
-            HStack(spacing: 2) {
-                ForEach(Array(monthlySummary.tagBreakdowns.enumerated()), id: \.element.id) { index, item in
+            HStack(spacing: 0) {
+                ForEach(Array(summary.tagBreakdowns.enumerated()), id: \.element.id) { index, item in
                     let fraction = CGFloat(item.totalSeconds / totalSec)
-                    let segWidth = max(fraction * (totalWidth - CGFloat(monthlySummary.tagBreakdowns.count - 1) * 2), 4)
+                    let segWidth = fraction * totalWidth
 
                     RoundedRectangle(cornerRadius: 3)
                         .fill(tagPaletteColor(index: index))
@@ -391,7 +392,7 @@ struct MonthlyDashboardView: View {
                     .fill(color)
                     .frame(width: 8, height: 8)
 
-                Text(item.displayName)
+                Text(item.tag == nil ? item.displayName : "#" + item.displayName)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(theme.textPrimary)
                     .padding(.horizontal, 7)
@@ -420,10 +421,10 @@ struct MonthlyDashboardView: View {
             .frame(height: 6)
 
             // Percentage Share
-            Text("\(Int(round(item.percentage)))%")
+            Text(item.percentageLabel)
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(color)
-                .frame(width: 45, alignment: .trailing)
+                .frame(width: 55, alignment: .trailing)
 
             // Duration
             Text(item.formattedDuration)

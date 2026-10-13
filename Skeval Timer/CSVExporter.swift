@@ -11,13 +11,6 @@ enum CSVExporter {
         return f
     }()
 
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }()
-
     private static let lock = NSLock()
 
     // MARK: - RFC-4180 CSV Generation
@@ -33,9 +26,10 @@ enum CSVExporter {
         for sprint in sorted {
             lock.lock()
             let dateStr = dateFormatter.string(from: sprint.startTime)
-            let startStr = timeFormatter.string(from: sprint.startTime)
-            let endStr = sprint.endTime != nil ? timeFormatter.string(from: sprint.effectiveEnd ?? sprint.endTime!) : ""
             lock.unlock()
+            let times = sprint.clipboardText.components(separatedBy: "\t")
+            let startStr = times[0]
+            let endStr = sprint.isOpen ? "" : times[1]
 
             let durStr = TimeFormatter.format(clock: sprint.duration ?? 0)
             let tagStr = sprint.tag?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -81,7 +75,9 @@ enum CSVExporter {
     // MARK: - macOS NSSavePanel Dialog
 
     @MainActor
-    static func promptSavePanel(sprints: [Sprint], suggestedName: String? = nil, onComplete: ((Bool, URL?) -> Void)? = nil) {
+    static func promptSavePanel(sprints: [Sprint], suggestedName: String? = nil,
+                                onComplete: ((Bool, URL?) -> Void)? = nil,
+                                onFailure: ((String) -> Void)? = nil) {
         let csvContent = generateCSV(sprints: sprints)
         let panel = NSSavePanel()
 
@@ -107,7 +103,7 @@ enum CSVExporter {
                     try csvContent.write(to: targetURL, atomically: true, encoding: .utf8)
                     onComplete?(true, targetURL)
                 } catch {
-                    print("❌ Failed to write CSV file: \(error)")
+                    onFailure?(error.localizedDescription)
                     onComplete?(false, nil)
                 }
             } else {

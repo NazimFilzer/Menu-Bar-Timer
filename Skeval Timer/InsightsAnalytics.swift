@@ -15,10 +15,15 @@ struct HeatmapDayCell: Identifiable, Equatable {
     let isInSelectedYear: Bool
 }
 
+struct HeatmapMonthHeader: Equatable {
+    let monthName: String
+    let columnIndex: Int
+}
+
 struct AnnualHeatmapMatrix: Equatable {
     let year: Int
-    let columns: [[HeatmapDayCell]] // Array of 52..53 columns (weeks), each with 7 rows (days)
-    let monthHeaders: [(monthName: String, columnIndex: Int)]
+    let columns: [[HeatmapDayCell]] // 53 or 54 calendar weeks, each with 7 rows.
+    let monthHeaders: [HeatmapMonthHeader]
     let totalActiveDays: Int
     let totalYearSeconds: TimeInterval
     let totalYearHours: Double
@@ -26,12 +31,6 @@ struct AnnualHeatmapMatrix: Equatable {
     let totalYearEarnings: Double
     let formattedYearEarnings: String
 
-    static func == (lhs: AnnualHeatmapMatrix, rhs: AnnualHeatmapMatrix) -> Bool {
-        lhs.year == rhs.year &&
-        lhs.columns.count == rhs.columns.count &&
-        lhs.totalActiveDays == rhs.totalActiveDays &&
-        lhs.totalYearSeconds == rhs.totalYearSeconds
-    }
 }
 
 struct TrendDataPoint: Identifiable, Equatable {
@@ -78,7 +77,7 @@ enum DateRangePreset: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    func dateRange(referenceDate: Date = Date(), calendar: Calendar = .current) -> (start: Date, end: Date) {
+    func dateRange(referenceDate: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian), earliestDate: Date? = nil) -> (start: Date, end: Date) {
         let end = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: referenceDate) ?? referenceDate
         switch self {
         case .last7Days:
@@ -96,8 +95,7 @@ enum DateRangePreset: String, CaseIterable, Identifiable {
             let start = calendar.date(from: comps) ?? referenceDate
             return (start, end)
         case .allTime:
-            // 5 years back to now
-            let start = calendar.date(byAdding: .year, value: -5, to: calendar.startOfDay(for: referenceDate)) ?? referenceDate
+            let start = calendar.startOfDay(for: min(earliestDate ?? referenceDate, referenceDate))
             return (start, end)
         case .custom:
             let start = calendar.date(byAdding: .day, value: -30, to: calendar.startOfDay(for: referenceDate)) ?? referenceDate
@@ -107,29 +105,6 @@ enum DateRangePreset: String, CaseIterable, Identifiable {
 }
 
 enum InsightsAnalytics {
-
-    private static let shortDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "MMM d"
-        return f
-    }()
-
-    private static let fullDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "MMM d, yyyy"
-        return f
-    }()
-
-    private static let monthAbbrFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "MMM"
-        return f
-    }()
-
-    private static let lock = NSLock()
 
     // MARK: - Period Calculation
 
@@ -143,47 +118,21 @@ enum InsightsAnalytics {
         var cal = calendar ?? Calendar(identifier: .gregorian)
         cal.firstWeekday = 2 // Monday start
 
-        let cleanStart = cal.startOfDay(for: startDate)
-        let cleanEnd = cal.date(bySettingHour: 23, minute: 59, second: 59, of: endDate) ?? endDate
+        let cleanStart = cal.startOfDay(for: min(startDate, endDate))
+        let lastDay = cal.startOfDay(for: max(startDate, endDate))
+        let cleanEnd = (cal.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay).addingTimeInterval(-1)
 
-        // Collect all completed sprints strictly within [cleanStart, cleanEnd]
-        var matchingSprints: [Sprint] = []
-        var activeDates: Set<String> = []
-        var totalSec: TimeInterval = 0
-
-        // Iterate through day keys in sorted order
-        let sortedKeys = logs.keys.sorted()
-        for key in sortedKeys {
-            guard let keyDate = TimeFormatter.parseDateKey(key) else { continue }
-            let dayStart = cal.startOfDay(for: keyDate)
-            if dayStart >= cleanStart && dayStart <= cleanEnd {
-                let sprints = logs[key] ?? []
-                let dayLog = DayLog(sprints: sprints)
-                for s in dayLog.completedSprints {
-                    matchingSprints.append(s)
-                    totalSec += s.duration ?? 0
-                    activeDates.insert(key)
-                }
-            }
-        }
-
-        matchingSprints.sort(by: { $0.startTime > $1.startTime })
+        let selectedLogs = logs.filter { includesDay($0.key, start: cleanStart, end: cleanEnd, calendar: cal) }
+        let matchingSprints = selectedLogs.values.flatMap { $0 }.filter { !$0.isOpen }
+            .sorted { $0.startTime > $1.startTime }
+        let totalSec = matchingSprints.reduce(0) { $0 + ($1.duration ?? 0) }
+        let activeDaysCount = selectedLogs.values.filter { DayLog(sprints: $0).accumulatedTotal > 0 }.count
 
         let totalDays = max(1, (cal.dateComponents([.day], from: cleanStart, to: cleanEnd).day ?? 0) + 1)
-        let activeDaysCount = activeDates.count
-        let elapsedDivisor = max(1, activeDaysCount > 0 ? activeDaysCount : totalDays)
-
-        let dailyAvgSec = totalSec > 0 ? (totalSec / Double(elapsedDivisor)) : 0.0
+        let dailyAvgSec = AnalyticsMetrics.average(totalSeconds: totalSec, days: activeDaysCount)
         let dailyAvgHours = (dailyAvgSec / 3600.0 * 10).rounded() / 10.0
 
-        let formattedAvg: String
-        if dailyAvgSec > 0 {
-            let avgH = Int(dailyAvgSec) / 3600
-            let avgM = (Int(dailyAvgSec) % 3600) / 60
-            formattedAvg = avgH > 0 ? (avgM > 0 ? "\(avgH)h \(avgM)m" : "\(avgH)h") : "\(avgM)m"
-        } else {
-            formattedAvg = "0m"
-        }
+        let formattedAvg = TimeFormatter.format(shortDuration: dailyAvgSec)
 
         let totalHours = (totalSec / 3600.0 * 100).rounded() / 100.0
         let formattedTotalHours = TimeFormatter.format(shortDuration: totalSec)
@@ -191,9 +140,7 @@ enum InsightsAnalytics {
         let totalEarnings = EarningsCalculator.calculate(durationInSeconds: totalSec, hourlyRate: settings.hourlyRate)
         let formattedTotalEarn = EarningsCalculator.format(amount: totalEarnings, currencySymbol: settings.currencySymbol)
 
-        lock.lock()
-        let rangeLabel = "\(shortDateFormatter.string(from: cleanStart)) – \(fullDateFormatter.string(from: cleanEnd))"
-        lock.unlock()
+        let rangeLabel = "\(AnalyticsMetrics.label(cleanStart, format: "MMM d, yyyy", calendar: cal)) – \(AnalyticsMetrics.label(cleanEnd, format: "MMM d, yyyy", calendar: cal))"
 
         // Generate trend data points
         let trendPoints = generateTrendPoints(
@@ -240,6 +187,11 @@ enum InsightsAnalytics {
         )
     }
 
+    private static func includesDay(_ key: String, start: Date, end: Date, calendar: Calendar) -> Bool {
+        guard let date = TimeFormatter.parseDateKey(key, calendar: calendar) else { return false }
+        return (start...end).contains(calendar.startOfDay(for: date))
+    }
+
     // MARK: - Trend Curve Points Generation
 
     private static func generateTrendPoints(
@@ -249,85 +201,31 @@ enum InsightsAnalytics {
         settings: GoalSettings,
         calendar: Calendar
     ) -> [TrendDataPoint] {
-        let daysBetween = (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1
-
-        var points: [TrendDataPoint] = []
-
-        if daysBetween <= 31 {
-            // Daily resolution
-            for i in 0..<daysBetween {
-                guard let d = calendar.date(byAdding: .day, value: i, to: start) else { continue }
-                let key = TimeFormatter.format(dateKey: d)
-                let sprints = logs[key] ?? []
-                let dayLog = DayLog(sprints: sprints)
-                let dur = dayLog.accumulatedTotal
-                let hrs = (dur / 3600.0 * 10).rounded() / 10.0
-                let earn = EarningsCalculator.calculate(durationInSeconds: dur, hourlyRate: settings.hourlyRate)
-
-                lock.lock()
-                let label = shortDateFormatter.string(from: d)
-                lock.unlock()
-
-                points.append(TrendDataPoint(
-                    id: key,
-                    date: d,
-                    label: label,
-                    totalSeconds: dur,
-                    totalHours: hrs,
-                    earnings: earn,
-                    sprintCount: dayLog.completedSprints.count,
-                    formattedDuration: TimeFormatter.format(shortDuration: dur)
-                ))
-            }
-        } else {
-            // Weekly resolution (buckets of 7 days)
-            var cur = start
-            var weekIndex = 1
-            while cur <= end {
-                let nextWeek = calendar.date(byAdding: .day, value: 7, to: cur) ?? end
-                let weekEnd = calendar.date(byAdding: .day, value: -1, to: nextWeek) ?? cur
-                let effectiveWeekEnd = min(weekEnd, end)
-
-                var weekSec: TimeInterval = 0
-                var weekSprintsCount = 0
-
-                var checkDate = cur
-                while checkDate <= effectiveWeekEnd {
-                    let key = TimeFormatter.format(dateKey: checkDate)
-                    let dayLog = DayLog(sprints: logs[key] ?? [])
-                    weekSec += dayLog.accumulatedTotal
-                    weekSprintsCount += dayLog.completedSprints.count
-                    guard let nextDay = calendar.date(byAdding: .day, value: 1, to: checkDate) else { break }
-                    checkDate = nextDay
-                }
-
-                let hrs = (weekSec / 3600.0 * 10).rounded() / 10.0
-                let earn = EarningsCalculator.calculate(durationInSeconds: weekSec, hourlyRate: settings.hourlyRate)
-
-                lock.lock()
-                let label = shortDateFormatter.string(from: cur)
-                lock.unlock()
-
-                points.append(TrendDataPoint(
-                    id: "W\(weekIndex)_\(TimeFormatter.format(dateKey: cur))",
-                    date: cur,
-                    label: label,
-                    totalSeconds: weekSec,
-                    totalHours: hrs,
-                    earnings: earn,
-                    sprintCount: weekSprintsCount,
-                    formattedDuration: TimeFormatter.format(shortDuration: weekSec)
-                ))
-
-                weekIndex += 1
-                cur = nextWeek
-            }
+        let dayCount = (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1
+        let bucketSize = dayCount <= 31 ? 1 : 7
+        return stride(from: 0, to: dayCount, by: bucketSize).enumerated().compactMap { index, offset in
+            guard let bucketStart = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+            return trendPoint(logs: logs, start: bucketStart, dayCount: min(bucketSize, dayCount - offset),
+                              weekIndex: bucketSize == 1 ? nil : index + 1, settings: settings, calendar: calendar)
         }
-
-        return points
     }
 
-    // MARK: - 52-Week Annual Heatmap Matrix
+    private static func trendPoint(logs: [String: [Sprint]], start: Date, dayCount: Int,
+                                   weekIndex: Int?, settings: GoalSettings, calendar: Calendar) -> TrendDataPoint {
+        let days = (0..<dayCount).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+        let dayLogs = days.map { DayLog(sprints: logs[TimeFormatter.format(dateKey: $0, calendar: calendar)] ?? []) }
+        let duration = dayLogs.reduce(0) { $0 + $1.accumulatedTotal }
+        let key = TimeFormatter.format(dateKey: start, calendar: calendar)
+        let id = weekIndex.map { "W\($0)_\(key)" } ?? key
+        return TrendDataPoint(id: id, date: start,
+                              label: AnalyticsMetrics.label(start, format: "MMM d", calendar: calendar),
+                              totalSeconds: duration, totalHours: duration / 3600,
+                              earnings: EarningsCalculator.calculate(durationInSeconds: duration, hourlyRate: settings.hourlyRate),
+                              sprintCount: dayLogs.reduce(0) { $0 + $1.completedSprints.count },
+                              formattedDuration: TimeFormatter.format(shortDuration: duration))
+    }
+
+    // MARK: - Annual Heatmap
 
     static func generateAnnualHeatmap(
         logs: [String: [Sprint]],
@@ -347,78 +245,19 @@ enum InsightsAnalytics {
         let daysFromMonday = (jan1Weekday + 5) % 7
         let firstHeatmapMonday = cal.date(byAdding: .day, value: -daysFromMonday, to: jan1) ?? jan1
 
-        var columns: [[HeatmapDayCell]] = []
-        var monthHeaders: [(monthName: String, columnIndex: Int)] = []
-        var seenMonths: Set<Int> = []
-
-        var curWeekMonday = firstHeatmapMonday
-        var activeDays = 0
-        var totalSec: TimeInterval = 0
-
-        // Build 53 columns (weeks), each with 7 days (Mon=0, Tue=1, ..., Sun=6)
-        for colIdx in 0..<53 {
-            var weekCells: [HeatmapDayCell] = []
-            var isAnyDayInYear = false
-
-            for dayIdx in 0..<7 {
-                guard let cellDate = cal.date(byAdding: .day, value: dayIdx, to: curWeekMonday) else { continue }
-                let cellYear = cal.component(.year, from: cellDate)
-                let cellMonth = cal.component(.month, from: cellDate)
-                let isInYear = (cellYear == year)
-                if isInYear { isAnyDayInYear = true }
-
-                let key = TimeFormatter.format(dateKey: cellDate)
-                let daySprints = logs[key] ?? []
-                let dayLog = DayLog(sprints: daySprints)
-                let dur = dayLog.accumulatedTotal
-                let hrs = (dur / 3600.0 * 10).rounded() / 10.0
-                let earn = EarningsCalculator.calculate(durationInSeconds: dur, hourlyRate: settings.hourlyRate)
-                let formattedDur = TimeFormatter.format(shortDuration: dur)
-                let formattedEarn = EarningsCalculator.format(amount: earn, currencySymbol: settings.currencySymbol)
-
-                if isInYear && dur > 0 {
-                    activeDays += 1
-                    totalSec += dur
-                }
-
-                let intensity = intensityLevel(forSeconds: dur)
-
-                let cell = HeatmapDayCell(
-                    id: key,
-                    date: cellDate,
-                    dayOfWeekIndex: dayIdx,
-                    weekIndex: colIdx,
-                    totalSeconds: dur,
-                    totalHours: hrs,
-                    sprintCount: dayLog.completedSprints.count,
-                    earnings: earn,
-                    formattedDuration: formattedDur,
-                    formattedEarnings: formattedEarn,
-                    intensityLevel: intensity,
-                    isInSelectedYear: isInYear
-                )
-                weekCells.append(cell)
-
-                // Track month label on the first day of that month inside this column
-                if isInYear && !seenMonths.contains(cellMonth) {
-                    seenMonths.insert(cellMonth)
-                    lock.lock()
-                    let mName = monthAbbrFormatter.string(from: cellDate)
-                    lock.unlock()
-                    monthHeaders.append((monthName: mName, columnIndex: colIdx))
-                }
-            }
-
-            columns.append(weekCells)
-
-            guard let nextMonday = cal.date(byAdding: .day, value: 7, to: curWeekMonday) else { break }
-            curWeekMonday = nextMonday
-
-            // Stop if we've crossed out of the year and already have 52 or 53 weeks
-            if colIdx >= 51 && !isAnyDayInYear {
-                break
+        let lastDay = cal.date(from: DateComponents(year: year, month: 12, day: 31))!
+        let columnCount = (cal.dateComponents([.day], from: firstHeatmapMonday, to: lastDay).day ?? 0) / 7 + 1
+        let columns = (0..<columnCount).map { column in
+            (0..<7).compactMap { row -> HeatmapDayCell? in
+                guard let date = cal.date(byAdding: .day, value: column * 7 + row, to: firstHeatmapMonday) else { return nil }
+                return heatmapCell(date: date, row: row, column: column, year: year,
+                                   logs: logs, settings: settings, calendar: cal)
             }
         }
+        let yearCells = columns.flatMap { $0 }.filter(\.isInSelectedYear)
+        let activeDays = yearCells.filter { $0.totalSeconds > 0 }.count
+        let totalSec = yearCells.reduce(0) { $0 + $1.totalSeconds }
+        let monthHeaders = heatmapHeaders(cells: yearCells, calendar: cal)
 
         let totalHrs = (totalSec / 3600.0 * 100).rounded() / 100.0
         let formattedYearDur = TimeFormatter.format(shortDuration: totalSec)
@@ -450,6 +289,30 @@ enum InsightsAnalytics {
             settings: settings,
             calendar: calendar
         )
+    }
+
+    private static func heatmapCell(date: Date, row: Int, column: Int, year: Int,
+                                    logs: [String: [Sprint]], settings: GoalSettings, calendar: Calendar) -> HeatmapDayCell {
+        let key = TimeFormatter.format(dateKey: date, calendar: calendar)
+        let log = DayLog(sprints: logs[key] ?? [])
+        let duration = log.accumulatedTotal
+        let earnings = EarningsCalculator.calculate(durationInSeconds: duration, hourlyRate: settings.hourlyRate)
+        return HeatmapDayCell(id: key, date: date, dayOfWeekIndex: row, weekIndex: column,
+                              totalSeconds: duration, totalHours: duration / 3600,
+                              sprintCount: log.completedSprints.count, earnings: earnings,
+                              formattedDuration: TimeFormatter.format(shortDuration: duration),
+                              formattedEarnings: EarningsCalculator.format(amount: earnings, currencySymbol: settings.currencySymbol),
+                              intensityLevel: intensityLevel(forSeconds: duration),
+                              isInSelectedYear: calendar.component(.year, from: date) == year)
+    }
+
+    private static func heatmapHeaders(cells: [HeatmapDayCell], calendar: Calendar) -> [HeatmapMonthHeader] {
+        var seenMonths = Set<Int>()
+        return cells.compactMap { cell in
+            let month = calendar.component(.month, from: cell.date)
+            guard seenMonths.insert(month).inserted else { return nil }
+            return HeatmapMonthHeader(monthName: AnalyticsMetrics.label(cell.date, format: "MMM", calendar: calendar), columnIndex: cell.weekIndex)
+        }
     }
 
     // MARK: - Intensity Tier Mapping

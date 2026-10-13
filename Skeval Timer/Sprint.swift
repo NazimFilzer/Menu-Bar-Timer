@@ -1,6 +1,10 @@
 import Foundation
 
 struct Sprint: Identifiable, Codable, Equatable {
+    private enum CodingKeys: String, CodingKey {
+        case id, startTime, endTime, pausedDuration, isPaused, pauseStartedAt, pauseCount, tag
+        case startTimeReferenceSeconds, endTimeReferenceSeconds, pauseStartedAtReferenceSeconds
+    }
     let id: UUID
     var startTime: Date
     var endTime: Date?
@@ -15,7 +19,7 @@ struct Sprint: Identifiable, Codable, Equatable {
         self.id = id
         self.startTime = startTime
         self.endTime = endTime
-        self.pausedDuration = pausedDuration
+        self.pausedDuration = Self.safePause(pausedDuration)
         self.isPaused = isPaused
         self.pauseStartedAt = pauseStartedAt
         self.pauseCount = pauseCount
@@ -26,13 +30,39 @@ struct Sprint: Identifiable, Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
-        startTime = try c.decode(Date.self, forKey: .startTime)
-        endTime = try c.decodeIfPresent(Date.self, forKey: .endTime)
-        pausedDuration = (try? c.decodeIfPresent(TimeInterval.self, forKey: .pausedDuration)) ?? 0
+        startTime = try Self.preciseDate(c, key: .startTimeReferenceSeconds) ?? c.decode(Date.self, forKey: .startTime)
+        endTime = try Self.preciseDate(c, key: .endTimeReferenceSeconds) ?? c.decodeIfPresent(Date.self, forKey: .endTime)
+        pausedDuration = Self.safePause((try? c.decodeIfPresent(TimeInterval.self, forKey: .pausedDuration)) ?? 0)
         isPaused = (try? c.decodeIfPresent(Bool.self, forKey: .isPaused)) ?? false
-        pauseStartedAt = try? c.decodeIfPresent(Date.self, forKey: .pauseStartedAt)
+        pauseStartedAt = Self.preciseDate(c, key: .pauseStartedAtReferenceSeconds) ?? (try? c.decodeIfPresent(Date.self, forKey: .pauseStartedAt))
         pauseCount = (try? c.decodeIfPresent(Int.self, forKey: .pauseCount)) ?? 0
         tag = try? c.decodeIfPresent(String.self, forKey: .tag)
+    }
+
+    // Keep the original date fields readable by older releases, and retain full
+    // Date precision in optional fields because ISO-8601 JSON strips fractions.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(startTime, forKey: .startTime)
+        try c.encodeIfPresent(endTime, forKey: .endTime)
+        try c.encode(Self.safePause(pausedDuration), forKey: .pausedDuration)
+        try c.encode(isPaused, forKey: .isPaused)
+        try c.encodeIfPresent(pauseStartedAt, forKey: .pauseStartedAt)
+        try c.encode(pauseCount, forKey: .pauseCount)
+        try c.encodeIfPresent(tag, forKey: .tag)
+        try c.encode(startTime.timeIntervalSinceReferenceDate, forKey: .startTimeReferenceSeconds)
+        try c.encodeIfPresent(endTime?.timeIntervalSinceReferenceDate, forKey: .endTimeReferenceSeconds)
+        try c.encodeIfPresent(pauseStartedAt?.timeIntervalSinceReferenceDate, forKey: .pauseStartedAtReferenceSeconds)
+    }
+
+    private static func preciseDate(_ container: KeyedDecodingContainer<CodingKeys>, key: CodingKeys) -> Date? {
+        guard let seconds = try? container.decode(Double.self, forKey: key), seconds.isFinite else { return nil }
+        return Date(timeIntervalSinceReferenceDate: seconds)
+    }
+
+    private static func safePause(_ duration: TimeInterval) -> TimeInterval {
+        duration.isFinite ? max(0, duration) : 0
     }
 
     var isOpen: Bool { endTime == nil }
@@ -40,7 +70,7 @@ struct Sprint: Identifiable, Codable, Equatable {
     // Net work time = wall-clock span minus paused seconds
     var duration: TimeInterval? {
         guard let end = endTime else { return nil }
-        return max(0, end.timeIntervalSince(startTime) - pausedDuration)
+        return max(0, end.timeIntervalSince(startTime) - Self.safePause(pausedDuration))
     }
 
     var durationLabel: String {
@@ -67,7 +97,7 @@ struct Sprint: Identifiable, Codable, Equatable {
     // This ensures the spreadsheet computes (effectiveEnd − startTime) == net work duration
     var effectiveEnd: Date? {
         guard let end = endTime else { return nil }
-        let calculated = end.addingTimeInterval(-pausedDuration)
+        let calculated = end.addingTimeInterval(-Self.safePause(pausedDuration))
         return max(startTime, calculated)
     }
 

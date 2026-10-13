@@ -25,11 +25,13 @@ class TimerViewModel {
     var lastCopiedId: UUID? = nil
     var isAllCopied: Bool = false
     var logRevision: Int = 0
+    private(set) var persistenceError: String?
     var pendingTag: String = ""
     var manualTagText: String = ""
 
     // Recovery inputs
     var recoveryEndText: String = ""
+    var recoveryEndDate: Date = Date()
     var recoveryEndError: String? = nil
 
     // Manual sprint entry inputs
@@ -45,7 +47,7 @@ class TimerViewModel {
     let engine: SprintEngine
     let store: DayLogStore
 
-    private var notifiedMilestones: Set<Int> = []
+    private(set) var notifiedMilestones: Set<Int> = []
     private var lastNotifiedDayKey: String = TimeFormatter.format(dateKey: Date())
     private var lastActiveDayKey: String = TimeFormatter.format(dateKey: Date())
 
@@ -71,11 +73,13 @@ class TimerViewModel {
         self.engine = effectiveEngine
 
         self.todayLog = effectiveStore.todayLog()
+        self.persistenceError = effectiveStore.storageError
         self.selectedDayLog = self.todayLog
         self.pendingSleepInterval = effectiveEngine.pendingSleepInterval
         self.state = effectiveEngine.state
         self.currentElapsed = effectiveEngine.state.currentElapsed
         self.currentPauseElapsed = effectiveEngine.currentPauseElapsed
+        self.recoveryEndDate = effectiveEngine.state.currentSprint?.startTime ?? Date()
 
         let goalSec = self.goal.dailyGoalSeconds
         if goalSec > 0 {
@@ -120,6 +124,9 @@ class TimerViewModel {
 
     private func handleStateChange(_ newState: SprintState) {
         let sprintChanged = state.currentSprint != newState.currentSprint
+        if newState.isRecovery && !state.isRecovery {
+            recoveryEndDate = newState.currentSprint?.startTime ?? Date()
+        }
         state = newState
         pendingSleepInterval = engine.pendingSleepInterval
         currentElapsed = newState.currentElapsed
@@ -288,9 +295,9 @@ class TimerViewModel {
         } else {
             height = 590
         }
-        if recoveryMode || hasPendingSleepResolution {
-            height += 90
-        }
+        if recoveryMode { height += 120 }
+        if hasPendingSleepResolution { height += 90 }
+        if persistenceError != nil { height += 80 }
         return height
     }
 
@@ -375,6 +382,7 @@ class TimerViewModel {
     func refreshLogs() {
         todayLog = store.todayLog()
         selectedDayLog = store.log(for: selectedDate)
+        persistenceError = store.storageError
         logRevision += 1
     }
 
@@ -407,7 +415,7 @@ class TimerViewModel {
 
     func saveRecoveryEndTime() {
         do {
-            try engine.saveRecoveryEndTime(recoveryEndText)
+            try engine.saveRecoveryEndTime(recoveryEndText, on: recoveryEndDate)
             recoveryEndText = ""
             recoveryEndError = nil
             refreshLogs()
@@ -439,18 +447,19 @@ class TimerViewModel {
         startTime: Date,
         endTime: Date,
         pausedDuration: TimeInterval = 0,
-        tag: String? = nil
-    ) -> Sprint {
-        let finalStart = TimeFormatter.combine(date: date, time: startTime)
-        let finalEnd = TimeFormatter.combine(date: date, time: endTime, wrapIfBefore: finalStart)
+        tag: String? = nil,
+        endDayOffset: Int? = nil
+    ) throws -> Sprint {
+        let entry = try SprintEntry(date: date, startTime: startTime, endTime: endTime,
+                                    pausedDuration: pausedDuration, endDayOffset: endDayOffset)
 
         let cleanTag = tag?.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveTag = (cleanTag?.isEmpty == false) ? cleanTag : nil
 
         let sprint = Sprint(
-            startTime: finalStart,
-            endTime: finalEnd,
-            pausedDuration: max(0, pausedDuration),
+            startTime: entry.start,
+            endTime: entry.end,
+            pausedDuration: entry.pausedDuration,
             isPaused: false,
             pauseStartedAt: nil,
             pauseCount: pausedDuration > 0 ? 1 : 0,
@@ -468,21 +477,23 @@ class TimerViewModel {
         newStartTime: Date,
         newEndTime: Date,
         newPausedDuration: TimeInterval,
-        newTag: String?
-    ) -> Sprint {
-        let finalStart = TimeFormatter.combine(date: newDate, time: newStartTime)
-        let finalEnd = TimeFormatter.combine(date: newDate, time: newEndTime, wrapIfBefore: finalStart)
+        newTag: String?,
+        endDayOffset: Int? = nil
+    ) throws -> Sprint {
+        guard !originalSprint.isOpen else { throw SprintEntryError.invalidEnd }
+        let entry = try SprintEntry(date: newDate, startTime: newStartTime, endTime: newEndTime,
+                                    pausedDuration: newPausedDuration, endDayOffset: endDayOffset)
 
         let cleanTag = newTag?.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveTag = (cleanTag?.isEmpty == false) ? cleanTag : nil
 
         let updatedSprint = Sprint(
             id: originalSprint.id,
-            startTime: finalStart,
-            endTime: finalEnd,
-            pausedDuration: max(0, newPausedDuration),
-            isPaused: originalSprint.isPaused,
-            pauseStartedAt: originalSprint.pauseStartedAt,
+            startTime: entry.start,
+            endTime: entry.end,
+            pausedDuration: entry.pausedDuration,
+            isPaused: false,
+            pauseStartedAt: nil,
             pauseCount: newPausedDuration > 0 ? max(originalSprint.pauseCount, 1) : 0,
             tag: effectiveTag
         )
@@ -610,7 +621,7 @@ class TimerViewModel {
             notifiedMilestones.removeAll()
         }
 
-        let totalElapsed = todayLog.accumulatedTotal + (isRunning ? currentElapsed : 0)
+        let totalElapsed = totalTodayElapsed
         let pct = Int((totalElapsed / goalSec) * 100)
         let milestones = [50, 75, 100]
         for m in milestones where pct >= m && !notifiedMilestones.contains(m) {

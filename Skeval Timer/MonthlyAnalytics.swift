@@ -1,7 +1,7 @@
 import Foundation
 
 struct TagAttribution: Identifiable, Equatable {
-    var id: String { displayName }
+    var id: String { tag.map { "tag:" + $0 } ?? "untagged" }
     let tag: String?
     let displayName: String
     let totalSeconds: TimeInterval
@@ -11,6 +11,11 @@ struct TagAttribution: Identifiable, Equatable {
     let formattedDuration: String
     let formattedEarnings: String
     let sprintCount: Int
+
+    var percentageLabel: String {
+        if percentage == 0 && totalSeconds > 0 { return "<0.1%" }
+        return percentage.formatted(.number.precision(.fractionLength(0...1))) + "%"
+    }
 }
 
 struct MonthOverMonthComparison: Equatable {
@@ -64,36 +69,6 @@ struct MonthlySummary: Equatable {
 
 enum MonthlyAnalytics {
 
-    private static let monthYearFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "MMMM yyyy"
-        return f
-    }()
-
-    private static let dayOfWeekFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "EEE"
-        return f
-    }()
-
-    private static let monthDayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "MMM d"
-        return f
-    }()
-
-    private static let dayNumberFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "d"
-        return f
-    }()
-
-    private static let lock = NSLock()
-
     static func calculate(
         logs: [String: [Sprint]],
         monthOffset: Int = 0,
@@ -105,99 +80,28 @@ enum MonthlyAnalytics {
         cal.firstWeekday = 2 // Monday start
 
         let targetDate = cal.date(byAdding: .month, value: monthOffset, to: referenceDate) ?? referenceDate
-        let targetComps = cal.dateComponents([.year, .month], from: targetDate)
-        guard let firstOfMonth = cal.date(from: targetComps) else {
-            fatalError("Could not calculate first day of month for \(targetDate)")
+        let dates = AnalyticsMetrics.monthDates(containing: targetDate, calendar: cal)
+        let firstOfMonth = dates.first ?? cal.startOfDay(for: targetDate)
+        let lastDayOfMonth = dates.last ?? firstOfMonth
+        let monthTitle = AnalyticsMetrics.label(firstOfMonth, format: "MMMM yyyy", calendar: cal)
+        let isCurrentMonth = cal.isDate(firstOfMonth, equalTo: referenceDate, toGranularity: .month)
+        let dayBuckets = dates.map {
+            AnalyticsMetrics.day($0, logs: logs, referenceDate: referenceDate, settings: settings, calendar: cal)
         }
-
-        guard let daysRange = cal.range(of: .day, in: .month, for: firstOfMonth) else {
-            fatalError("Could not calculate days in month for \(firstOfMonth)")
-        }
-        let totalDaysInMonth = daysRange.count
-        let lastDayOfMonth = cal.date(byAdding: .day, value: totalDaysInMonth - 1, to: firstOfMonth) ?? firstOfMonth
-
-        lock.lock()
-        let monthTitle = monthYearFormatter.string(from: firstOfMonth)
-        lock.unlock()
-
-        let currentComps = cal.dateComponents([.year, .month], from: referenceDate)
-        let isCurrentMonth = (targetComps.year == currentComps.year && targetComps.month == currentComps.month)
-
-        var dayBuckets: [DailyBarData] = []
-        var totalMonthlySeconds: TimeInterval = 0
-        var allCompletedSprintsInMonth: [Sprint] = []
-
-        for day in 1...totalDaysInMonth {
-            guard let dayDate = cal.date(byAdding: .day, value: day - 1, to: firstOfMonth) else { continue }
-            let key = TimeFormatter.format(dateKey: dayDate)
-            let sprints = logs[key] ?? []
-            let dayLog = DayLog(sprints: sprints)
-            let duration = dayLog.accumulatedTotal
-            totalMonthlySeconds += duration
-            allCompletedSprintsInMonth.append(contentsOf: dayLog.completedSprints)
-
-            let hours = (duration / 3600.0 * 100).rounded() / 100.0
-            let earnings = EarningsCalculator.calculate(durationInSeconds: duration, hourlyRate: settings.hourlyRate)
-            let formattedEarn = EarningsCalculator.format(amount: earnings, currencySymbol: settings.currencySymbol)
-            let formattedDur = TimeFormatter.format(shortDuration: duration)
-            let isToday = cal.isDate(dayDate, inSameDayAs: referenceDate)
-
-            let goalSeconds = settings.dailyGoalSeconds
-            let progress = goalSeconds > 0 ? min(duration / goalSeconds, 2.0) : 0.0
-
-            lock.lock()
-            let dow = dayOfWeekFormatter.string(from: dayDate)
-            let mDay = monthDayFormatter.string(from: dayDate)
-            let dayNum = dayNumberFormatter.string(from: dayDate)
-            lock.unlock()
-
-            let bucket = DailyBarData(
-                id: key,
-                date: dayDate,
-                dayOfWeekLabel: dow,
-                dateLabel: mDay,
-                dayNumberLabel: dayNum,
-                isToday: isToday,
-                totalSeconds: duration,
-                totalHours: hours,
-                earnings: earnings,
-                formattedDuration: formattedDur,
-                formattedEarnings: formattedEarn,
-                goalProgress: progress,
-                sprintCount: dayLog.completedSprints.count,
-                completedSprints: dayLog.completedSprints
-            )
-            dayBuckets.append(bucket)
-        }
-
-        let elapsedDays: Int
-        if isCurrentMonth {
-            let refDay = cal.component(.day, from: referenceDate)
-            elapsedDays = max(1, min(refDay, totalDaysInMonth))
-        } else if monthOffset < 0 {
-            elapsedDays = totalDaysInMonth
-        } else {
-            elapsedDays = 0
-        }
-
-        let dailyAvgSec: TimeInterval = elapsedDays > 0 ? (totalMonthlySeconds / Double(elapsedDays)) : 0.0
+        let totalMonthlySeconds = dayBuckets.reduce(0) { $0 + $1.totalSeconds }
+        let allCompletedSprintsInMonth = dayBuckets.flatMap(\.completedSprints)
+        let elapsedDays = elapsedDayCount(isCurrentMonth: isCurrentMonth, monthOffset: monthOffset,
+                                         referenceDate: referenceDate, totalDays: dates.count, calendar: cal)
+        let dailyAvgSec = AnalyticsMetrics.average(totalSeconds: totalMonthlySeconds, days: elapsedDays)
         let dailyAvgHours = (dailyAvgSec / 3600.0 * 10).rounded() / 10.0
-
-        let formattedAvg: String
-        if dailyAvgSec > 0 {
-            let avgH = Int(dailyAvgSec) / 3600
-            let avgM = (Int(dailyAvgSec) % 3600) / 60
-            formattedAvg = avgH > 0 ? (avgM > 0 ? "\(avgH)h \(avgM)m" : "\(avgH)h") : "\(avgM)m"
-        } else {
-            formattedAvg = "0m"
-        }
+        let formattedAvg = TimeFormatter.format(shortDuration: dailyAvgSec)
 
         let totalMonthlyHours = (totalMonthlySeconds / 3600.0 * 100).rounded() / 100.0
         let formattedMonthlyHours = TimeFormatter.format(shortDuration: totalMonthlySeconds)
 
         let monthlyGoalSec = settings.monthlyGoalSeconds
         let monthlyGoalProg = monthlyGoalSec > 0 ? min(totalMonthlySeconds / monthlyGoalSec, 1.0) : 0.0
-        let monthlyGoalPct = monthlyGoalSec > 0 ? Int(round((totalMonthlySeconds / monthlyGoalSec) * 100)) : 0
+        let monthlyGoalPct = monthlyGoalSec > 0 ? AnalyticsMetrics.goalPercent(totalSeconds: totalMonthlySeconds, goalSeconds: monthlyGoalSec) : 0
 
         let totalEarn = EarningsCalculator.calculate(durationInSeconds: totalMonthlySeconds, hourlyRate: settings.hourlyRate)
         let formattedEarn = EarningsCalculator.format(amount: totalEarn, currencySymbol: settings.currencySymbol)
@@ -210,18 +114,9 @@ enum MonthlyAnalytics {
         let tagBreakdowns = calculateTagBreakdown(sprints: allCompletedSprintsInMonth, totalSeconds: totalMonthlySeconds, hourlyRate: settings.hourlyRate, currencySymbol: settings.currencySymbol)
 
         // Month-over-month comparison
-        let priorMonthOffset = monthOffset - 1
-        let priorDate = cal.date(byAdding: .month, value: priorMonthOffset, to: referenceDate) ?? referenceDate
-        let priorComps = cal.dateComponents([.year, .month], from: priorDate)
-        let priorFirst = cal.date(from: priorComps) ?? priorDate
-        let priorDaysCount = cal.range(of: .day, in: .month, for: priorFirst)?.count ?? 30
-
-        var priorTotalSeconds: TimeInterval = 0
-        for pDay in 1...priorDaysCount {
-            guard let pDate = cal.date(byAdding: .day, value: pDay - 1, to: priorFirst) else { continue }
-            let pKey = TimeFormatter.format(dateKey: pDate)
-            let pSprints = logs[pKey] ?? []
-            priorTotalSeconds += DayLog(sprints: pSprints).accumulatedTotal
+        let priorDate = cal.date(byAdding: .month, value: -1, to: firstOfMonth) ?? firstOfMonth
+        let priorTotalSeconds = AnalyticsMetrics.monthDates(containing: priorDate, calendar: cal).reduce(0.0) {
+            $0 + DayLog(sprints: logs[TimeFormatter.format(dateKey: $1, calendar: cal)] ?? []).accumulatedTotal
         }
 
         let mom = calculateMonthOverMonth(
@@ -275,48 +170,31 @@ enum MonthlyAnalytics {
         )
     }
 
+    private static func elapsedDayCount(isCurrentMonth: Bool, monthOffset: Int, referenceDate: Date,
+                                        totalDays: Int, calendar: Calendar) -> Int {
+        if isCurrentMonth { return calendar.component(.day, from: referenceDate) }
+        return monthOffset < 0 ? totalDays : 0
+    }
+
     private static func calculateTagBreakdown(
         sprints: [Sprint],
         totalSeconds: TimeInterval,
         hourlyRate: Double,
         currencySymbol: String
     ) -> [TagAttribution] {
-        var groupDict: [String: (tag: String?, seconds: TimeInterval, count: Int)] = [:]
-
-        for sprint in sprints {
-            let cleanTag = sprint.tag?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let key = (cleanTag != nil && !cleanTag!.isEmpty) ? cleanTag! : "Untagged"
-            let originalTag = (cleanTag != nil && !cleanTag!.isEmpty) ? cleanTag : nil
-            let dur = sprint.duration ?? 0
-
-            if var entry = groupDict[key] {
-                entry.seconds += dur
-                entry.count += 1
-                groupDict[key] = entry
-            } else {
-                groupDict[key] = (tag: originalTag, seconds: dur, count: 1)
-            }
+        let grouped = Dictionary(grouping: sprints) { sprint -> String? in
+            let tag = sprint.tag?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return tag?.isEmpty == false ? tag : nil
         }
-
-        var results: [TagAttribution] = []
-        for (displayName, val) in groupDict {
-            let pct = totalSeconds > 0 ? (val.seconds / totalSeconds * 1000.0).rounded() / 10.0 : 0.0
-            let hours = (val.seconds / 3600.0 * 10).rounded() / 10.0
-            let earn = EarningsCalculator.calculate(durationInSeconds: val.seconds, hourlyRate: hourlyRate)
-            let formattedDur = TimeFormatter.format(shortDuration: val.seconds)
-            let formattedEarn = EarningsCalculator.format(amount: earn, currencySymbol: currencySymbol)
-
-            results.append(TagAttribution(
-                tag: val.tag,
-                displayName: displayName,
-                totalSeconds: val.seconds,
-                totalHours: hours,
-                earnings: earn,
-                percentage: pct,
-                formattedDuration: formattedDur,
-                formattedEarnings: formattedEarn,
-                sprintCount: val.count
-            ))
+        let results = grouped.map { tag, sprints in
+            let seconds = sprints.reduce(0) { $0 + ($1.duration ?? 0) }
+            let pct = totalSeconds > 0 ? (seconds / totalSeconds * 1000).rounded() / 10 : 0
+            let earnings = EarningsCalculator.calculate(durationInSeconds: seconds, hourlyRate: hourlyRate)
+            return TagAttribution(tag: tag, displayName: tag ?? "Untagged", totalSeconds: seconds,
+                                  totalHours: (seconds / 3600 * 10).rounded() / 10, earnings: earnings,
+                                  percentage: pct, formattedDuration: TimeFormatter.format(shortDuration: seconds),
+                                  formattedEarnings: EarningsCalculator.format(amount: earnings, currencySymbol: currencySymbol),
+                                  sprintCount: sprints.count)
         }
 
         return results.sorted {
@@ -341,29 +219,22 @@ enum MonthlyAnalytics {
         let pctChange: Double
         if priorSeconds > 0 {
             pctChange = ((secDiff / priorSeconds) * 1000.0).rounded() / 10.0
-        } else if currentSeconds > 0 {
-            pctChange = 100.0
         } else {
             pctChange = 0.0
         }
 
-        let earnDiff = ((secDiff / 3600.0) * hourlyRate * 100).rounded() / 100.0
+        let earnDiff = ((EarningsCalculator.calculate(durationInSeconds: currentSeconds, hourlyRate: hourlyRate)
+                         - EarningsCalculator.calculate(durationInSeconds: priorSeconds, hourlyRate: hourlyRate)) * 100).rounded() / 100
         let formattedEarnDiff = (secDiff < 0 ? "-" : "+") + EarningsCalculator.format(amount: abs(earnDiff), currencySymbol: currencySymbol)
 
-        let hoursPrefix = isPos ? "+" : (secDiff < 0 ? "" : "")
+        let hoursPrefix = isPos ? "+" : ""
         let formattedHoursDiff = "\(hoursPrefix)\(hoursDiff)h"
 
-        let pctPrefix = isPos ? "+" : (secDiff < 0 ? "" : "")
-        let formattedPct = "\(pctPrefix)\(Int(round(pctChange)))%"
+        let pctPrefix = hoursPrefix
+        let formattedPct = priorSeconds == 0 && currentSeconds > 0 ? "N/A" : "\(pctPrefix)\(Int(round(pctChange)))%"
 
-        let summaryText: String
-        if isNeu {
-            summaryText = "Same as last month (0%)"
-        } else if isPos {
-            summaryText = "+\(hoursDiff)h (+\(Int(round(pctChange)))%) vs last month"
-        } else {
-            summaryText = "\(hoursDiff)h (\(Int(round(pctChange)))%) vs last month"
-        }
+        let summaryText = comparisonText(hoursDifference: hoursDiff, percentage: formattedPct,
+                                         hasPriorWork: priorSeconds > 0, isNeutral: isNeu, prefix: hoursPrefix)
 
         return MonthOverMonthComparison(
             currentSeconds: currentSeconds,
@@ -379,4 +250,11 @@ enum MonthlyAnalytics {
             summaryText: summaryText
         )
     }
+    private static func comparisonText(hoursDifference: Double, percentage: String, hasPriorWork: Bool,
+                                       isNeutral: Bool, prefix: String) -> String {
+        if isNeutral { return "Same as last month (0%)" }
+        if !hasPriorWork { return "\(prefix)\(hoursDifference)h vs last month (no prior work)" }
+        return "\(prefix)\(hoursDifference)h (\(percentage)) vs last month"
+    }
+
 }

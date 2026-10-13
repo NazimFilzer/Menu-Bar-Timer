@@ -169,10 +169,17 @@ private struct DashboardResolutionView: View {
     @Bindable var vm: TimerViewModel
 
     var body: some View {
+        if let error = vm.persistenceError {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout).foregroundStyle(.orange).padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.12))
+        }
         if vm.recoveryMode {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Finish or resume your recovered sprint").font(.headline)
                 HStack {
+                    DatePicker("End date", selection: $vm.recoveryEndDate, displayedComponents: .date)
                     TextField("End time, HH:mm:ss", text: $vm.recoveryEndText)
                         .textFieldStyle(.roundedBorder).frame(width: 190)
                         .accessibilityLabel("Recovered sprint end time")

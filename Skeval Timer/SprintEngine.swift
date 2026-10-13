@@ -172,7 +172,6 @@ final class SprintEngine {
         if state.isPaused, let pausedAt = pauseStartedAt {
             totalPausedDuration += max(0, now.timeIntervalSince(pausedAt))
         }
-        if pendingSleepInterval != nil { pauseCount += 1 }
         pendingSleepInterval = nil
         sleepStartedAt = nil
 
@@ -260,19 +259,10 @@ final class SprintEngine {
         startTicker()
     }
 
-    func saveRecoveryEndTime(_ text: String) throws {
+    func saveRecoveryEndTime(_ text: String, on endDate: Date? = nil) throws {
         guard case .recovery(var sprint) = state else { return }
-        guard let end = TimeFormatter.parseTime(text, on: sprint.startTime) else {
-            throw RecoveryError.invalidFormat
-        }
-        guard end > sprint.startTime else {
-            throw RecoveryError.mustBeAfterStart(TimeFormatter.format(time: sprint.startTime))
-        }
-
-        var recoveredPausedDuration = totalPausedDuration
-        if sprint.isPaused, let pStart = sprint.pauseStartedAt, end > pStart {
-            recoveredPausedDuration += max(0, end.timeIntervalSince(pStart))
-        }
+        let end = try recoveryEnd(text: text, sprint: sprint, date: endDate ?? sprint.startTime)
+        let recoveredPausedDuration = recoveryPause(sprint: sprint, end: end)
 
         guard end.timeIntervalSince(sprint.startTime) > recoveredPausedDuration else {
             throw RecoveryError.breakExceedsSprintTime
@@ -289,6 +279,19 @@ final class SprintEngine {
         state = .idle
 
         onSprintCompleted?(sprint)
+    }
+
+    private func recoveryEnd(text: String, sprint: Sprint, date: Date) throws -> Date {
+        guard let end = TimeFormatter.parseTime(text, on: date) else { throw RecoveryError.invalidFormat }
+        guard end > sprint.startTime else {
+            throw RecoveryError.mustBeAfterStart(TimeFormatter.format(time: sprint.startTime))
+        }
+        return end
+    }
+
+    private func recoveryPause(sprint: Sprint, end: Date) -> TimeInterval {
+        guard sprint.isPaused, let pauseStart = sprint.pauseStartedAt else { return totalPausedDuration }
+        return totalPausedDuration + max(0, end.timeIntervalSince(pauseStart))
     }
 
     func dismissRecovery() {
@@ -312,6 +315,8 @@ final class SprintEngine {
         sprint.isPaused = true
         sprint.pauseStartedAt = now
         sprint.pausedDuration = totalPausedDuration
+        pauseCount += 1
+        sprint.pauseCount = pauseCount
         store.save(sprint: sprint)
 
         state = .paused(sprint: sprint, elapsed: elapsed)
@@ -323,6 +328,9 @@ final class SprintEngine {
         let interval = SleepInterval(sleepStartedAt: sleepStart, wakeAt: wakeTime)
         pendingSleepInterval = interval
         sleepStartedAt = nil
+        currentPauseElapsed = max(0, wakeTime.timeIntervalSince(sleepStart))
+        onPauseTick?(currentPauseElapsed)
+        startPauseTicker(startedAt: sleepStart)
 
         onSleepIntervalDetected?(interval)
     }
@@ -343,8 +351,8 @@ final class SprintEngine {
         totalPausedDuration += decisionPause
         if !countAsWork {
             totalPausedDuration += interval.duration
-            pauseCount += 1
         }
+        if countAsWork && decisionPause == 0 { pauseCount = max(0, pauseCount - 1) }
         sprint.isPaused = false
         sprint.pauseStartedAt = nil
         sprint.pausedDuration = totalPausedDuration

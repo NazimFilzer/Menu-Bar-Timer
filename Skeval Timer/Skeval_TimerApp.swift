@@ -17,7 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     var statusItem: NSStatusItem!
     var popover: NSPopover!
     var dashboardController: DashboardWindowController!
-    let vm = TimerViewModel()
+    let vm: TimerViewModel
     private var presenter: StatusBarPresenter!
 
     // Global Carbon hotkeys & local monitor:
@@ -29,6 +29,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private var localHotkeyMonitor: Any? = nil
     private var lastClockHotkeyTriggerTime: Date = .distantPast
     private var lastPauseHotkeyTriggerTime: Date = .distantPast
+
+    override init() {
+        vm = TimerViewModel()
+        super.init()
+    }
+
+    init(vm: TimerViewModel) {
+        self.vm = vm
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
@@ -202,8 +212,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
-    func triggerClockToggle() {
-        let now = Date()
+    func triggerClockToggle(at now: Date = Date()) {
         guard now.timeIntervalSince(lastClockHotkeyTriggerTime) > 0.3 else { return }
         lastClockHotkeyTriggerTime = now
 
@@ -216,8 +225,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
-    func triggerPauseToggle() {
-        let now = Date()
+    func triggerPauseToggle(at now: Date = Date()) {
         guard now.timeIntervalSince(lastPauseHotkeyTriggerTime) > 0.3 else { return }
         lastPauseHotkeyTriggerTime = now
 
@@ -324,7 +332,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         LaunchAtLoginHelper.isEnabled
     }
 
-    static func setLaunchAtLogin(_ enabled: Bool) {
+    @discardableResult
+    static func setLaunchAtLogin(_ enabled: Bool) -> String? {
         LaunchAtLoginHelper.setEnabled(enabled)
     }
 

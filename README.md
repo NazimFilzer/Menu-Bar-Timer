@@ -35,3 +35,5 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 ```
 
 The [v2 refresh report](docs/v2-refresh.md) records the branch comparison, changes, and validation.
+
+The [metrics and functionality audit](docs/v2-metrics-audit.md) records the fixes, 2,476 passing assertions, native UI checks, and remaining macOS integration checks.

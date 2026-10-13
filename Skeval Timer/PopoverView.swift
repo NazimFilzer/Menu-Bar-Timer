@@ -30,6 +30,11 @@ struct PopoverView: View {
 
                 Divider().background(theme.dividerColor)
 
+                if let error = vm.persistenceError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange).padding(12)
+                }
+
                 if vm.recoveryMode {
                     RecoveryBannerView(vm: vm, theme: theme)
                         .transition(.move(edge: .top).combined(with: .opacity))
@@ -210,6 +215,9 @@ private struct RecoveryBannerView: View {
                         .foregroundColor(theme.textSecondary)
                 }
             }
+
+            DatePicker("End date", selection: $vm.recoveryEndDate, displayedComponents: .date)
+                .font(.caption)
 
             HStack(spacing: 8) {
                 Button("Resume ▶") {
@@ -988,6 +996,7 @@ private struct SettingsSectionView: View {
     @Binding var launchAtLogin: Bool
     @Bindable var themeManager: ThemeManager
     @State private var rateInput: String = ""
+    @State private var loginError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1157,14 +1166,17 @@ private struct SettingsSectionView: View {
                                 .foregroundColor(theme.textSecondary)
                         }
                         Spacer()
-                        Toggle("", isOn: $launchAtLogin)
+                        Toggle("", isOn: Binding(get: { launchAtLogin }, set: { enabled in
+                            loginError = AppDelegate.setLaunchAtLogin(enabled)
+                            launchAtLogin = AppDelegate.isLaunchAtLoginEnabled
+                        }))
+                            .accessibilityLabel("Launch at login")
                             .toggleStyle(.switch)
                             .controlSize(.small)
                             .tint(theme.neonTeal)
-                                        .onChange(of: launchAtLogin) { _, newValue in
-                                AppDelegate.setLaunchAtLogin(newValue)
-                            }
                     }
+
+                    if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
 
                     Divider().background(theme.dividerColor)
 

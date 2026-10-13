@@ -250,7 +250,7 @@ private struct BillingCard: View {
                         .font(.system(size: 11, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                     Spacer()
-                    Text(EarningsCalculator.format(amount: vm.goal.hourlyRate > 0 ? vm.goal.hourlyRate * 8 : 4000, currencySymbol: vm.goal.currencySymbol) + " for 8 hours")
+                    Text(EarningsCalculator.format(amount: vm.goal.hourlyRate * 8, currencySymbol: vm.goal.currencySymbol) + " for 8 hours")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.neonTeal)
                 }
@@ -335,6 +335,7 @@ private struct ThemeCard: View {
 private struct SystemCard: View {
     @Binding var launchAtLogin: Bool
     let theme: PopoverTheme
+    @State private var loginError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -354,14 +355,17 @@ private struct SystemCard: View {
                             .foregroundColor(theme.textSecondary)
                     }
                     Spacer()
-                    Toggle("", isOn: $launchAtLogin)
+                    Toggle("", isOn: Binding(get: { launchAtLogin }, set: { enabled in
+                        loginError = LaunchAtLoginHelper.setEnabled(enabled)
+                        launchAtLogin = LaunchAtLoginHelper.isEnabled
+                    }))
+                        .accessibilityLabel("Launch at login")
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .tint(theme.neonTeal)
-                        .onChange(of: launchAtLogin) { _, newValue in
-                            LaunchAtLoginHelper.setEnabled(newValue)
-                        }
                 }
+
+                if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
 
                 Divider().background(theme.dividerColor)
 

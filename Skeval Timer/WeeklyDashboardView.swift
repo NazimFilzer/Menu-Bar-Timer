@@ -40,19 +40,20 @@ struct WeeklyDashboardView: View {
     }
 
     var body: some View {
+        let summary = weeklySummary
         VStack(spacing: 18) {
             // Personal Greeting Card
-            greetingCardView
+            greetingCardView(summary: summary)
 
             // 3 Key Metric Cards Row
-            metricsRowView
+            metricsRowView(summary: summary)
 
             // Weekly Target Progress Bar Card
-            weeklyTargetProgressCardView
+            weeklyTargetProgressCardView(summary: summary)
 
             // Interactive 7-Day Bar Chart
             WeeklyChartView(
-                summary: weeklySummary,
+                summary: summary,
                 dailyGoalHours: vm.goal.dailyGoalHours,
                 dailyGoalLabel: vm.goal.goalLabel,
                 theme: theme,
@@ -62,7 +63,7 @@ struct WeeklyDashboardView: View {
             // Interactive Sprint Log CRUD Table
             SprintLogTableView(
                 vm: vm,
-                summary: weeklySummary,
+                summary: summary,
                 theme: theme
             )
         }
@@ -70,14 +71,14 @@ struct WeeklyDashboardView: View {
 
     // MARK: - Greeting Card
 
-    private var greetingCardView: some View {
+    private func greetingCardView(summary: WeeklySummary) -> some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(greetingText)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(theme.textPrimary)
 
-                Text(weeklySubtitle)
+                Text(weeklySubtitle(summary: summary))
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
             }
@@ -111,11 +112,11 @@ struct WeeklyDashboardView: View {
         )
     }
 
-    private var weeklySubtitle: String {
-        if weeklySummary.weeklyGoalPercent >= 100 {
+    private func weeklySubtitle(summary: WeeklySummary) -> String {
+        if summary.weeklyGoalPercent >= 100 {
             return "🎉 Fantastic work! You've achieved 100% of your weekly goal."
-        } else if weeklySummary.totalSeconds > 0 {
-            return "You've logged \(weeklySummary.formattedTotalHours) this week (\(weeklySummary.weeklyGoalPercent)% of your target)."
+        } else if summary.totalSeconds > 0 {
+            return "You've logged \(summary.formattedTotalHours) this week (\(summary.weeklyGoalPercent)% of your target)."
         } else {
             return "Start a sprint to log your progress toward your \(vm.goal.weeklyGoalLabel) weekly goal."
         }
@@ -123,7 +124,7 @@ struct WeeklyDashboardView: View {
 
     // MARK: - Metric Cards Row
 
-    private var metricsRowView: some View {
+    private func metricsRowView(summary: WeeklySummary) -> some View {
         HStack(spacing: 16) {
             // 1. Today's Hours
             MetricCardView(
@@ -146,8 +147,8 @@ struct WeeklyDashboardView: View {
             // 3. Current Week's Daily Average
             MetricCardView(
                 title: "DAILY AVERAGE",
-                value: weeklySummary.formattedDailyAverage,
-                subtitle: weeklySummary.isCurrentWeek ? "Current week average" : "Historical week average",
+                value: summary.formattedDailyAverage,
+                subtitle: summary.isCurrentWeek ? "Current week average" : "Historical week average",
                 icon: "chart.line.uptrend.xyaxis",
                 theme: theme
             )
@@ -156,7 +157,7 @@ struct WeeklyDashboardView: View {
 
     // MARK: - Weekly Target Progress Bar Card
 
-    private var weeklyTargetProgressCardView: some View {
+    private func weeklyTargetProgressCardView(summary: WeeklySummary) -> some View {
         VStack(spacing: 12) {
             // Top Header & Badges
             HStack {
@@ -175,20 +176,20 @@ struct WeeklyDashboardView: View {
 
                 // Percentage Badge
                 HStack(spacing: 4) {
-                    Text("\(weeklySummary.weeklyGoalPercent)%")
+                    Text("\(summary.weeklyGoalPercent)%")
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                     Text("of \(vm.goal.weeklyGoalLabel) goal")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3.5)
-                .background(weeklySummary.weeklyGoalPercent >= 100 ? Color.green.opacity(0.18) : theme.neonTeal.opacity(0.15))
-                .foregroundColor(weeklySummary.weeklyGoalPercent >= 100 ? Color.green : theme.neonTeal)
+                .background(summary.weeklyGoalPercent >= 100 ? Color.green.opacity(0.18) : theme.neonTeal.opacity(0.15))
+                .foregroundColor(summary.weeklyGoalPercent >= 100 ? Color.green : theme.neonTeal)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
                         .stroke(
-                            weeklySummary.weeklyGoalPercent >= 100 ? Color.green.opacity(0.4) : theme.neonTeal.opacity(0.3),
+                            summary.weeklyGoalPercent >= 100 ? Color.green.opacity(0.4) : theme.neonTeal.opacity(0.3),
                             lineWidth: 1
                         )
                 )
@@ -204,7 +205,7 @@ struct WeeklyDashboardView: View {
                         .kerning(0.6)
 
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(weeklySummary.formattedTotalHours)
+                        Text(summary.formattedTotalHours)
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.textPrimary)
                         Text("/ \(vm.goal.weeklyGoalLabel)")
@@ -222,7 +223,7 @@ struct WeeklyDashboardView: View {
                         .foregroundColor(theme.textSecondary)
                         .kerning(0.6)
 
-                    Text(weeklySummary.earningsProgressLabel)
+                    Text(summary.earningsProgressLabel)
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.neonTeal)
                 }
@@ -231,7 +232,7 @@ struct WeeklyDashboardView: View {
             // Visual Dual Gradient Progress Bar
             GeometryReader { proxy in
                 let width = proxy.size.width
-                let progressWidth = width * CGFloat(weeklySummary.weeklyGoalProgress)
+                let progressWidth = width * CGFloat(summary.weeklyGoalProgress)
 
                 ZStack(alignment: .leading) {
                     // Track
@@ -243,16 +244,16 @@ struct WeeklyDashboardView: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: weeklySummary.weeklyGoalPercent >= 100
+                                colors: summary.weeklyGoalPercent >= 100
                                     ? [Color(red: 0.15, green: 0.82, blue: 0.65), Color(red: 0.08, green: 0.58, blue: 0.45)]
                                     : [theme.neonTeal, theme.neonTeal.opacity(0.7)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(progressWidth, weeklySummary.totalSeconds > 0 ? 10 : 0), height: 10)
+                        .frame(width: max(progressWidth, summary.totalSeconds > 0 ? 10 : 0), height: 10)
                         .shadow(
-                            color: theme.neonTeal.opacity(weeklySummary.weeklyGoalPercent >= 100 ? 0.6 : 0.3),
+                            color: theme.neonTeal.opacity(summary.weeklyGoalPercent >= 100 ? 0.6 : 0.3),
                             radius: 4,
                             x: 0,
                             y: 0
@@ -263,7 +264,7 @@ struct WeeklyDashboardView: View {
 
             // Bottom status footnote
             HStack {
-                if weeklySummary.weeklyGoalPercent >= 100 {
+                if summary.weeklyGoalPercent >= 100 {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 10))
@@ -272,7 +273,7 @@ struct WeeklyDashboardView: View {
                     }
                     .foregroundColor(Color.green)
                 } else {
-                    let remainingSeconds = max(weeklySummary.weeklyGoalSeconds - weeklySummary.totalSeconds, 0)
+                    let remainingSeconds = max(summary.weeklyGoalSeconds - summary.totalSeconds, 0)
                     Text("\(TimeFormatter.format(shortDuration: remainingSeconds)) remaining to hit goal")
                         .font(.system(size: 10, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)

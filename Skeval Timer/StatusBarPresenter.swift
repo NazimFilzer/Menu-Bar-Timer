@@ -9,9 +9,12 @@ final class StatusBarPresenter {
     }
 
     private let statusItem: NSStatusItem
-    private var lastSecond: Int = -1
-    private var lastPillState: PillState = .idle
-    private var lastThemeName: String = ""
+    private struct Presentation: Equatable {
+        let text: String
+        let state: PillState
+        let themeName: String
+    }
+    private var lastPresentation: Presentation?
 
     init(statusItem: NSStatusItem) {
         self.statusItem = statusItem
@@ -22,42 +25,24 @@ final class StatusBarPresenter {
         button.title = ""
 
         let effectiveTheme = theme ?? ThemeManager.shared.theme
-        let themeChanged = effectiveTheme.name != lastThemeName
+        let presentation = presentation(state: state, accumulatedTotal: accumulatedTotal,
+                                        pauseElapsed: pauseElapsed, themeName: effectiveTheme.name)
+        button.setAccessibilityLabel("Skeval Timer, \(state.statusTitle.lowercased()), \(presentation.text)")
+        guard force || presentation != lastPresentation else { return }
+        lastPresentation = presentation
+        button.image = makePillImage(text: presentation.text, state: presentation.state, theme: effectiveTheme)
+        button.image?.isTemplate = false
+    }
 
-        if state.isRunning {
-            let elapsed = Int(state.isPaused ? pauseElapsed : state.currentElapsed)
-            let pillState: PillState = state.isPaused ? .paused : .running
-
-            if !force && !themeChanged && elapsed == lastSecond && pillState == lastPillState {
-                return
-            }
-
-            lastSecond = elapsed
-            lastPillState = pillState
-            lastThemeName = effectiveTheme.name
-
-            let text = state.isPaused
-                ? TimeFormatter.format(clock: pauseElapsed)
-                : TimeFormatter.format(clock: state.currentElapsed)
-            button.image = makePillImage(text: text, state: pillState, theme: effectiveTheme)
-            button.image?.isTemplate = false
-        } else {
-            let text = accumulatedTotal > 0
-                ? TimeFormatter.format(clock: accumulatedTotal)
-                : "00:00:00"
-            let pillState: PillState = .idle
-
-            if !force && !themeChanged && pillState == lastPillState && lastSecond == -1 {
-                return
-            }
-
-            lastSecond = -1
-            lastPillState = pillState
-            lastThemeName = effectiveTheme.name
-
-            button.image = makePillImage(text: text, state: pillState, theme: effectiveTheme)
-            button.image?.isTemplate = false
+    private func presentation(state: SprintState, accumulatedTotal: TimeInterval,
+                              pauseElapsed: TimeInterval, themeName: String) -> Presentation {
+        if state.isPaused {
+            return Presentation(text: TimeFormatter.format(clock: pauseElapsed), state: .paused, themeName: themeName)
         }
+        if state.isRunning {
+            return Presentation(text: TimeFormatter.format(clock: state.currentElapsed), state: .running, themeName: themeName)
+        }
+        return Presentation(text: TimeFormatter.format(clock: accumulatedTotal), state: .idle, themeName: themeName)
     }
 
     func makePillImage(text: String, state: PillState, theme: PopoverTheme? = nil) -> NSImage {
@@ -83,44 +68,15 @@ final class StatusBarPresenter {
             let pillRect = CGRect(x: 1, y: 1, width: pillWidth - 2, height: pillHeight - 2)
             let cornerRadius = pillRect.height / 2
 
-            let pillColor: NSColor
-            switch state {
-            case .running:
-                pillColor = effectiveTheme.accentNSColor
-            case .paused:
-                pillColor = effectiveTheme.pausedNSColor
-            case .idle:
-                pillColor = NSColor(white: 0.30, alpha: 0.95)
-            }
+            let pillColor = Self.pillColor(state: state, theme: effectiveTheme)
 
             let pillPath = CGPath(roundedRect: pillRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
             ctx.setFillColor(pillColor.cgColor)
             ctx.addPath(pillPath)
             ctx.fillPath()
 
-            switch state {
-            case .paused:
-                let barW: CGFloat = 2
-                let barH: CGFloat = 7
-                let barY = (pillHeight - barH) / 2
-                let bar1X = paddingX
-                let bar2X = paddingX + barW + 2
-                ctx.setFillColor(fgColor.cgColor)
-                ctx.fill(CGRect(x: bar1X, y: barY, width: barW, height: barH))
-                ctx.fill(CGRect(x: bar2X, y: barY, width: barW, height: barH))
-            case .running:
-                let dotY = (pillHeight - dotSize) / 2
-                let dotRect = CGRect(x: paddingX, y: dotY, width: dotSize, height: dotSize)
-                ctx.setFillColor(fgColor.cgColor)
-                ctx.addEllipse(in: dotRect)
-                ctx.fillPath()
-            case .idle:
-                let dotY = (pillHeight - dotSize) / 2
-                let dotRect = CGRect(x: paddingX, y: dotY, width: dotSize, height: dotSize)
-                ctx.setFillColor(NSColor(white: 0.75, alpha: 0.8).cgColor)
-                ctx.addEllipse(in: dotRect)
-                ctx.fillPath()
-            }
+            Self.drawSymbol(state: state, context: ctx, foreground: fgColor,
+                            padding: paddingX, height: pillHeight, dotSize: dotSize)
 
             let textX = paddingX + dotSize + gap
             let textY = (pillHeight - textSize.height) / 2 + 0.5
@@ -131,4 +87,27 @@ final class StatusBarPresenter {
         img.isTemplate = false
         return img
     }
+    private static func pillColor(state: PillState, theme: PopoverTheme) -> NSColor {
+        switch state {
+        case .running: return theme.accentNSColor
+        case .paused: return theme.pausedNSColor
+        case .idle: return NSColor(white: 0.30, alpha: 0.95)
+        }
+    }
+
+    private static func drawSymbol(state: PillState, context: CGContext, foreground: NSColor,
+                            padding: CGFloat, height: CGFloat, dotSize: CGFloat) {
+        if state == .paused {
+            context.setFillColor(foreground.cgColor)
+            for x in [padding, padding + 4] {
+                context.fill(CGRect(x: x, y: (height - 7) / 2, width: 2, height: 7))
+            }
+            return
+        }
+        let color = state == .idle ? NSColor(white: 0.75, alpha: 0.8) : foreground
+        context.setFillColor(color.cgColor)
+        context.addEllipse(in: CGRect(x: padding, y: (height - dotSize) / 2, width: dotSize, height: dotSize))
+        context.fillPath()
+    }
+
 }

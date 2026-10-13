@@ -12,6 +12,8 @@ final class DayLogStore: @unchecked Sendable {
         self.logs = storage.loadAll()
     }
 
+    var storageError: String? { storage.errorDescription }
+
     func todayLog() -> DayLog {
         log(for: Date())
     }
@@ -46,6 +48,7 @@ final class DayLogStore: @unchecked Sendable {
 
     func save(sprint: Sprint) {
         lock.lock()
+        defer { lock.unlock() }
         let newKey = TimeFormatter.format(dateKey: sprint.startTime)
         for (key, bucket) in logs where key != newKey {
             if bucket.contains(where: { $0.id == sprint.id }) {
@@ -66,10 +69,7 @@ final class DayLogStore: @unchecked Sendable {
         }
         targetBucket.sort { $0.startTime < $1.startTime }
         logs[newKey] = targetBucket
-        let snapshot = logs
-        lock.unlock()
-
-        storage.saveAll(snapshot)
+        storage.saveAll(logs)
     }
 
     func delete(sprint: Sprint) {
@@ -78,36 +78,18 @@ final class DayLogStore: @unchecked Sendable {
 
     func delete(sprintId: UUID, preferredDate: Date? = nil) {
         lock.lock()
-        var found = false
-        if let pref = preferredDate {
-            let key = TimeFormatter.format(dateKey: pref)
-            if var bucket = logs[key], let idx = bucket.firstIndex(where: { $0.id == sprintId }) {
-                bucket.remove(at: idx)
-                if bucket.isEmpty {
-                    logs.removeValue(forKey: key)
-                } else {
-                    logs[key] = bucket
-                }
-                found = true
-            }
-        }
-        if !found {
-            for (key, bucket) in logs {
-                if let idx = bucket.firstIndex(where: { $0.id == sprintId }) {
-                    var updated = bucket
-                    updated.remove(at: idx)
-                    if updated.isEmpty {
-                        logs.removeValue(forKey: key)
-                    } else {
-                        logs[key] = updated
-                    }
-                    break
-                }
-            }
-        }
-        let snapshot = logs
-        lock.unlock()
+        defer { lock.unlock() }
+        guard let key = dayKey(containing: sprintId, preferredDate: preferredDate), var bucket = logs[key] else { return }
+        bucket.removeAll { $0.id == sprintId }
+        logs[key] = bucket.isEmpty ? nil : bucket
+        storage.saveAll(logs)
+    }
 
-        storage.saveAll(snapshot)
+    private func dayKey(containing sprintId: UUID, preferredDate: Date?) -> String? {
+        if let date = preferredDate {
+            let key = TimeFormatter.format(dateKey: date)
+            if logs[key]?.contains(where: { $0.id == sprintId }) == true { return key }
+        }
+        return logs.first { $0.value.contains { $0.id == sprintId } }?.key
     }
 }

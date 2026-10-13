@@ -973,7 +973,7 @@ func testSprintLogCRUDAndStoreConsistency() {
     let initialRev = vm.logRevision
     let s1Start = cal.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 9, minute: 0))!
     let s1End = cal.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 11, minute: 30))!
-    let s1 = vm.addManualSprint(
+    let s1 = try! vm.addManualSprint(
         date: wedDate,
         startTime: s1Start,
         endTime: s1End,
@@ -995,7 +995,7 @@ func testSprintLogCRUDAndStoreConsistency() {
     // 2. Add second sprint on Monday
     let s2Start = cal.date(from: DateComponents(year: 2026, month: 8, day: 31, hour: 10, minute: 0))!
     let s2End = cal.date(from: DateComponents(year: 2026, month: 8, day: 31, hour: 12, minute: 0))!
-    let s2 = vm.addManualSprint(
+    let s2 = try! vm.addManualSprint(
         date: monDate,
         startTime: s2Start,
         endTime: s2End,
@@ -1022,7 +1022,7 @@ func testSprintLogCRUDAndStoreConsistency() {
     let editRev = vm.logRevision
     let s1NewStart = cal.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 8, minute: 30))!
     let s1NewEnd = cal.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12, minute: 0))!
-    let updatedS1 = vm.updateSprint(
+    let updatedS1 = try! vm.updateSprint(
         originalSprint: s1,
         newDate: wedDate,
         newStartTime: s1NewStart,
@@ -1045,7 +1045,7 @@ func testSprintLogCRUDAndStoreConsistency() {
     let thuStart = cal.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 15, minute: 0))!
     let thuEnd = cal.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 17, minute: 0))!
 
-    let movedS2 = vm.updateSprint(
+    let movedS2 = try! vm.updateSprint(
         originalSprint: s2,
         newDate: thuDate,
         newStartTime: thuStart,
@@ -1283,7 +1283,8 @@ func testMonthOverMonthComparison() {
     let momZero = summaryZero.monthOverMonth
     assertTrue(momZero.isPositive)
     assertEqual(momZero.hoursDifference, 120.0)
-    assertEqual(momZero.percentageChange, 100.0)
+    assertEqual(momZero.percentageChange, 0.0)
+    assertEqual(momZero.formattedPercentageChange, "N/A")
 
     // Case 4: Both months 0h -> neutral
     let summaryEmpty = MonthlyAnalytics.calculate(logs: [:], monthOffset: 0, referenceDate: refDate, settings: settings, calendar: cal)
@@ -1340,7 +1341,7 @@ func testInsightsPeriodSummaryAndDateRangeFiltering() {
     assertEqual(period.activeDaysCount, 2)
     assertEqual(period.totalDaysCount, 10)
     assertEqual(period.dailyAverageHours, 3.0)
-    assertEqual(period.formattedDailyAverage, "3h")
+    assertEqual(period.formattedDailyAverage, "3h 0m")
     assertEqual(period.distinctTags, ["#core", "#fix"])
 
     assertTrue(!period.trendPoints.isEmpty)
@@ -1985,7 +1986,7 @@ func testV2LiveEarningsAndHistorySynchronization() {
     vm.selectDate(yesterday)
     assertEqual(vm.displayedEarnings, 1200, "History excludes the live sprint")
     let revision = vm.logRevision
-    _ = vm.updateSprint(originalSprint: old, newDate: yesterday, newStartTime: old.startTime,
+    _ = try! vm.updateSprint(originalSprint: old, newDate: yesterday, newStartTime: old.startTime,
                         newEndTime: old.startTime.addingTimeInterval(7200), newPausedDuration: 600, newTag: "updated")
     assertEqual(vm.selectedDayLog.accumulatedTotal, 6600)
     assertTrue(vm.logRevision > revision)
@@ -2073,6 +2074,7 @@ func testSleepDecisionDelayAndRecoveryRetry() {
 @main
 struct TestMain {
     static func main() async {
+        defer { cleanUpAuditSettings() }
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
         testSprintTaggingAndBackwardCompatibility()
@@ -2088,6 +2090,8 @@ struct TestMain {
         testTagFilterMatching()
         testAppVersion()
         testSprintEntryValidation()
+        testMetricsAudit()
+        testPersistenceAudit()
         await MainActor.run {
             testSprintEngine()
             testAppThemes()
@@ -2107,6 +2111,7 @@ struct TestMain {
             testTimeAndPauseMathVerification()
             testV2LiveEarningsAndHistorySynchronization()
             testSleepDecisionDelayAndRecoveryRetry()
+            testLifecycleAudit()
         }
         print("Results: \(passedTests) / \(totalTests) assertions passed.")
         if passedTests != totalTests { exit(1) }

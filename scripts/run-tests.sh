@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix='skeval-tests-') as directory:
     if Path(xcode).exists():
         environment.setdefault('DEVELOPER_DIR', xcode)
     subprocess.run(['xcrun', 'swiftc', '-parse-as-library', *sources,
-                    str(delegate), 'Tests/TestRunner.swift', '-o', str(binary)],
+                    str(delegate), *sorted(str(path) for path in Path('Tests').glob('*.swift')),
+                    '-o', str(binary)],
                    env=environment, check=True)
     subprocess.run([str(binary)], env=environment, check=True)
 PY

@@ -63,6 +63,9 @@ struct SprintLogTableView: View {
     @State private var sprintToDelete: Sprint? = nil
     @State private var isDeleteAlertPresented: Bool = false
     @State private var copiedSprintId: UUID? = nil
+    @State private var exportMessage: String?
+    @State private var exportError: String = ""
+    @State private var isExportErrorPresented = false
 
     private static let tableDateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -91,6 +94,7 @@ struct SprintLogTableView: View {
         VStack(spacing: 14) {
             // Header: Title, Count Badge & Add Sprint Button
             headerRow
+            if let exportMessage { Text(exportMessage).font(.caption).foregroundStyle(theme.neonTeal) }
 
             // Search & Tag Filter Bar
             filterBar
@@ -103,6 +107,9 @@ struct SprintLogTableView: View {
             }
         }
         .padding(18)
+        .alert("Export failed", isPresented: $isExportErrorPresented) {
+            Button("OK", role: .cancel) { }
+        } message: { Text(exportError) }
         .background(theme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
@@ -180,7 +187,14 @@ struct SprintLogTableView: View {
                 Button(action: {
                     CSVExporter.promptSavePanel(
                         sprints: filteredSprints,
-                        suggestedName: "skeval-sprints-export.csv"
+                        suggestedName: "skeval-sprints-export.csv",
+                        onComplete: { success, url in
+                            if success, let url { exportMessage = "Exported to \(url.lastPathComponent)" }
+                        },
+                        onFailure: { error in
+                            exportError = error
+                            isExportErrorPresented = true
+                        }
                     )
                 }) {
                     HStack(spacing: 5) {
@@ -284,9 +298,9 @@ struct SprintLogTableView: View {
 
                         // Unique tags chips
                         ForEach(distinctTags, id: \.self) { tag in
-                            let count = allSprints.filter { $0.tag?.caseInsensitiveCompare(tag) == .orderedSame }.count
+                            let count = allSprints.filter { TagFilter.tag(tag).matches(sprint: $0) }.count
                             tagFilterChip(
-                                title: "#\(tag) (\(count))",
+                                title: "#\(tag.trimmingCharacters(in: CharacterSet(charactersIn: "#"))) (\(count))",
                                 isSelected: selectedTagFilter == .tag(tag),
                                 onTap: {
                                     if selectedTagFilter == .tag(tag) {
@@ -509,12 +523,12 @@ struct SprintLogTableView: View {
                 .foregroundColor(theme.neonTeal.opacity(0.6))
                 .padding(.top, 10)
 
-            Text(allSprints.isEmpty ? "No Sprints Recorded This Week" : "No Sprints Found")
+            Text(allSprints.isEmpty ? "No Sprints Recorded" : "No Sprints Found")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundColor(theme.textPrimary)
 
             Text(allSprints.isEmpty
-                 ? "Completed sprints for this week will show up here. You can also manually add a sprint above."
+                 ? "Completed sprints for this period will show up here. You can also manually add a sprint above."
                  : "No sprints matched your current search and tag filters.")
                 .font(.system(size: 10, weight: .regular, design: .rounded))
                 .foregroundColor(theme.textSecondary)
@@ -551,7 +565,8 @@ struct SprintFormFieldsView: View {
     @Binding var selectedDate: Date
     @Binding var startTime: Date
     @Binding var endTime: Date
-    @Binding var pauseMinutes: Int
+    @Binding var pauseMinutes: Double
+    @Binding var endDayOffset: Int
     @Binding var tagText: String
     let theme: PopoverTheme
 
@@ -591,13 +606,26 @@ struct SprintFormFieldsView: View {
             }
 
             HStack {
+                Text("End Day:")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(theme.textSecondary)
+                    .frame(width: 90, alignment: .leading)
+                Stepper(endDayOffset == 0 ? "Same day" : "\(endDayOffset) day(s) later", value: $endDayOffset, in: 0...3650)
+                    .accessibilityLabel("End day offset")
+                Spacer()
+            }
+
+            HStack {
                 Text("Pause Duration:")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
                     .frame(width: 90, alignment: .leading)
 
-                Stepper("\(pauseMinutes) min", value: $pauseMinutes, in: 0...480, step: 5)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                TextField("Minutes", value: $pauseMinutes, format: .number)
+                    .accessibilityLabel("Pause duration in minutes")
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 90)
+                Text("min").font(.caption).foregroundColor(theme.textSecondary)
                 Spacer()
             }
 
@@ -688,11 +716,8 @@ struct AddSprintModalView: View {
     let defaultDate: Date
     let onDismiss: () -> Void
 
-    @State private var selectedDate: Date
-    @State private var startTime: Date
-    @State private var endTime: Date
-    @State private var pauseMinutes: Int = 0
-    @State private var tagText: String = ""
+    @State private var draft: SprintDraft
+    @State private var saveError: String?
 
     init(vm: TimerViewModel, theme: PopoverTheme, defaultDate: Date, onDismiss: @escaping () -> Void) {
         self.vm = vm
@@ -700,20 +725,10 @@ struct AddSprintModalView: View {
         self.defaultDate = defaultDate
         self.onDismiss = onDismiss
 
-        let cal = Calendar.current
-        let start = cal.date(bySettingHour: 9, minute: 0, second: 0, of: defaultDate) ?? defaultDate
-        let end = cal.date(bySettingHour: 11, minute: 30, second: 0, of: defaultDate) ?? defaultDate.addingTimeInterval(9000)
-
-        _selectedDate = State(initialValue: defaultDate)
-        _startTime = State(initialValue: start)
-        _endTime = State(initialValue: end)
+        _draft = State(initialValue: SprintDraft(date: defaultDate))
     }
 
-    private var validatedEntry: SprintEntry? {
-        let start = TimeFormatter.combine(date: selectedDate, time: startTime)
-        let end = TimeFormatter.combine(date: selectedDate, time: endTime, wrapIfBefore: start)
-        return try? SprintEntry(start: start, end: end, pausedDuration: TimeInterval(pauseMinutes * 60))
-    }
+    private var validatedEntry: SprintEntry? { draft.entry }
 
     private var netDuration: TimeInterval { validatedEntry?.netDuration ?? 0 }
     private var isValid: Bool { validatedEntry != nil }
@@ -745,11 +760,12 @@ struct AddSprintModalView: View {
             Divider().background(theme.dividerColor)
 
             SprintFormFieldsView(
-                selectedDate: $selectedDate,
-                startTime: $startTime,
-                endTime: $endTime,
-                pauseMinutes: $pauseMinutes,
-                tagText: $tagText,
+                selectedDate: $draft.selectedDate,
+                startTime: $draft.startTime,
+                endTime: $draft.endTime,
+                pauseMinutes: $draft.pauseMinutes,
+                endDayOffset: $draft.endDayOffset,
+                tagText: $draft.tagText,
                 theme: theme
             )
 
@@ -761,6 +777,8 @@ struct AddSprintModalView: View {
                 isValid: isValid,
                 theme: theme
             )
+
+            if let saveError { Text(saveError).font(.caption).foregroundStyle(.red) }
 
             HStack(spacing: 10) {
                 Button("Cancel", action: onDismiss)
@@ -795,16 +813,11 @@ struct AddSprintModalView: View {
     }
 
     private func saveSprint() {
-        guard isValid else { return }
-        let cleanTag = tagText.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-        _ = vm.addManualSprint(
-            date: selectedDate,
-            startTime: startTime,
-            endTime: endTime,
-            pausedDuration: TimeInterval(pauseMinutes * 60),
-            tag: cleanTag.isEmpty ? nil : cleanTag
-        )
-        onDismiss()
+        do {
+            _ = try vm.addManualSprint(date: draft.selectedDate, startTime: draft.startTime, endTime: draft.endTime,
+                                      pausedDuration: draft.pausedDuration, tag: draft.tagText, endDayOffset: draft.endDayOffset)
+            onDismiss()
+        } catch { saveError = error.localizedDescription }
     }
 }
 
@@ -816,11 +829,8 @@ struct EditSprintModalView: View {
     let theme: PopoverTheme
     let onDismiss: () -> Void
 
-    @State private var selectedDate: Date
-    @State private var startTime: Date
-    @State private var endTime: Date
-    @State private var pauseMinutes: Int
-    @State private var tagText: String
+    @State private var draft: SprintDraft
+    @State private var saveError: String?
 
     init(sprint: Sprint, vm: TimerViewModel, theme: PopoverTheme, onDismiss: @escaping () -> Void) {
         self.sprint = sprint
@@ -828,18 +838,10 @@ struct EditSprintModalView: View {
         self.theme = theme
         self.onDismiss = onDismiss
 
-        _selectedDate = State(initialValue: sprint.startTime)
-        _startTime = State(initialValue: sprint.startTime)
-        _endTime = State(initialValue: sprint.endTime ?? sprint.startTime.addingTimeInterval(3600))
-        _pauseMinutes = State(initialValue: Int(sprint.pausedDuration / 60))
-        _tagText = State(initialValue: sprint.tag ?? "")
+        _draft = State(initialValue: SprintDraft(sprint: sprint))
     }
 
-    private var validatedEntry: SprintEntry? {
-        let start = TimeFormatter.combine(date: selectedDate, time: startTime)
-        let end = TimeFormatter.combine(date: selectedDate, time: endTime, wrapIfBefore: start)
-        return try? SprintEntry(start: start, end: end, pausedDuration: TimeInterval(pauseMinutes * 60))
-    }
+    private var validatedEntry: SprintEntry? { draft.entry }
 
     private var netDuration: TimeInterval { validatedEntry?.netDuration ?? 0 }
     private var isValid: Bool { validatedEntry != nil }
@@ -871,11 +873,12 @@ struct EditSprintModalView: View {
             Divider().background(theme.dividerColor)
 
             SprintFormFieldsView(
-                selectedDate: $selectedDate,
-                startTime: $startTime,
-                endTime: $endTime,
-                pauseMinutes: $pauseMinutes,
-                tagText: $tagText,
+                selectedDate: $draft.selectedDate,
+                startTime: $draft.startTime,
+                endTime: $draft.endTime,
+                pauseMinutes: $draft.pauseMinutes,
+                endDayOffset: $draft.endDayOffset,
+                tagText: $draft.tagText,
                 theme: theme
             )
 
@@ -887,6 +890,8 @@ struct EditSprintModalView: View {
                 isValid: isValid,
                 theme: theme
             )
+
+            if let saveError { Text(saveError).font(.caption).foregroundStyle(.red) }
 
             HStack(spacing: 10) {
                 Button("Cancel", action: onDismiss)
@@ -921,16 +926,12 @@ struct EditSprintModalView: View {
     }
 
     private func saveChanges() {
-        guard isValid else { return }
-        let cleanTag = tagText.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-        _ = vm.updateSprint(
-            originalSprint: sprint,
-            newDate: selectedDate,
-            newStartTime: startTime,
-            newEndTime: endTime,
-            newPausedDuration: TimeInterval(pauseMinutes * 60),
-            newTag: cleanTag.isEmpty ? nil : cleanTag
-        )
-        onDismiss()
+        do {
+            _ = try vm.updateSprint(originalSprint: sprint, newDate: draft.selectedDate,
+                                   newStartTime: draft.startTime, newEndTime: draft.endTime,
+                                   newPausedDuration: draft.pausedDuration, newTag: draft.tagText,
+                                   endDayOffset: draft.endDayOffset)
+            onDismiss()
+        } catch { saveError = error.localizedDescription }
     }
 }

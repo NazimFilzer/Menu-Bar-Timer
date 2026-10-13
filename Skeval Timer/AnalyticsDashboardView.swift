@@ -2,21 +2,26 @@ import SwiftUI
 
 struct AnalyticsDashboardView: View {
     @Bindable var vm: TimerViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let theme: PopoverTheme
 
     @State private var selectedPreset: DateRangePreset = .last30Days
     @State private var customStartDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var customEndDate: Date = Date()
-    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
+    @State private var selectedYear: Int = Calendar(identifier: .gregorian).component(.year, from: Date())
     @State private var hoveredHeatmapCell: HeatmapDayCell? = nil
     @State private var hoveredTrendPoint: TrendDataPoint? = nil
     @State private var exportSuccessMessage: String? = nil
+    @State private var exportError = ""
+    @State private var isExportErrorPresented = false
 
     private var activeDateRange: (start: Date, end: Date) {
         if selectedPreset == .custom {
             return (customStartDate, customEndDate)
         } else {
-            return selectedPreset.dateRange()
+            let earliest = vm.store.allLogs().values.flatMap { $0 }
+                .filter { !$0.isOpen }.map(\.startTime).min()
+            return selectedPreset.dateRange(earliestDate: earliest)
         }
     }
 
@@ -41,37 +46,42 @@ struct AnalyticsDashboardView: View {
     }
 
     var body: some View {
+        let summary = periodSummary
+        let matrix = annualHeatmap
         ScrollView {
             VStack(spacing: 20) {
                 // Top Filter & Action Bar
-                topFilterAndActionBar
+                topFilterAndActionBar(summary: summary)
 
                 // Period Summary Cards Row (Total Hours, Total Earnings, Daily Average, Total Sprints)
-                periodSummaryCardsRow
+                periodSummaryCardsRow(summary: summary)
 
                 // Long-Term Productivity Trend Curve Chart
-                trendLineChartCard
+                trendLineChartCard(summary: summary)
 
                 // GitHub-Style Annual Contribution Heatmap (52 Weeks)
-                annualHeatmapCard
+                annualHeatmapCard(matrix: matrix)
 
                 // Sprints in Selected Period Table
                 SprintLogTableView(
                     vm: vm,
-                    sprints: periodSummary.sprints,
-                    distinctTags: periodSummary.distinctTags,
-                    defaultDate: periodSummary.endDate,
+                    sprints: summary.sprints,
+                    distinctTags: summary.distinctTags,
+                    defaultDate: summary.endDate,
                     theme: theme,
-                    title: "SPRINTS IN SELECTED PERIOD (\(periodSummary.sprints.count))"
+                    title: "SPRINTS IN SELECTED PERIOD (\(summary.sprints.count))"
                 )
             }
             .padding(20)
         }
+        .alert("Export failed", isPresented: $isExportErrorPresented) {
+            Button("OK", role: .cancel) { }
+        } message: { Text(exportError) }
     }
 
     // MARK: - Top Filter & Action Bar
 
-    private var topFilterAndActionBar: some View {
+    private func topFilterAndActionBar(summary: PeriodSummary) -> some View {
         VStack(spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 // Preset Segmented Control
@@ -79,7 +89,7 @@ struct AnalyticsDashboardView: View {
                     ForEach(DateRangePreset.allCases) { preset in
                         let isSelected = selectedPreset == preset
                         Button(action: {
-                            withAnimation(.easeInOut(duration: 0.15)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
                                 selectedPreset = preset
                             }
                         }) {
@@ -103,7 +113,7 @@ struct AnalyticsDashboardView: View {
 
                 // Export to CSV Button
                 Button(action: {
-                    exportCurrentPeriodCSV()
+                    exportCurrentPeriodCSV(summary: summary)
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.doc.fill")
@@ -144,7 +154,7 @@ struct AnalyticsDashboardView: View {
 
                     Spacer()
 
-                    Text(periodSummary.dateRangeLabel)
+                    Text(summary.dateRangeLabel)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundColor(theme.neonTeal)
                 }
@@ -174,11 +184,12 @@ struct AnalyticsDashboardView: View {
         }
     }
 
-    private func exportCurrentPeriodCSV() {
-        CSVExporter.promptSavePanel(sprints: periodSummary.sprints) { success, url in
+    private func exportCurrentPeriodCSV(summary: PeriodSummary) {
+        let exportedSprints = summary.sprints
+        CSVExporter.promptSavePanel(sprints: exportedSprints, onComplete: { success, url in
             if success, let path = url?.lastPathComponent {
                 withAnimation {
-                    exportSuccessMessage = "Successfully exported \(periodSummary.sprints.count) sprints to \(path)"
+                    exportSuccessMessage = "Exported \(exportedSprints.count) sprints to \(path)"
                 }
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(3))
@@ -187,18 +198,21 @@ struct AnalyticsDashboardView: View {
                     }
                 }
             }
-        }
+        }, onFailure: { error in
+            exportError = error
+            isExportErrorPresented = true
+        })
     }
 
     // MARK: - Period Summary Cards Row
 
-    private var periodSummaryCardsRow: some View {
+    private func periodSummaryCardsRow(summary: PeriodSummary) -> some View {
         HStack(spacing: 16) {
             // 1. Total Hours
             SummaryCard(
                 title: "TOTAL LOGGED",
-                value: periodSummary.formattedTotalHours,
-                subtitle: "\(periodSummary.activeDaysCount) active days / \(periodSummary.totalDaysCount) days",
+                value: summary.formattedTotalHours,
+                subtitle: "\(summary.activeDaysCount) active days / \(summary.totalDaysCount) days",
                 icon: "clock.fill",
                 theme: theme
             )
@@ -206,7 +220,7 @@ struct AnalyticsDashboardView: View {
             // 2. Total Earnings
             SummaryCard(
                 title: "TOTAL EARNINGS",
-                value: periodSummary.formattedTotalEarnings,
+                value: summary.formattedTotalEarnings,
                 subtitle: "Rate: \(EarningsCalculator.format(amount: vm.goal.hourlyRate, currencySymbol: vm.goal.currencySymbol))/hr",
                 icon: "banknote.fill",
                 theme: theme
@@ -215,7 +229,7 @@ struct AnalyticsDashboardView: View {
             // 3. Daily Average
             SummaryCard(
                 title: "DAILY AVERAGE",
-                value: periodSummary.formattedDailyAverage,
+                value: summary.formattedDailyAverage,
                 subtitle: "Per active working day",
                 icon: "chart.line.uptrend.xyaxis",
                 theme: theme
@@ -224,8 +238,8 @@ struct AnalyticsDashboardView: View {
             // 4. Sprints Count
             SummaryCard(
                 title: "COMPLETED SPRINTS",
-                value: "\(periodSummary.totalSprintsCount)",
-                subtitle: "\(periodSummary.distinctTags.count) distinct tags used",
+                value: "\(summary.totalSprintsCount)",
+                subtitle: "\(summary.distinctTags.count) distinct tags used",
                 icon: "timer",
                 theme: theme
             )
@@ -234,7 +248,7 @@ struct AnalyticsDashboardView: View {
 
     // MARK: - Trend Line Chart Card
 
-    private var trendLineChartCard: some View {
+    private func trendLineChartCard(summary: PeriodSummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             // Header
             HStack {
@@ -251,12 +265,12 @@ struct AnalyticsDashboardView: View {
 
                 Spacer()
 
-                Text(periodSummary.dateRangeLabel)
+                Text(summary.dateRangeLabel)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(theme.textSecondary)
             }
 
-            if periodSummary.trendPoints.isEmpty || periodSummary.totalSeconds == 0 {
+            if summary.trendPoints.isEmpty || summary.totalSeconds == 0 {
                 HStack {
                     Spacer()
                     VStack(spacing: 6) {
@@ -273,13 +287,22 @@ struct AnalyticsDashboardView: View {
             } else {
                 // Interactive Curve Surface
                 ZStack(alignment: .top) {
-                    trendCurvePlotSurface
+                    trendCurvePlotSurface(summary: summary)
 
                     if let point = hoveredTrendPoint {
                         trendInspectionTooltip(for: point)
                     }
                 }
                 .frame(height: 180)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Productivity trend, \(summary.dateRangeLabel)")
+                .accessibilityValue("\(summary.formattedTotalHours), \(summary.formattedTotalEarnings), \(summary.totalSprintsCount) completed sprints")
+
+                DisclosureGroup("Trend data") {
+                    trendDataRows(summary: summary)
+                }
+                .font(.caption)
+                .foregroundStyle(theme.textSecondary)
             }
         }
         .padding(18)
@@ -291,11 +314,11 @@ struct AnalyticsDashboardView: View {
         )
     }
 
-    private var trendCurvePlotSurface: some View {
+    private func trendCurvePlotSurface(summary: PeriodSummary) -> some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height - 25 // 25pt for X labels
-            let points = periodSummary.trendPoints
+            let points = summary.trendPoints
             let maxHours = max(points.map(\.totalHours).max() ?? 1.0, 1.0) * 1.15
 
             let count = max(points.count, 2)
@@ -310,18 +333,7 @@ struct AnalyticsDashboardView: View {
 
             ZStack(alignment: .bottomLeading) {
                 // Area fill under curve
-                Path { path in
-                    guard let first = coords.first else { return }
-                    path.move(to: CGPoint(x: first.x, y: height))
-                    path.addLine(to: first)
-                    for pt in coords.dropFirst() {
-                        path.addLine(to: pt)
-                    }
-                    if let last = coords.last {
-                        path.addLine(to: CGPoint(x: last.x, y: height))
-                    }
-                    path.closeSubpath()
-                }
+                trendArea(coordinates: coords, height: height)
                 .fill(
                     LinearGradient(
                         colors: [theme.neonTeal.opacity(0.3), theme.neonTeal.opacity(0.02)],
@@ -331,13 +343,7 @@ struct AnalyticsDashboardView: View {
                 )
 
                 // Line path
-                Path { path in
-                    guard let first = coords.first else { return }
-                    path.move(to: first)
-                    for pt in coords.dropFirst() {
-                        path.addLine(to: pt)
-                    }
-                }
+                trendLine(coordinates: coords)
                 .stroke(
                     LinearGradient(
                         colors: [theme.neonTeal, theme.neonTeal.opacity(0.8)],
@@ -350,44 +356,75 @@ struct AnalyticsDashboardView: View {
                 // Data Points
                 ForEach(Array(points.enumerated()), id: \.element.id) { idx, pt in
                     let coord = coords[idx]
-                    let isHovered = hoveredTrendPoint?.id == pt.id
-
-                    Circle()
-                        .fill(isHovered ? Color.white : theme.neonTeal)
-                        .frame(width: isHovered ? 8 : 5, height: isHovered ? 8 : 5)
-                        .shadow(color: theme.neonTeal, radius: isHovered ? 6 : 2)
-                        .position(coord)
-                        .onHover { hovering in
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                hoveredTrendPoint = hovering ? pt : nil
-                            }
-                        }
+                    trendMarker(point: pt).position(coord)
                 }
 
                 // X-Axis Labels (first, middle, last)
-                HStack {
-                    if let first = points.first {
-                        Text(first.label)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(theme.textSecondary)
-                    }
-                    Spacer()
-                    if points.count > 2 {
-                        let mid = points[points.count / 2]
-                        Text(mid.label)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(theme.textSecondary)
-                    }
-                    Spacer()
-                    if let last = points.last {
-                        Text(last.label)
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(theme.textSecondary)
-                    }
-                }
+                trendLabels(points: points)
                 .offset(y: height + 6)
             }
         }
+    }
+
+    private func trendDataRows(summary: PeriodSummary) -> some View {
+        LazyVStack(alignment: .leading, spacing: 8) {
+            Text(summary.totalDaysCount > 31 ? "Intervals of up to 7 days, starting on each date below." : "Daily totals.")
+            ForEach(summary.trendPoints) { point in
+                HStack {
+                    Text(TimeFormatter.format(dateKey: point.date)).monospacedDigit()
+                    Spacer()
+                    Text(point.formattedDuration)
+                    Text(EarningsCalculator.format(amount: point.earnings, currencySymbol: vm.goal.currencySymbol))
+                    Text("\(point.sprintCount) sprints")
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(TimeFormatter.format(dateKey: point.date))
+                .accessibilityValue("\(point.formattedDuration), \(EarningsCalculator.format(amount: point.earnings, currencySymbol: vm.goal.currencySymbol)), \(point.sprintCount) sprints")
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    private func trendArea(coordinates: [CGPoint], height: CGFloat) -> Path {
+        Path { path in
+            guard let first = coordinates.first, let last = coordinates.last else { return }
+            path.move(to: CGPoint(x: first.x, y: height))
+            path.addLines(coordinates)
+            path.addLine(to: CGPoint(x: last.x, y: height))
+            path.closeSubpath()
+        }
+    }
+
+    private func trendLine(coordinates: [CGPoint]) -> Path {
+        Path { $0.addLines(coordinates) }
+    }
+
+    private func trendMarker(point: TrendDataPoint) -> some View {
+        let hovered = hoveredTrendPoint?.id == point.id
+        let size: CGFloat = hovered ? 8 : 5
+        return Circle()
+            .fill(hovered ? Color.white : theme.neonTeal)
+            .frame(width: size, height: size)
+            .shadow(color: theme.neonTeal, radius: hovered ? 6 : 2)
+            .onHover { hoveredTrendPoint = $0 ? point : nil }
+            .accessibilityElement()
+            .accessibilityLabel(point.label)
+            .accessibilityValue("\(point.formattedDuration), \(EarningsCalculator.format(amount: point.earnings, currencySymbol: vm.goal.currencySymbol)), \(point.sprintCount) sprints")
+    }
+
+    private func trendLabels(points: [TrendDataPoint]) -> some View {
+        HStack {
+            if let first = points.first { trendLabel(first.label) }
+            Spacer()
+            if points.count > 2 { trendLabel(points[points.count / 2].label) }
+            Spacer()
+            if let last = points.last { trendLabel(last.label) }
+        }
+    }
+
+    private func trendLabel(_ text: String) -> some View {
+        Text(text).font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .foregroundStyle(theme.textSecondary)
     }
 
     private func trendInspectionTooltip(for point: TrendDataPoint) -> some View {
@@ -422,9 +459,9 @@ struct AnalyticsDashboardView: View {
         .shadow(color: Color.black.opacity(0.3), radius: 6, x: 0, y: 3)
     }
 
-    // MARK: - GitHub-Style Annual Contribution Heatmap (52 Weeks)
+    // MARK: - Annual Contribution Heatmap
 
-    private var annualHeatmapCard: some View {
+    private func annualHeatmapCard(matrix: AnnualHeatmapMatrix) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             // Header with Year Switcher
             HStack {
@@ -438,7 +475,7 @@ struct AnalyticsDashboardView: View {
                         .foregroundColor(theme.textPrimary)
                         .kerning(0.8)
 
-                    Text("\(annualHeatmap.totalActiveDays) active days")
+                    Text("\(matrix.totalActiveDays) active days")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -452,7 +489,7 @@ struct AnalyticsDashboardView: View {
                 // Year Switcher: < 2026 >
                 HStack(spacing: 6) {
                     Button(action: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
                             selectedYear -= 1
                             hoveredHeatmapCell = nil
                         }
@@ -466,6 +503,8 @@ struct AnalyticsDashboardView: View {
                             .overlay(Circle().stroke(theme.cardBorder, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Previous year")
+                    .disabled(selectedYear <= 1)
 
                     Text(String(selectedYear))
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
@@ -473,9 +512,9 @@ struct AnalyticsDashboardView: View {
                         .frame(minWidth: 44)
 
                     Button(action: {
-                        let currentYear = Calendar.current.component(.year, from: Date())
+                        let currentYear = Calendar(identifier: .gregorian).component(.year, from: Date())
                         if selectedYear < currentYear {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
                                 selectedYear += 1
                                 hoveredHeatmapCell = nil
                             }
@@ -485,12 +524,13 @@ struct AnalyticsDashboardView: View {
                             .font(.system(size: 10, weight: .bold))
                             .padding(5)
                             .background(theme.cardBg.opacity(0.8))
-                            .foregroundColor(selectedYear < Calendar.current.component(.year, from: Date()) ? theme.textPrimary : theme.textSecondary.opacity(0.4))
+                            .foregroundColor(selectedYear < Calendar(identifier: .gregorian).component(.year, from: Date()) ? theme.textPrimary : theme.textSecondary.opacity(0.4))
                             .clipShape(Circle())
                             .overlay(Circle().stroke(theme.cardBorder, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
-                    .disabled(selectedYear >= Calendar.current.component(.year, from: Date()))
+                    .accessibilityLabel("Next year")
+                    .disabled(selectedYear >= Calendar(identifier: .gregorian).component(.year, from: Date()))
                 }
             }
 
@@ -510,9 +550,9 @@ struct AnalyticsDashboardView: View {
 
                     ScrollView(.horizontal, showsIndicators: true) {
                         VStack(alignment: .leading, spacing: 6) {
-                            heatmapMonthHeadersRow
+                            heatmapMonthHeadersRow(matrix: matrix)
                             HStack(spacing: 2.5) {
-                                ForEach(Array(annualHeatmap.columns.enumerated()), id: \.offset) { _, cells in
+                                ForEach(Array(matrix.columns.enumerated()), id: \.offset) { _, cells in
                                     VStack(spacing: 2.5) {
                                         ForEach(cells) { cell in heatmapCellView(cell: cell) }
                                     }
@@ -531,7 +571,7 @@ struct AnalyticsDashboardView: View {
 
             // Bottom Legend & Totals Footnote
             HStack {
-                Text("\(annualHeatmap.formattedYearDuration) logged in \(String(selectedYear)) • \(annualHeatmap.formattedYearEarnings) earned")
+                Text("\(matrix.formattedYearDuration) logged in \(String(selectedYear)) • \(matrix.formattedYearEarnings) earned")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
 
@@ -564,16 +604,16 @@ struct AnalyticsDashboardView: View {
         )
     }
 
-    private var heatmapMonthHeadersRow: some View {
+    private func heatmapMonthHeadersRow(matrix: AnnualHeatmapMatrix) -> some View {
         ZStack(alignment: .topLeading) {
-            ForEach(annualHeatmap.monthHeaders, id: \.columnIndex) { header in
+            ForEach(matrix.monthHeaders, id: \.columnIndex) { header in
                 Text(header.monthName)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(theme.textSecondary)
                     .offset(x: CGFloat(header.columnIndex) * 12.5)
             }
         }
-        .frame(width: CGFloat(annualHeatmap.columns.count) * 12.5 - 2.5, height: 12, alignment: .topLeading)
+        .frame(width: CGFloat(matrix.columns.count) * 12.5 - 2.5, height: 12, alignment: .topLeading)
     }
 
     private func heatmapCellView(cell: HeatmapDayCell) -> some View {

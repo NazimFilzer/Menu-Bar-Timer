@@ -12,14 +12,14 @@ enum EarningsCalculator {
     private static let lock = NSLock()
 
     static func calculate(durationInSeconds: TimeInterval, hourlyRate: Double) -> Double {
-        guard durationInSeconds > 0, hourlyRate > 0 else { return 0.0 }
-        let raw = (durationInSeconds / 3600.0) * hourlyRate
-        return (raw * 100).rounded() / 100.0
+        calculate(durationInHours: durationInSeconds / 3600.0, hourlyRate: hourlyRate)
     }
 
     static func calculate(durationInHours: Double, hourlyRate: Double) -> Double {
-        guard durationInHours > 0, hourlyRate > 0 else { return 0.0 }
+        guard durationInHours.isFinite, hourlyRate.isFinite,
+              durationInHours > 0, hourlyRate > 0 else { return 0.0 }
         let raw = durationInHours * hourlyRate
+        guard (raw * 100).isFinite else { return 0.0 }
         return (raw * 100).rounded() / 100.0
     }
 
@@ -43,7 +43,7 @@ enum EarningsCalculator {
     }
 
     static func format(amount: Double, currencySymbol: String) -> String {
-        let cleanAmount = max(0, amount)
+        let cleanAmount = amount.isFinite && (amount * 100).isFinite ? max(0, amount) : 0
         let rounded = (cleanAmount * 100).rounded() / 100.0
         lock.lock()
         defer { lock.unlock() }
