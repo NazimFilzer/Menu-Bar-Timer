@@ -11,7 +11,7 @@ struct PopoverView: View {
     private var theme: PopoverTheme { themeManager.theme }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             theme.bgDark.ignoresSafeArea()
 
             if vm.isRunning {
@@ -52,6 +52,8 @@ struct PopoverView: View {
 
                 SprintHistorySectionView(vm: vm, theme: theme)
 
+                Spacer(minLength: 0)
+
                 Divider().background(theme.dividerColor)
 
                 SettingsSectionView(
@@ -61,9 +63,26 @@ struct PopoverView: View {
                     themeManager: themeManager
                 )
             }
+
+            if vm.isManualEntryPresented {
+                Color.black.opacity(0.6)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            vm.dismissManualEntry()
+                        }
+                    }
+                    .transition(.opacity)
+
+                VStack {
+                    Spacer()
+                    ManualSprintSheetView(vm: vm, theme: theme)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(100)
+            }
         }
         .frame(width: 330)
-        .focusEffectDisabled()
         .preferredColorScheme(theme.isLight ? .light : .dark)
     }
 }
@@ -85,21 +104,47 @@ private struct PopoverHeaderView: View {
                     Text("SKEVAL TIMER")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
-                        .kerning(1.2)
+                        .kerning(1.0)
+                        .lineLimit(1)
 
-                    Text("MVP")
+                    Text(AppVersion.current)
                         .font(.system(size: 9, weight: .heavy, design: .rounded))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(theme.neonTeal.opacity(0.2))
                         .foregroundColor(theme.neonTeal)
                         .clipShape(Capsule())
+                        .lineLimit(1)
                 }
+                .fixedSize(horizontal: true, vertical: false)
 
-                Text(TimeFormatter.format(headerDate: Date()))
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
-            }
+                Menu {
+                    ForEach(vm.availablePastDates, id: \.self) { date in
+                        Button(action: {
+                            vm.selectDate(date)
+                        }) {
+                            if Calendar.current.isDate(date, inSameDayAs: vm.selectedDate) {
+                                Text("✓ " + vm.menuItemTitle(for: date))
+                            } else {
+                                Text(vm.menuItemTitle(for: date))
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(vm.headerDateSubtitle)
+                            .font(.system(size: 11, weight: vm.isViewingToday ? .regular : .semibold, design: .rounded))
+                            .foregroundColor(vm.isViewingToday ? theme.textSecondary : .orange)
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 7.5, weight: .bold))
+                            .foregroundColor(vm.isViewingToday ? theme.textSecondary.opacity(0.7) : .orange)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .fixedSize()
+                    }
 
             Spacer()
 
@@ -110,8 +155,6 @@ private struct PopoverHeaderView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "macwindow")
                             .font(.system(size: 9, weight: .bold))
-                        Text("Dashboard")
-                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
@@ -121,6 +164,7 @@ private struct PopoverHeaderView: View {
                     .overlay(Capsule().stroke(theme.neonTeal.opacity(0.3), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open dashboard")
                 .help("Open Dashboard Window")
 
                 HStack(spacing: 6) {
@@ -172,7 +216,6 @@ private struct RecoveryBannerView: View {
                     vm.resumeRecovery()
                 }
                 .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
-                .focusable(false)
 
                 TextField("HH:mm:ss", text: $vm.recoveryEndText)
                     .textFieldStyle(.plain)
@@ -184,13 +227,11 @@ private struct RecoveryBannerView: View {
                     .background(theme.cardBg)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.orange.opacity(0.5), lineWidth: 1))
-                    .focusable(false)
 
                 Button("Save") {
                     vm.saveRecoveryEndTime()
                 }
                 .buttonStyle(PillButtonStyle(color: Color(white: 0.7)))
-                .focusable(false)
 
                 Spacer()
 
@@ -200,7 +241,6 @@ private struct RecoveryBannerView: View {
                         .foregroundColor(theme.textSecondary)
                 }
                 .buttonStyle(.plain)
-                .focusable(false)
             }
 
             if let err = vm.recoveryEndError {
@@ -259,7 +299,6 @@ private struct SleepResolutionBannerView: View {
                     }
                 }
                 .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
-                .focusable(false)
 
                 Button(action: {
                     vm.resolveSleep(countAsWork: false)
@@ -271,7 +310,6 @@ private struct SleepResolutionBannerView: View {
                     }
                 }
                 .buttonStyle(PillButtonStyle(color: Color(white: 0.7), foregroundColor: .black))
-                .focusable(false)
             }
         }
         .padding(.horizontal, 16)
@@ -345,7 +383,7 @@ private struct ClockSectionView: View {
                     .foregroundColor(theme.textSecondary)
             }
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
         .animation(.easeInOut(duration: 0.25), value: vm.isPaused)
     }
 }
@@ -356,18 +394,41 @@ private struct DailyGoalProgressView: View {
     let vm: TimerViewModel
     let theme: PopoverTheme
 
+    private var earningsColor: Color {
+        theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Daily Goal Target")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
-                    .textCase(.uppercase)
-                    .kerning(0.8)
-                Spacer()
-                Text(vm.progressLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(vm.progressFraction >= 1.0 ? theme.neonTeal : theme.textPrimary)
+            if vm.goal.hasHourlyRate {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(vm.displayedGoalTitle)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(vm.isViewingToday ? theme.textSecondary : .orange)
+                        .textCase(.uppercase)
+                        .kerning(0.8)
+                    Spacer()
+                    HStack(spacing: 3) {
+                        Text(vm.displayedEarningsLabel)
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(earningsColor)
+                        Text("/ \(vm.targetEarningsLabel)")
+                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                }
+            } else {
+                HStack {
+                    Text(vm.displayedGoalTitle)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(vm.isViewingToday ? theme.textSecondary : .orange)
+                        .textCase(.uppercase)
+                        .kerning(0.8)
+                    Spacer()
+                    Text(vm.displayedProgressLabel)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(vm.displayedProgressFraction >= 1.0 ? theme.neonTeal : theme.textPrimary)
+                }
             }
 
             GeometryReader { geo in
@@ -384,12 +445,26 @@ private struct DailyGoalProgressView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: geo.size.width * CGFloat(vm.progressFraction), height: 6)
+                        .frame(width: geo.size.width * CGFloat(vm.displayedProgressFraction), height: 6)
                         .shadow(color: theme.neonTeal.opacity(0.6), radius: 4)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: vm.progressFraction)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: vm.displayedProgressFraction)
                 }
             }
             .frame(height: 6)
+
+            if vm.goal.hasHourlyRate {
+                HStack {
+                    Text("Logged: \(vm.displayedTotalShortLabel) / \(vm.goal.goalLabel)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(theme.textSecondary)
+                    Spacer()
+                    let pct = Int(round(vm.displayedProgressFraction * 100))
+                    Text("\(pct)% achieved")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundColor(vm.displayedProgressFraction >= 1.0 ? earningsColor : theme.textSecondary)
+                }
+                .padding(.top, 1)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -402,6 +477,7 @@ private struct TimestampCard: View {
     let title: String
     let value: String
     var isHighlighted: Bool = false
+    var highlightColor: Color? = nil
     let theme: PopoverTheme
 
     var body: some View {
@@ -412,13 +488,16 @@ private struct TimestampCard: View {
                 .kerning(0.6)
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(isHighlighted ? theme.neonTeal : theme.textSecondary)
+                .foregroundColor(isHighlighted ? (highlightColor ?? theme.neonTeal) : theme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(theme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isHighlighted && highlightColor != nil ? highlightColor!.opacity(0.35) : theme.cardBorder, lineWidth: 1)
+        )
     }
 }
 
@@ -432,19 +511,62 @@ private struct ActionSectionView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                TimestampCard(
-                    title: "START TIME",
-                    value: vm.currentSprint?.startLabel ?? "--:--:--",
-                    isHighlighted: vm.currentSprint != nil,
-                    theme: theme
-                )
+                if let sprint = vm.currentSprint {
+                    TimestampCard(
+                        title: "START TIME",
+                        value: sprint.startLabel,
+                        isHighlighted: true,
+                        highlightColor: theme.neonTeal,
+                        theme: theme
+                    )
 
-                TimestampCard(
-                    title: "END TIME",
-                    value: vm.currentSprint?.endLabel ?? "--:--:--",
-                    isHighlighted: false,
-                    theme: theme
-                )
+                    if vm.isPaused {
+                        TimestampCard(
+                            title: "PAUSED AT",
+                            value: sprint.pauseStartedLabel,
+                            isHighlighted: true,
+                            highlightColor: .orange,
+                            theme: theme
+                        )
+                    } else {
+                        TimestampCard(
+                            title: "TOTAL BREAKS",
+                            value: TimeFormatter.format(clock: vm.totalCurrentSprintPaused),
+                            isHighlighted: vm.totalCurrentSprintPaused > 0,
+                            highlightColor: vm.totalCurrentSprintPaused > 0 ? .orange.opacity(0.85) : nil,
+                            theme: theme
+                        )
+                    }
+                } else if let lastSprint = vm.todayLog.completedSprints.last {
+                    TimestampCard(
+                        title: "PREV START",
+                        value: lastSprint.startLabel,
+                        isHighlighted: false,
+                        theme: theme
+                    )
+
+                    TimestampCard(
+                        title: "PREV END",
+                        value: lastSprint.endLabel,
+                        isHighlighted: true,
+                        highlightColor: theme.textPrimary,
+                        theme: theme
+                    )
+                } else {
+                    TimestampCard(
+                        title: "START TIME",
+                        value: "--:--:--",
+                        isHighlighted: false,
+                        theme: theme
+                    )
+
+                    TimestampCard(
+                        title: "TOTAL BREAKS",
+                        value: "--:--:--",
+                        isHighlighted: false,
+                        theme: theme
+                    )
+                }
             }
 
             // Tag Assignment Row
@@ -534,7 +656,7 @@ private struct ActionSectionView: View {
             if vm.isRunning {
                 HStack(spacing: 8) {
                     Button(action: pauseResumeAction) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: vm.isPaused ? "play.fill" : "pause.fill")
                                 .font(.system(size: 11, weight: .bold))
                             Text(vm.isPaused ? "RESUME" : "PAUSE")
@@ -543,7 +665,7 @@ private struct ActionSectionView: View {
                         }
                         .foregroundColor(vm.isPaused ? .black : .orange)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
                         .background(
                             vm.isPaused
                                 ? LinearGradient(colors: [Color.orange.opacity(0.9), Color.orange], startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -554,49 +676,78 @@ private struct ActionSectionView: View {
                     }
                     .buttonStyle(PressedScaleButtonStyle())
                     .disabled(vm.recoveryMode)
+                    .help("Pause / Resume (⌘⌥⇧P)")
+
+                    Button(action: mainAction) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 11, weight: .black))
+                            Text("CLOCK OUT")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .kerning(0.4)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.9)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 1.0, green: 0.45, blue: 0.45), theme.softRed],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .shadow(color: theme.softRed.opacity(0.45), radius: 6, y: 2)
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                        .disabled(vm.recoveryMode)
+                    .help("Clock Out & Copy (⌘⌥⇧C)")
+
+                    Button(action: { vm.reset() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(theme.textSecondary)
+                            .frame(width: 34, height: 34)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                        .disabled(vm.recoveryMode)
+                    .help("Discard current sprint")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            Button(action: mainAction) {
-                HStack(spacing: 8) {
-                    Image(systemName: vm.isRunning ? "stop.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .black))
-                    Text(vm.isRunning ? "CLOCK OUT & COPY" : "CLOCK IN")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .kerning(0.5)
-                }
-                .foregroundColor(vm.isRunning ? .white : theme.actionButtonForeground)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .background(
-                    LinearGradient(
-                        colors: vm.isRunning
-                            ? [Color(red: 1.0, green: 0.45, blue: 0.45), theme.softRed]
-                            : [theme.accentColor.opacity(0.85), theme.accentColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            } else {
+                Button(action: mainAction) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 13, weight: .black))
+                        Text("CLOCK IN")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .kerning(0.5)
+                    }
+                    .foregroundColor(theme.actionButtonForeground)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [theme.accentColor.opacity(0.85), theme.accentColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: (vm.isRunning ? theme.softRed : theme.accentColor).opacity(0.45), radius: 8, y: 3)
-            }
-            .buttonStyle(PressedScaleButtonStyle())
-            .focusable(false)
-            .disabled(vm.recoveryMode)
-
-            if vm.currentSprint != nil {
-                Button(action: { vm.reset() }) {
-                    Label("Discard current sprint", systemImage: "xmark.circle")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: theme.accentColor.opacity(0.45), radius: 8, y: 3)
                 }
-                .buttonStyle(.plain)
-                .focusable(false)
+                .buttonStyle(PressedScaleButtonStyle())
+                .disabled(vm.recoveryMode)
+                .help("Clock In (⌘⌥⇧C)")
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: vm.isRunning)
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: vm.isPaused)
     }
@@ -623,43 +774,81 @@ private struct SprintHistorySectionView: View {
                     Image(systemName: "list.bullet.rectangle.fill")
                         .font(.system(size: 11))
                         .foregroundColor(theme.neonTeal)
-                    Text("TODAY'S SPRINTS")
+                    Text(vm.sprintsSectionTitle)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
                         .kerning(0.8)
+
+                    if !vm.displayedCompletedSprints.isEmpty {
+                        Text("(\(vm.displayedCompletedSprints.count))")
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textSecondary)
+                    }
                 }
 
                 Spacer()
 
-                HStack(spacing: 5) {
-                    Text("\(vm.todayLog.completedSprints.count) completed")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-
-                    if vm.todayLog.totalPausedDuration > 0 {
-                        Text("•")
-                            .font(.system(size: 9))
-                            .foregroundColor(theme.textSecondary.opacity(0.5))
-                        HStack(spacing: 3) {
-                            Image(systemName: "pause.fill")
-                                .font(.system(size: 7))
-                            Text("\(vm.todayLog.totalPausedLabel) breaks")
-                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                HStack(spacing: 6) {
+                    if vm.displayedCompletedSprints.isEmpty {
+                        Text("0 completed")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                    } else {
+                        if vm.selectedDayLog.totalPausedDuration > 0 {
+                            HStack(spacing: 3) {
+                                Image(systemName: "pause.fill")
+                                    .font(.system(size: 7))
+                                Text(vm.selectedDayLog.totalPausedLabel)
+                                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                            }
+                            .foregroundColor(Color.orange.opacity(0.85))
                         }
-                        .foregroundColor(Color.orange.opacity(0.85))
+
+                        Button(action: { vm.copyAllDisplayedSprints() }) {
+                            HStack(spacing: 3.5) {
+                                Image(systemName: vm.isAllCopied ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                Text(vm.isAllCopied ? "COPIED" : "COPY ALL")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(vm.isAllCopied ? .black : theme.neonTeal)
+                            .padding(.horizontal, 6.5)
+                            .padding(.vertical, 3)
+                            .background(vm.isAllCopied ? theme.neonTeal : theme.neonTeal.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+                        }
+                        .buttonStyle(PressedScaleButtonStyle())
+                                .help("Copy all sprints for this day to clipboard (Start & End columns for spreadsheets)")
                     }
+
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            vm.openManualEntry()
+                        }
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundColor(theme.neonTeal)
+                            .frame(width: 20, height: 20)
+                            .background(theme.neonTeal.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+                    }
+                    .buttonStyle(PressedScaleButtonStyle())
+                        .help("Add sprint manually (+)")
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 8)
 
-            if vm.todayLog.completedSprints.isEmpty {
+            if vm.displayedCompletedSprints.isEmpty {
                 VStack(spacing: 4) {
                     Image(systemName: "clock.badge.checkmark")
                         .font(.system(size: 20))
                         .foregroundColor(theme.textSecondary.opacity(0.5))
-                    Text("No sprints logged for today yet")
+                    Text(vm.isViewingToday ? "No sprints logged for today yet" : "No sprints logged for \(vm.selectedDayShortTitle)")
                         .font(.system(size: 11, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                 }
@@ -671,7 +860,7 @@ private struct SprintHistorySectionView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(spacing: 5) {
-                        ForEach(vm.todayLog.completedSprintsDescending, id: \.sprint.id) { item in
+                        ForEach(vm.displayedCompletedSprintsDescending, id: \.sprint.id) { item in
                             SprintCardRow(
                                 index: item.index,
                                 sprint: item.sprint,
@@ -684,7 +873,12 @@ private struct SprintHistorySectionView: View {
                     }
                     .padding(.horizontal, 16)
                 }
-                .frame(maxHeight: 340)
+                .frame(maxHeight: vm.isSettingsExpanded ? 160 : 340)
+                .contextMenu {
+                    Button(vm.isViewingToday ? "Copy All Today's Sprints" : "Copy All \(vm.selectedDayShortTitle)'s Sprints") {
+                        vm.copyAllDisplayedSprints()
+                    }
+                }
             }
         }
         .padding(.bottom, 12)
@@ -764,7 +958,6 @@ private struct SprintCardRow: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
-                .focusable(false)
                 .help(isCopied ? "Copied" : (sprint.hasPause ? "Actual end: \(sprint.endLabel) · Spreadsheet end: \(sprint.effectiveEndLabel) (\(sprint.pausedLabel) pause deducted)" : "Copy"))
 
                 Button(action: onDelete) {
@@ -776,7 +969,6 @@ private struct SprintCardRow: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
-                .focusable(false)
                 .help("Delete sprint")
             }
         }
@@ -795,6 +987,7 @@ private struct SettingsSectionView: View {
     let theme: PopoverTheme
     @Binding var launchAtLogin: Bool
     @Bindable var themeManager: ThemeManager
+    @State private var rateInput: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -819,10 +1012,9 @@ private struct SettingsSectionView: View {
                 .padding(.vertical, 10)
             }
             .buttonStyle(.plain)
-            .focusable(false)
 
             if vm.isSettingsExpanded {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("Theme")
@@ -869,8 +1061,7 @@ private struct SettingsSectionView: View {
                                     )
                                 }
                                 .buttonStyle(.plain)
-                                .focusable(false)
-                            }
+                                            }
                         }
                     }
 
@@ -893,14 +1084,65 @@ private struct SettingsSectionView: View {
                         Slider(value: $vm.goal.dailyGoalHours, in: 1...16, step: 0.5)
                             .tint(theme.neonTeal)
                             .controlSize(.small)
-                            .focusable(false)
-                        HStack {
+                                    HStack {
                             Text("1h")
                             Spacer()
                             Text("16h")
                         }
                         .font(.system(size: 9, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
+                    }
+
+                    Divider().background(theme.dividerColor)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hourly Rate")
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .foregroundColor(theme.textPrimary)
+                                Text("Earned money tracker")
+                                    .font(.system(size: 9.5, weight: .regular, design: .rounded))
+                                    .foregroundColor(theme.textSecondary)
+                            }
+                            Spacer()
+                            HStack(spacing: 3) {
+                                Text(vm.goal.currencySymbol)
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundColor(theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5))
+                                TextField("0", text: $rateInput)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .foregroundColor(theme.textPrimary)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 55)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(theme.cardBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .stroke(theme.cardBorder, lineWidth: 1)
+                                    )
+                                                        .onChange(of: rateInput) { _, newValue in
+                                        let filtered = newValue.filter { $0.isNumber || $0 == "." }
+                                        if filtered != newValue {
+                                            rateInput = filtered
+                                        }
+                                        if let val = Double(filtered), val.isFinite, val >= 0 {
+                                            vm.goal.hourlyRate = val
+                                        } else {
+                                            vm.goal.hourlyRate = 0.0
+                                        }
+                                    }
+                                Text("/hr")
+                                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                                    .foregroundColor(theme.textSecondary)
+                            }
+                        }
+                    }
+                    .onAppear {
+                        rateInput = vm.goal.hourlyRate > 0 ? String(vm.goal.hourlyRate) : ""
                     }
 
                     Divider().background(theme.dividerColor)
@@ -919,8 +1161,7 @@ private struct SettingsSectionView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                             .tint(theme.neonTeal)
-                            .focusable(false)
-                            .onChange(of: launchAtLogin) { _, newValue in
+                                        .onChange(of: launchAtLogin) { _, newValue in
                                 AppDelegate.setLaunchAtLogin(newValue)
                             }
                     }
@@ -931,12 +1172,34 @@ private struct SettingsSectionView: View {
                         Image(systemName: "keyboard")
                             .font(.system(size: 10))
                             .foregroundColor(theme.textSecondary)
-                        Text("Global hotkey:")
+                        Text("Clock In / Out:")
                             .font(.system(size: 10, weight: .regular, design: .rounded))
                             .foregroundColor(theme.textSecondary)
                         Spacer()
                         HStack(spacing: 3) {
                             ForEach(["⌘", "⌥", "⇧", "C"], id: \.self) { key in
+                                Text(key)
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(theme.textPrimary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(theme.cardBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.cardBorder, lineWidth: 1))
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(theme.textSecondary)
+                        Text("Pause / Resume:")
+                            .font(.system(size: 10, weight: .regular, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                        Spacer()
+                        HStack(spacing: 3) {
+                            ForEach(["⌘", "⌥", "⇧", "P"], id: \.self) { key in
                                 Text(key)
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                                     .foregroundColor(theme.textPrimary)
@@ -966,8 +1229,7 @@ private struct SettingsSectionView: View {
                         .padding(.vertical, 2)
                     }
                     .buttonStyle(.plain)
-                    .focusable(false)
-                }
+                    }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
                 .transition(.opacity)
@@ -983,7 +1245,6 @@ private struct PressedScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-            .focusable(false)
     }
 }
 
@@ -998,7 +1259,230 @@ private struct PillButtonStyle: ButtonStyle {
             .padding(.vertical, 5)
             .background(color.opacity(configuration.isPressed ? 0.7 : 1.0))
             .clipShape(Capsule())
-            .focusable(false)
+    }
+}
+
+// MARK: - Manual Sprint Sheet View (Type C Native Modal)
+
+private struct ManualSprintSheetView: View {
+    @Bindable var vm: TimerViewModel
+    let theme: PopoverTheme
+
+    private var earningsDeltaColor: Color {
+        theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5)
+    }
+
+    var body: some View {
+        VStack(spacing: 9) {
+            Capsule()
+                .fill(Color.white.opacity(0.25))
+                .frame(width: 32, height: 3.5)
+                .padding(.top, 1)
+
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.badge.plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(theme.neonTeal)
+                    Text(vm.isViewingToday ? "MANUAL SPRINT" : "MANUAL SPRINT (\(vm.selectedDayShortTitle.uppercased()))")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+                        .kerning(0.8)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.dismissManualEntry()
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 20, height: 20)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 7) {
+                HStack {
+                    Text("START")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 44, alignment: .leading)
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        Button("-15m") { vm.stepManualTime(isStart: true, minutes: -15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+
+                        TextField("HH:mm:ss", text: $vm.manualStartText)
+                            .accessibilityLabel("Manual sprint start time")
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 76)
+                            .padding(.vertical, 3.5)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
+
+                        Button("+15m") { vm.stepManualTime(isStart: true, minutes: 15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+                    }
+                }
+
+                HStack {
+                    Text("END")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 44, alignment: .leading)
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        Button("-15m") { vm.stepManualTime(isStart: false, minutes: -15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+
+                        TextField("HH:mm:ss", text: $vm.manualEndText)
+                            .accessibilityLabel("Manual sprint end time")
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 76)
+                            .padding(.vertical, 3.5)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
+
+                        Button("+15m") { vm.stepManualTime(isStart: false, minutes: 15) }
+                            .buttonStyle(StepperChipButtonStyle(theme: theme))
+                    }
+                }
+
+                HStack {
+                    Text("BREAK")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textSecondary)
+                        .frame(width: 44, alignment: .leading)
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        TextField("0", text: $vm.manualBreakMinutesText)
+                            .accessibilityLabel("Break minutes")
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundColor(theme.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 36)
+                            .padding(.vertical, 3)
+                            .background(theme.cardBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
+
+                        Text("mins pause")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                }
+            }
+            .padding(8)
+            .background(theme.cardBg.opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
+
+            TextField("Optional project or client tag", text: $vm.manualTagText)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Manual sprint tag")
+                .font(.system(size: 12))
+
+            if let netDuration = vm.manualComputedNetDuration {
+                HStack {
+                    HStack(spacing: 4) {
+                        Text("Net:")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                        Text(TimeFormatter.format(clock: netDuration))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(earningsDeltaColor)
+                    }
+
+                    Spacer()
+
+                    if vm.goal.hasHourlyRate {
+                        Text("+\(EarningsCalculator.format(amount: vm.manualComputedEarningsDelta, currencySymbol: vm.goal.currencySymbol))")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(earningsDeltaColor)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(earningsDeltaColor.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(earningsDeltaColor.opacity(0.25), lineWidth: 1))
+            } else if let error = vm.manualEntryError {
+                Text(error)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(theme.softRed)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
+
+            HStack(spacing: 8) {
+                Button("Cancel") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.dismissManualEntry()
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: theme.cardBg, foregroundColor: theme.textSecondary))
+                .keyboardShortcut(.cancelAction)
+                .frame(maxWidth: .infinity)
+
+                Button("Log Sprint") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        _ = vm.saveManualSprint()
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
+                .frame(maxWidth: .infinity)
+                .disabled(vm.manualComputedNetDuration == nil)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(theme.bgDark)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(theme.cardBorder, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.6), radius: 20, y: -4)
+        )
+    }
+}
+
+private struct StepperChipButtonStyle: ButtonStyle {
+    let theme: PopoverTheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+            .foregroundColor(theme.textSecondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3.5)
+            .background(Color.white.opacity(configuration.isPressed ? 0.12 : 0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.cardBorder, lineWidth: 1))
     }
 }
 

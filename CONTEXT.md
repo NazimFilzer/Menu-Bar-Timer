@@ -74,3 +74,16 @@ The persistence module managing day-grouped sprint logs behind a storage seam
 The menu bar visual presenter responsible for rendering state pills (idle, active, paused)
 and synchronizing with engine ticks.
 
+
+## Version tracking
+
+- v2.0 is the current version on the v2 branch. It combines main's live daily earnings, recent-day history, manual entry, pause hotkey, exact timer math, and day rollover with v2's tags, dashboard editing, sleep resolution, weekly and monthly analytics, and CSV reports.
+- Main remains at v1.2. Work on v2 does not modify main.
+
+## Daily totals and reports
+
+Daily totals include completed sprints plus the active sprint when its start day is today. Historical daily totals and weekly, monthly, and analytics reports use completed sprints. Earnings use the configured currency and hourly rate. A sprint belongs to its start day even when it crosses midnight.
+
+## Sleep decision hold
+
+The timer stays held after wake until sleep is classified as work or paused. The time between wake and that decision counts as paused time in either case.

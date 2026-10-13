@@ -356,6 +356,8 @@ func testCrashRecoveryAndPausePersistence() {
     assertEqual(decoded?.pauseCount, 0)
 }
 
+import Carbon
+
 func testSprintTaggingAndBackwardCompatibility() {
     print("Running Sprint Tagging & Backward Compatibility tests...")
 
@@ -1450,15 +1452,627 @@ func testTagFilterMatching() {
     assertTrue(untaggedFilter.matches(sprint: sEmpty), "Whitespace-only tag matches untagged filter")
 }
 
-// MARK: - Main Runner
+@MainActor
+func testGlobalHotkeys() {
+    print("Running Global Hotkey tests...")
 
+    // Verify key codes: C = 8 (0x08), P = 35 (0x23)
+    assertEqual(Int(kVK_ANSI_C), 8, "kVK_ANSI_C must be 8")
+    assertEqual(Int(kVK_ANSI_P), 35, "kVK_ANSI_P must be 35")
+
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+
+    // Simulation of triggerPauseToggle()
+    func simulatePauseToggle() {
+        if case .paused = engine.state {
+            engine.resume()
+        } else if case .active = engine.state {
+            engine.pause()
+        }
+    }
+
+    // Idle state: hotkey has no effect
+    simulatePauseToggle()
+    assertEqual(engine.state, .idle)
+
+    // Start running
+    engine.clockIn()
+    assertTrue(engine.state.isRunning)
+    assertFalse(engine.state.isPaused)
+
+    // Hotkey: Active -> Paused
+    simulatePauseToggle()
+    assertTrue(engine.state.isPaused)
+
+    // Hotkey: Paused -> Active (Resumed)
+    simulatePauseToggle()
+    assertFalse(engine.state.isPaused)
+    assertTrue(engine.state.isRunning)
+
+    // Clean up
+    engine.clockOut()
+    assertEqual(engine.state, .idle)
+}
+
+func testAppVersion() {
+    print("Running AppVersion tests...")
+    assertEqual(AppVersion.current, "v2.0", "App version should be tracked as v1.2")
+    assertEqual(AppVersion.marketingVersion, "2.0", "Marketing version should be 1.2")
+    assertEqual(AppVersion.buildNumber, "4", "Build number should be 3")
+}
+
+@MainActor
+func testEarningsTracking() {
+    print("Running Today's Earnings & Hourly Rate tests...")
+
+    // 1. TimeFormatter rupee formatting
+    assertEqual(TimeFormatter.format(rupees: 0), "₹0", "Zero rupees should format as ₹0")
+    assertEqual(TimeFormatter.format(rupees: 1000), "₹1,000", "1000 should format with comma")
+    assertEqual(TimeFormatter.format(rupees: 3750.2), "₹3,750", "Decimal should round to nearest whole rupee")
+    assertEqual(TimeFormatter.format(rupees: 3750.8), "₹3,751", "Decimal .8 should round up")
+    assertEqual(TimeFormatter.format(rupees: 100000), "₹1,00,000", "Lakh formatting should use Indian grouping")
+
+    // 2. GoalSettings rates & targets
+    let goal = GoalSettings.shared
+    let savedRate = goal.hourlyRate
+    let savedHours = goal.dailyGoalHours
+    defer {
+        goal.hourlyRate = savedRate
+        goal.dailyGoalHours = savedHours
+    }
+
+    goal.dailyGoalHours = 8.0
+    goal.hourlyRate = 0.0
+    assertFalse(goal.hasHourlyRate, "hasHourlyRate must be false when hourlyRate is 0")
+    assertEqual(goal.targetEarnings, 0.0, "targetEarnings must be 0 when rate is 0")
+
+    goal.hourlyRate = 1500.0
+    assertTrue(goal.hasHourlyRate, "hasHourlyRate must be true when hourlyRate > 0")
+    assertEqual(goal.targetEarnings, 12000.0, "8 hours at 1500/hr = 12000 target earnings")
+    assertEqual(goal.targetEarningsLabel, "₹12,000")
+
+    // 3. TimerViewModel calculations with completed + live elapsed
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    // Save a completed sprint of 2 hours (7200 seconds)
+    let t0 = Date().addingTimeInterval(-7200)
+    let completedSprint = Sprint(startTime: t0, endTime: t0.addingTimeInterval(7200), pausedDuration: 0)
+    store.save(sprint: completedSprint)
+    vm.todayLog = store.todayLog()
+
+    assertEqual(vm.todayLog.accumulatedTotal, 7200, "Accumulated total should be 2 hours")
+    // With rate = 1500: 2h * 1500 = 3000
+    assertEqual(vm.todayEarnings, 3000.0, "2 hours at 1500/hr must equal 3000")
+    assertEqual(vm.todayEarningsLabel, "₹3,000")
+
+    // Simulate clock in: live running sprint adds 1800s (30m)
+    vm.clockIn()
+    vm.currentElapsed = 1800 // 30 minutes
+    // Total time = 2.5 hours -> 2.5 * 1500 = 3750
+    assertEqual(vm.totalTodayElapsed, 9000)
+    assertEqual(vm.todayEarnings, 3750.0, "2.5 hours with live ticking must equal 3750")
+    assertEqual(vm.todayEarningsLabel, "₹3,750")
+
+    // Overtime test: simulate 10 hours logged (36000s) on 8h goal
+    vm.currentElapsed = 28800 // 8h live + 2h completed = 10h total
+    assertEqual(vm.totalTodayElapsed, 36000)
+    assertEqual(vm.todayEarnings, 15000.0, "10 hours at 1500/hr must equal 15000")
+    assertEqual(vm.todayEarningsLabel, "₹15,000")
+    assertEqual(vm.progressFraction, 1.0, "Progress fraction must cap at 1.0 on overtime")
+    assertTrue(vm.isDailyGoalReached, "Goal must be marked reached")
+
+    // Clean up sprint
+    vm.clockOut()
+
+    // Clearing rate reverts to 0 and disables tracking
+    goal.hourlyRate = 0.0
+    assertFalse(goal.hasHourlyRate)
+    assertEqual(vm.todayEarnings, 0.0, "todayEarnings must be 0 when rate is cleared")
+}
+
+@MainActor
+func testManualSprintEntry() {
+    print("Running Manual Sprint Entry tests...")
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    assertFalse(vm.isManualEntryPresented)
+
+    // Open manual entry
+    vm.openManualEntry()
+    assertTrue(vm.isManualEntryPresented)
+
+    // Test invalid format validation
+    vm.manualStartText = "invalid"
+    vm.manualEndText = "10:00:00"
+    let success1 = vm.saveManualSprint()
+    assertFalse(success1)
+    assertEqual(vm.manualEntryError, "Invalid start time (HH:mm:ss)")
+    assertTrue(vm.isManualEntryPresented)
+
+    // Test end before start validation
+    vm.manualStartText = "11:00:00"
+    vm.manualEndText = "10:00:00"
+    let success2 = vm.saveManualSprint()
+    assertFalse(success2)
+    assertEqual(vm.manualEntryError, "End time must be after start time")
+
+    // Test break duration exceeding total time
+    vm.manualStartText = "10:00:00"
+    vm.manualEndText = "10:30:00"
+    vm.manualBreakMinutesText = "45"
+    let success3 = vm.saveManualSprint()
+    assertFalse(success3)
+    assertEqual(vm.manualEntryError, "Break duration exceeds sprint time")
+
+    // Test stepper buttons
+    vm.manualStartText = "10:00:00"
+    vm.stepManualTime(isStart: true, minutes: 15)
+    assertEqual(vm.manualStartText, "10:15:00")
+    vm.stepManualTime(isStart: true, minutes: -30)
+    assertEqual(vm.manualStartText, "09:45:00")
+
+    // Test valid manual sprint saving with 10 min break
+    vm.manualStartText = "09:00:00"
+    vm.manualEndText = "10:30:00" // 90 min gross
+    vm.manualBreakMinutesText = "10" // 10 min break -> 80 min net (4800s)
+    let net = vm.manualComputedNetDuration
+    assertEqual(net, 4800.0)
+
+    let success4 = vm.saveManualSprint()
+    assertTrue(success4)
+    assertFalse(vm.isManualEntryPresented)
+    assertEqual(vm.todayLog.completedSprints.count, 1)
+
+    let saved = vm.todayLog.completedSprints.first!
+    assertEqual(saved.startLabel, "09:00:00")
+    assertEqual(saved.endLabel, "10:30:00")
+    assertEqual(saved.pausedDuration, 600.0)
+    assertEqual(saved.duration, 4800.0)
+    assertEqual(saved.effectiveEndLabel, "10:20:00")
+    assertEqual(vm.todayLog.accumulatedTotal, 4800.0)
+
+    // Test clipboard text of manual sprint
+    assertEqual(saved.clipboardText, "09:00:00\t10:20:00")
+
+    // Test out-of-order sprint insertion & chronological sorting:
+    // Existing sprint: 09:00:00 - 10:30:00 (#1)
+    // Now add a later sprint: 14:00:00 - 15:00:00
+    vm.manualStartText = "14:00:00"
+    vm.manualEndText = "15:00:00"
+    vm.manualBreakMinutesText = "0"
+    assertTrue(vm.saveManualSprint())
+
+    // Now add an earlier sprint (retroactive): 07:00:00 - 08:00:00
+    vm.manualStartText = "07:00:00"
+    vm.manualEndText = "08:00:00"
+    vm.manualBreakMinutesText = "0"
+    assertTrue(vm.saveManualSprint())
+
+    // Sprints must be sorted chronologically in completedSprints:
+    // Index 0: 07:00 - 08:00
+    // Index 1: 09:00 - 10:30
+    // Index 2: 14:00 - 15:00
+    assertEqual(vm.todayLog.completedSprints.count, 3)
+    assertEqual(vm.todayLog.completedSprints[0].startLabel, "07:00:00")
+    assertEqual(vm.todayLog.completedSprints[1].startLabel, "09:00:00")
+    assertEqual(vm.todayLog.completedSprints[2].startLabel, "14:00:00")
+
+    // In the UI view (completedSprintsDescending):
+    // Top card should be #3 (14:00:00)
+    // Middle card should be #2 (09:00:00)
+    // Bottom card should be #1 (07:00:00)
+    let descending = vm.todayLog.completedSprintsDescending
+    assertEqual(descending.count, 3)
+    assertEqual(descending[0].index, 3)
+    assertEqual(descending[0].sprint.startLabel, "14:00:00")
+    assertEqual(descending[1].index, 2)
+    assertEqual(descending[1].sprint.startLabel, "09:00:00")
+    assertEqual(descending[2].index, 1)
+    assertEqual(descending[2].sprint.startLabel, "07:00:00")
+
+    // Test dismiss
+    vm.openManualEntry()
+    assertTrue(vm.isManualEntryPresented)
+    vm.dismissManualEntry()
+    assertFalse(vm.isManualEntryPresented)
+}
+
+@MainActor
+func testPastDaysHistory() {
+    print("Running Past Days History & Navigation tests...")
+
+    let inMemory = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: inMemory)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    // Initial state: Viewing today
+    assertTrue(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Today")
+    assertEqual(vm.sprintsSectionTitle, "TODAY'S SPRINTS")
+    assertEqual(vm.availablePastDates.count, 7)
+
+    // Verify availablePastDates starts today and goes back 6 days
+    let cal = Calendar.current
+    for (i, d) in vm.availablePastDates.enumerated() {
+        let diff = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: cal.startOfDay(for: Date())).day ?? 0
+        assertEqual(diff, i, "Day at index \(i) should be \(i) days ago")
+    }
+
+    // Set hourly rate
+    vm.goal.hourlyRate = 500.0
+
+    // Setup: 1 sprint today (1 hour: 3600s), 2 sprints yesterday (2 hours each: 7200s total)
+    let today = Date()
+    let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+
+    // Today's sprint
+    let sTodayStart = cal.date(bySettingHour: 10, minute: 0, second: 0, of: today)!
+    let sTodayEnd = cal.date(bySettingHour: 11, minute: 0, second: 0, of: today)!
+    let sToday = Sprint(startTime: sTodayStart, endTime: sTodayEnd, pausedDuration: 0)
+    store.save(sprint: sToday)
+
+    // Yesterday's sprints
+    let sYest1Start = cal.date(bySettingHour: 9, minute: 0, second: 0, of: yesterday)!
+    let sYest1End = cal.date(bySettingHour: 11, minute: 0, second: 0, of: yesterday)!
+    let sYest1 = Sprint(startTime: sYest1Start, endTime: sYest1End, pausedDuration: 0) // 2h (7200s)
+
+    let sYest2Start = cal.date(bySettingHour: 14, minute: 0, second: 0, of: yesterday)!
+    let sYest2End = cal.date(bySettingHour: 16, minute: 0, second: 0, of: yesterday)!
+    let sYest2 = Sprint(startTime: sYest2Start, endTime: sYest2End, pausedDuration: 0) // 2h (7200s)
+
+    store.save(sprint: sYest1)
+    store.save(sprint: sYest2)
+
+    // Refresh vm today log
+    vm.selectDate(today)
+    assertEqual(vm.displayedCompletedSprints.count, 1)
+    assertEqual(vm.displayedAccumulatedTotal, 3600.0)
+    assertEqual(vm.displayedEarnings, 500.0)
+    assertEqual(vm.displayedGoalTitle, "Daily Target")
+
+    // Test menu item title
+    let yestMenuItem = vm.menuItemTitle(for: yesterday)
+    assertTrue(yestMenuItem.contains("Yesterday") && yestMenuItem.contains("(2)"))
+
+    // Navigate to Yesterday
+    vm.selectDate(yesterday)
+    assertFalse(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Yesterday")
+    assertEqual(vm.sprintsSectionTitle, "YESTERDAY'S SPRINTS")
+    assertEqual(vm.displayedCompletedSprints.count, 2)
+    assertEqual(vm.displayedAccumulatedTotal, 14400.0) // 4h
+    assertEqual(vm.displayedEarnings, 2000.0) // 4h * 500
+    assertEqual(vm.displayedGoalTitle, "Yesterday's Target")
+    assertEqual(vm.displayedTotalShortLabel, "4h 0m")
+
+    // Verify copy all displayed sprints copies yesterday's 2 sprints
+    let yestClipboard = vm.selectedDayLog.clipboardText
+    assertEqual(yestClipboard, "\(sYest1.clipboardText)\n\(sYest2.clipboardText)")
+
+    // Test saving manual sprint while viewing yesterday
+    vm.manualStartText = "17:00:00"
+    vm.manualEndText = "18:00:00"
+    vm.manualBreakMinutesText = "0"
+    let savedYest = vm.saveManualSprint()
+    assertTrue(savedYest)
+
+    // Yesterday now has 3 sprints, today still has 1 sprint
+    assertEqual(vm.displayedCompletedSprints.count, 3)
+    assertEqual(vm.todayLog.completedSprints.count, 1)
+
+    // Test jump to today
+    vm.jumpToToday()
+    assertTrue(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Today")
+    assertEqual(vm.sprintsSectionTitle, "TODAY'S SPRINTS")
+    assertEqual(vm.displayedCompletedSprints.count, 1)
+    assertEqual(vm.displayedAccumulatedTotal, 3600.0)
+    assertEqual(vm.displayedEarnings, 500.0)
+    assertEqual(vm.displayedGoalTitle, "Daily Target")
+}
+
+@MainActor
+func testPopoverHeightAndSizing() {
+    print("Running Popover Height & Dynamic Sizing tests...")
+    let inMemory = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: inMemory)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    // 1. Initial empty state: no sprints, not expanded, no recovery -> stable 590 to prevent UI compaction
+    assertEqual(vm.displayedCompletedSprints.count, 0)
+    assertFalse(vm.isSettingsExpanded)
+    assertFalse(vm.recoveryMode)
+    assertEqual(vm.desiredPopoverHeight, 590.0, "Empty state without sprints should be 590 to prevent UI compaction")
+
+    // 2. Settings expanded without sprints -> 780
+    vm.isSettingsExpanded = true
+    assertEqual(vm.desiredPopoverHeight, 780.0, "Empty state with settings expanded should be 780")
+    vm.isSettingsExpanded = false
+
+    // 3. Add sprint today -> stable 590
+    let today = Date()
+    let sToday = Sprint(startTime: today, endTime: today.addingTimeInterval(3600), pausedDuration: 0)
+    store.save(sprint: sToday)
+    vm.todayLog = store.todayLog()
+    vm.selectDate(today)
+
+    assertEqual(vm.displayedCompletedSprints.count, 1)
+    assertEqual(vm.desiredPopoverHeight, 590.0, "State with completed sprints should be 590")
+
+    // 4. Settings expanded with sprints -> 780
+    vm.isSettingsExpanded = true
+    assertEqual(vm.desiredPopoverHeight, 780.0, "State with sprints and settings expanded should be 780")
+    vm.isSettingsExpanded = false
+
+    // 5. Past days navigation sizing test
+    // Yesterday has 0 sprints, Today has 1 sprint
+    let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+    vm.selectDate(yesterday)
+    assertEqual(vm.displayedCompletedSprints.count, 0)
+    assertEqual(vm.desiredPopoverHeight, 590.0, "Viewing yesterday with 0 sprints should size stably to 590")
+
+    vm.selectDate(today)
+    assertEqual(vm.displayedCompletedSprints.count, 1)
+    assertEqual(vm.desiredPopoverHeight, 590.0, "Returning to today with 1 sprint should size to 590")
+}
+
+@MainActor
+func testAutomaticDayRollover() {
+    print("Running Automatic Day Rollover tests...")
+    let inMemory = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: inMemory)
+    let engine = SprintEngine(store: store)
+    let vm = TimerViewModel(engine: engine, store: store)
+
+    let today = Date()
+    let cal = Calendar.current
+    let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+
+    // 1. User was viewing yesterday
+    vm.selectDate(yesterday)
+    assertFalse(vm.isViewingToday)
+    assertEqual(vm.selectedDayShortTitle, "Yesterday")
+
+    // 2. Starting timer via clockIn() must automatically advance view to Today
+    vm.clockIn()
+    assertTrue(vm.isViewingToday, "Clocking in must automatically switch view to today")
+    assertTrue(vm.isRunning)
+    vm.clockOut()
+
+    // 3. Day rollover detection via checkAndHandleDayChange
+    let tomorrow = cal.date(byAdding: .day, value: 1, to: today)!
+    vm.checkAndHandleDayChange(now: tomorrow)
+    assertEqual(TimeFormatter.format(dateKey: vm.selectedDate), TimeFormatter.format(dateKey: tomorrow), "Advancing to tomorrow must update selectedDate")
+}
+
+@MainActor
+func testTimeAndPauseMathVerification() {
+    print("Running Time, Pause, and Break Math Invariant tests...")
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    let engine = SprintEngine(store: store)
+
+    // 1. Exact fractional-second pause and zero-drift verification
+    let t0 = Date()
+    engine.clockIn(at: t0)
+
+    let t1 = t0.addingTimeInterval(10.75) // Active: 10.75s
+    engine.pause(at: t1)
+    assertEqual(engine.state.currentElapsed, 10.75, "Elapsed at pause must match exact fractional work time")
+    assertEqual(engine.totalCurrentSprintPaused, 0.0, "Pause just started, accumulated pause is 0")
+
+    let t2 = t1.addingTimeInterval(2.50) // Pause 1: 2.50s
+    engine.resume(at: t2)
+    assertEqual(engine.totalCurrentSprintPaused, 2.50, "Paused duration must record exact 2.50s")
+    assertEqual(engine.state.currentElapsed, 10.75, "Elapsed after resume must equal active time before pause")
+
+    let t3 = t2.addingTimeInterval(7.15) // Active 2: 7.15s (gross 10.75 + 2.50 + 7.15 = 20.40s)
+    engine.pause(at: t3)
+    let expectedElapsedAtPause2 = 10.75 + 7.15
+    assertEqual(round(engine.state.currentElapsed * 100) / 100, round(expectedElapsedAtPause2 * 100) / 100, "Second pause must preserve exact sum of active intervals (17.90s)")
+
+    let t4 = t3.addingTimeInterval(3.70) // Pause 2: 3.70s (total pause 2.50 + 3.70 = 6.20s)
+    engine.resume(at: t4)
+    assertEqual(round(engine.totalCurrentSprintPaused * 100) / 100, 6.20, "Total paused duration must equal sum of pauses (6.20s)")
+
+    let t5 = t4.addingTimeInterval(5.90) // Active 3: 5.90s (total wall clock: 30.00s)
+    var completed: Sprint? = nil
+    engine.onSprintCompleted = { completed = $0 }
+    engine.clockOut(at: t5)
+
+    assertTrue(completed != nil)
+    // Gross: 30.0s. Paused: 6.2s. Net work: 23.8s.
+    assertEqual(round((completed?.pausedDuration ?? 0) * 100) / 100, 6.20)
+    assertEqual(round((completed?.duration ?? 0) * 100) / 100, 23.80)
+    let expectedEffectiveEnd = t5.addingTimeInterval(-6.20)
+    assertEqual(completed?.effectiveEnd, expectedEffectiveEnd)
+
+    // 2. EffectiveEnd clamping invariant: effectiveEnd never precedes startTime
+    let clampedSprint = Sprint(startTime: t0, endTime: t0.addingTimeInterval(100), pausedDuration: 150)
+    assertEqual(clampedSprint.duration, 0.0, "Duration must clamp to 0 when pause exceeds gross duration")
+    assertEqual(clampedSprint.effectiveEnd, t0, "EffectiveEnd must clamp to startTime when pause exceeds duration")
+
+    // 3. Recovery validation: break duration exceeding sprint time must throw
+    let openSprintWithPauses = Sprint(startTime: t0, pausedDuration: 600)
+    store.save(sprint: openSprintWithPauses)
+    engine.reload()
+    guard case .recovery = engine.state else {
+        assertTrue(false, "Engine must be in recovery")
+        return
+    }
+    // Enter end time only 300s after start (5 min end, but 10 min pauses recorded)
+    let invalidRecoveryEnd = TimeFormatter.format(time: t0.addingTimeInterval(300))
+    var threwExpectedError = false
+    do {
+        try engine.saveRecoveryEndTime(invalidRecoveryEnd)
+    } catch RecoveryError.breakExceedsSprintTime {
+        threwExpectedError = true
+    } catch {
+        // other error
+    }
+    assertTrue(threwExpectedError, "Recovery must throw breakExceedsSprintTime when end time <= pause duration")
+    engine.dismissRecovery()
+
+    // 4. Manual entry validation: invalid break minutes text
+    let vm = TimerViewModel(engine: engine, store: store)
+    vm.openManualEntry()
+    vm.manualStartText = "10:00:00"
+    vm.manualEndText = "11:00:00"
+    vm.manualBreakMinutesText = "-10" // negative break minutes
+    assertFalse(vm.saveManualSprint(), "Negative break minutes must fail save")
+    assertEqual(vm.manualEntryError, "Invalid break minutes")
+
+    vm.manualBreakMinutesText = "abc" // non-numeric
+    assertFalse(vm.saveManualSprint(), "Non-numeric break minutes must fail save")
+    assertEqual(vm.manualEntryError, "Invalid break minutes")
+
+    vm.manualBreakMinutesText = "15" // valid 15 min
+    assertTrue(vm.saveManualSprint(), "Valid 15 min break must succeed")
+    let savedManual = vm.todayLog.completedSprints.first { $0.startLabel == "10:00:00" }
+    assertEqual(savedManual?.pausedDuration, 900.0)
+    assertEqual(savedManual?.pauseCount, 1)
+    assertEqual(savedManual?.duration, 2700.0)
+}
+
+func testSprintEntryValidation() {
+    let date = Date()
+    for invalid in ["10:xx:30", "10::30", "10:30:00:00", "10", "24:00", "10:60", "10:30:60"] {
+        assertTrue(TimeFormatter.parseTime(invalid, on: date) == nil, "Reject malformed time \(invalid)")
+    }
+    assertTrue(TimeFormatter.parseTime("10:30", on: date) != nil)
+    for invalid in ["nan", "inf", "-5", "abc", "60"] {
+        let entry = try? SprintEntry(date: date, startText: "10:00", endText: "11:00", breakText: invalid)
+        assertTrue(entry == nil, "Reject invalid break \(invalid)")
+    }
+    let valid = try? SprintEntry(date: date, startText: "10:00", endText: "11:00", breakText: "12.5")
+    assertEqual(valid?.netDuration, 2850)
+}
+
+@MainActor
+func testV2LiveEarningsAndHistorySynchronization() {
+    let suite = "skeval-v2-refresh-\(UUID())"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = GoalSettings(userDefaults: defaults)
+    settings.hourlyRate = 1200
+    settings.currencySymbol = "$"
+    let store = DayLogStore(storage: InMemoryDayLogAdapter())
+    let engine = SprintEngine(store: store, observeWorkspace: false)
+    let vm = TimerViewModel(engine: engine, store: store, goal: settings)
+    let today = Calendar.current.startOfDay(for: Date())
+    let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+    let old = Sprint(startTime: yesterday.addingTimeInterval(36000), endTime: yesterday.addingTimeInterval(39600), tag: "client")
+    store.save(sprint: old)
+    vm.selectDate(yesterday)
+    assertEqual(vm.displayedEarnings, 1200)
+    assertEqual(vm.displayedEarningsLabel, "$1,200")
+    vm.clockIn(tag: "current")
+    vm.currentElapsed = 1800
+    assertTrue(vm.isViewingToday)
+    assertEqual(vm.todayEarnings, 600)
+    assertEqual(vm.todayEarningsLabel, "$600")
+    assertEqual(vm.targetEarningsLabel, "$9,600")
+    vm.selectDate(yesterday)
+    assertEqual(vm.displayedEarnings, 1200, "History excludes the live sprint")
+    let revision = vm.logRevision
+    _ = vm.updateSprint(originalSprint: old, newDate: yesterday, newStartTime: old.startTime,
+                        newEndTime: old.startTime.addingTimeInterval(7200), newPausedDuration: 600, newTag: "updated")
+    assertEqual(vm.selectedDayLog.accumulatedTotal, 6600)
+    assertTrue(vm.logRevision > revision)
+    assertEqual(vm.displayedCompletedSprints.first?.tag, "updated")
+    vm.delete(sprint: old)
+    assertEqual(vm.displayedCompletedSprints.count, 0)
+    vm.reset()
+
+    engine.clockIn(at: yesterday.addingTimeInterval(82800))
+    vm.currentElapsed = 5400
+    assertEqual(vm.totalTodayElapsed, 0, "A sprint belongs to its start day across midnight")
+    assertEqual(vm.liveSprintElapsed(on: yesterday), 5400)
+    vm.reset()
+
+    vm.selectDate(yesterday)
+    vm.manualStartText = "09:00"
+    vm.manualEndText = "10:00"
+    vm.manualBreakMinutesText = "5"
+    vm.manualTagText = " archive "
+    let manualRevision = vm.logRevision
+    assertTrue(vm.saveManualSprint())
+    assertEqual(vm.selectedDayLog.accumulatedTotal, 3300)
+    assertEqual(vm.displayedCompletedSprints.first?.tag, "archive")
+    assertTrue(vm.logRevision > manualRevision)
+    assertEqual(vm.todayLog.completedSprints.count, 0)
+    vm.copyAllDisplayedSprints()
+    assertEqual(NSPasteboard.general.string(forType: .string), vm.selectedDayLog.clipboardText)
+}
+
+@MainActor
+func testSleepDecisionDelayAndRecoveryRetry() {
+    let store = DayLogStore(storage: InMemoryDayLogAdapter())
+    let engine = SprintEngine(store: store, observeWorkspace: false)
+    let vm = TimerViewModel(engine: engine, store: store)
+    let start = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date())!
+    engine.clockIn(at: start)
+    engine.pause(at: start.addingTimeInterval(300))
+    engine.resume(at: start.addingTimeInterval(360))
+    engine.handleSystemSleep(at: start.addingTimeInterval(600))
+    engine.handleSystemWake(at: start.addingTimeInterval(1200))
+    assertTrue(vm.hasPendingSleepResolution, "The sleep banner is observable after waking")
+    assertEqual(engine.state.currentElapsed, 540)
+    engine.resume(at: start.addingTimeInterval(1250))
+    assertTrue(engine.state.isPaused, "Resume cannot bypass the sleep choice")
+    engine.resolveSleepInterval(countAsWork: false, at: start.addingTimeInterval(1500))
+    assertEqual(engine.state.currentElapsed, 540)
+    engine.clockOut(at: start.addingTimeInterval(1800))
+    assertEqual(store.log(for: start).completedSprints.last?.duration, 840)
+    assertEqual(store.log(for: start).completedSprints.last?.pausedDuration, 960)
+    assertFalse(vm.hasPendingSleepResolution)
+
+    engine.clockIn(at: start.addingTimeInterval(3600))
+    engine.handleSystemSleep(at: start.addingTimeInterval(3900))
+    engine.handleSystemWake(at: start.addingTimeInterval(4500))
+    engine.resolveSleepInterval(countAsWork: true, at: start.addingTimeInterval(4800))
+    assertEqual(engine.state.currentElapsed, 900, "Only the sleep interval counts as work")
+    engine.clockOut(at: start.addingTimeInterval(5100))
+    assertEqual(store.log(for: start).completedSprints.last?.duration, 1200)
+    assertEqual(store.log(for: start).completedSprints.last?.pausedDuration, 300)
+
+    engine.clockIn(at: start.addingTimeInterval(7200))
+    engine.handleSystemSleep(at: start.addingTimeInterval(7500))
+    engine.handleSystemWake(at: start.addingTimeInterval(7800))
+    engine.clockOut(at: start.addingTimeInterval(8100))
+    assertEqual(store.log(for: start).completedSprints.last?.duration, 300, "Clocking out while held excludes all held time")
+    assertTrue(engine.pendingSleepInterval == nil)
+
+    let open = Sprint(startTime: start, pausedDuration: 0, isPaused: true, pauseStartedAt: start)
+    store.save(sprint: open)
+    engine.reload()
+    for _ in 0..<2 {
+        do {
+            try engine.saveRecoveryEndTime("09:05:00")
+            assertTrue(false, "An entirely paused sprint must fail validation")
+        } catch {
+            assertEqual(engine.totalCurrentSprintPaused, 0, "A failed save must not accumulate extra pause time")
+        }
+    }
+    engine.resumeRecovery(at: start.addingTimeInterval(600))
+    engine.clockOut(at: start.addingTimeInterval(900))
+    assertEqual(store.log(for: start).completedSprints.first(where: { $0.id == open.id })?.duration, 300)
+}
+
+// MARK: - Main Runner
 @main
 struct TestMain {
     static func main() async {
-        print("========================================")
-        print("Skeval Timer Architecture Verification")
-        print("========================================")
-
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
         testSprintTaggingAndBackwardCompatibility()
@@ -1472,26 +2086,29 @@ struct TestMain {
         testAnnualContributionHeatmap()
         testRFC4180CSVExport()
         testTagFilterMatching()
+        testAppVersion()
+        testSprintEntryValidation()
         await MainActor.run {
             testSprintEngine()
-            testSprintEngineTagging()
+            testAppThemes()
             testRapidPauseResumeCycles()
             testCrashRecoveryAndPausePersistence()
-            testAppThemes()
+            testSprintEngineTagging()
             testTimerViewModelTaggingAndEarnings()
             testSleepAndWakeResolution()
             testDashboardWindowControllerLifecycle()
             testSprintLogCRUDAndStoreConsistency()
+            testGlobalHotkeys()
+            testEarningsTracking()
+            testManualSprintEntry()
+            testPastDaysHistory()
+            testPopoverHeightAndSizing()
+            testAutomaticDayRollover()
+            testTimeAndPauseMathVerification()
+            testV2LiveEarningsAndHistorySynchronization()
+            testSleepDecisionDelayAndRecoveryRetry()
         }
-
-        print("----------------------------------------")
         print("Results: \(passedTests) / \(totalTests) assertions passed.")
-        if passedTests == totalTests {
-            print("✅ All architecture tests passed successfully!")
-        } else {
-            print("❌ Some tests failed!")
-            exit(1)
-        }
+        if passedTests != totalTests { exit(1) }
     }
 }
-

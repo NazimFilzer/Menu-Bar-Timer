@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skeval Timer — Sprint Compaction UI Prototype</title>
+  <style>
+    :root {
+      --bg-desktop: #080c14;
+      --menubar-bg: rgba(18, 24, 38, 0.85);
+      --popover-bg: #0d121d;
+      --card-bg: #141b29;
+      --card-border: #232f48;
+      --text-primary: #f1f5f9;
+      --text-secondary: #8493a8;
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.35);
+      --soft-red: #ff5252;
+      --soft-red-glow: rgba(255, 82, 82, 0.35);
+      --amber: #ff9f0a;
+      --amber-glow: rgba(255, 159, 10, 0.35);
+      --green: #10b981;
+      --divider: rgba(255, 255, 255, 0.08);
+      --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+      --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    body.light-theme {
+      --bg-desktop: #e2e8f0;
+      --menubar-bg: rgba(248, 250, 252, 0.88);
+      --popover-bg: #ffffff;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.25);
+      --divider: rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 15%, #151e33 0%, #060910 100%);
+      min-height: 100vh;
+      font-family: var(--font-ui);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 120px;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    body.light-theme {
+      background: radial-gradient(circle at 50% 15%, #f1f5f9 0%, #cbd5e1 100%);
+    }
+
+    /* Top macOS Menu Bar */
+    .macos-menubar {
+      width: 100%;
+      height: 32px;
+      background: var(--menubar-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .menubar-left { display: flex; align-items: center; gap: 16px; font-weight: 600; font-size: 13px; }
+    .menubar-right { display: flex; align-items: center; gap: 12px; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .status-pill.active {
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(0, 229, 255, 0.45);
+      color: var(--accent);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+    }
+    .status-pill.paused {
+      background: rgba(255, 159, 10, 0.15);
+      border: 1px solid rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+      box-shadow: 0 0 10px rgba(255, 159, 10, 0.25);
+    }
+    .status-pill.idle {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text-secondary);
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-pill.active .pulse-dot {
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    /* Workspace Header */
+    .workspace-banner {
+      margin: 22px 0 14px;
+      text-align: center;
+    }
+    .workspace-banner h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .badge-compaction {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+    .workspace-banner p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 5px;
+    }
+
+    /* Interactive Simulator Controls */
+    .simulator-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(20, 27, 41, 0.9);
+      padding: 8px 18px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 22px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .sim-group { display: flex; align-items: center; gap: 6px; }
+    .sim-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .sim-btn-group { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 3px; border-radius: 18px; }
+    .sim-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sim-btn:hover { color: var(--text-primary); }
+    .sim-btn.active {
+      background: rgba(0, 229, 255, 0.18);
+      border-color: rgba(0, 229, 255, 0.45);
+      color: var(--accent);
+    }
+    .sim-btn.active.mode-running {
+      background: rgba(0, 229, 255, 0.18);
+      border-color: rgba(0, 229, 255, 0.45);
+      color: var(--accent);
+    }
+    .sim-btn.active.mode-paused {
+      background: rgba(255, 159, 10, 0.18);
+      border-color: rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+    }
+    .sim-btn.active.mode-idle {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+
+    /* Layout Viewport */
+    .viewports-wrapper {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 32px;
+      max-width: 1080px;
+      width: 100%;
+      padding: 0 16px;
+    }
+
+    /* Column Container */
+    .mockup-column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 330px;
+      padding: 0 4px;
+    }
+    .column-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .space-saved-pill {
+      font-size: 10.5px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    .space-baseline-pill {
+      font-size: 10.5px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text-secondary);
+    }
+
+    /* Popover Shell */
+    .popover-container {
+      position: relative;
+      width: 330px;
+      background: var(--popover-bg);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: all 0.25s ease;
+    }
+    .popover-container.radial-glow {
+      background: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.12) 0%, var(--popover-bg) 75%);
+    }
+
+    /* Header */
+    .pop-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px 11px;
+    }
+    .pop-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tag-badge {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 5px;
+      background: rgba(0, 229, 255, 0.2);
+      color: var(--accent);
+      border-radius: 10px;
+    }
+    .pop-date {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .pop-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--accent);
+    }
+    .pop-status-badge.paused { color: var(--amber); }
+    .pop-status-badge.idle { color: var(--text-secondary); }
+
+    .divider {
+      height: 1px;
+      background: var(--divider);
+      width: 100%;
+    }
+
+    /* Clock Section */
+    .clock-section {
+      padding: 15px 16px;
+      text-align: center;
+      transition: padding 0.2s ease;
+    }
+    .clock-section.compact-clock {
+      padding: 11px 16px 12px;
+    }
+    .big-timer {
+      font-family: var(--font-mono);
+      font-size: 42px;
+      font-weight: 300;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+      text-shadow: 0 2px 10px var(--accent-glow);
+    }
+    .big-timer.paused {
+      color: var(--amber);
+      text-shadow: 0 2px 10px var(--amber-glow);
+    }
+    .big-timer.idle {
+      color: var(--text-primary);
+      text-shadow: none;
+    }
+    .timer-subtext {
+      font-size: 11.5px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+    .paused-pill-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: linear-gradient(135deg, #ff9f0a, #e67e00);
+      color: #000;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(255, 159, 10, 0.4);
+    }
+
+    /* Goal Section */
+    .goal-section {
+      padding: 8px 16px 9px;
+    }
+    .goal-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 5px;
+    }
+    .goal-progress-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .goal-progress-fill {
+      width: 58%;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(0, 229, 255, 0.8), var(--accent));
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    /* Action Section Containers */
+    .action-section {
+      padding: 11px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      background: rgba(0, 0, 0, 0.08);
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    .action-section.compact-pad {
+      padding: 9px 16px;
+      gap: 7px;
+    }
+
+    /* Timestamp Cards Row */
+    .ts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+    .ts-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ts-card.compact {
+      padding: 6px 9px;
+    }
+    .ts-card.highlighted-teal {
+      border-color: rgba(0, 229, 255, 0.35);
+    }
+    .ts-card.highlighted-amber {
+      border-color: rgba(255, 159, 10, 0.35);
+    }
+    .ts-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+    .ts-value {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .ts-value.active-teal { color: var(--accent); }
+    .ts-value.active-amber { color: var(--amber); }
+
+    /* Button Styling */
+    .btn-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border-radius: 9px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      position: relative;
+      outline: none;
+    }
+    .btn-action:active { transform: scale(0.975); }
+
+    /* Primary Clock In / Clock Out Full Width (Baseline) */
+    .btn-clockin {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.85), var(--accent));
+      color: #041018;
+      padding: 10px 0;
+      font-size: 13px;
+      box-shadow: 0 4px 12px var(--accent-glow);
+      width: 100%;
+    }
+    .btn-clockout-full {
+      background: linear-gradient(135deg, #ff5252, #e53935);
+      color: #ffffff;
+      padding: 10.5px 0;
+      font-size: 12.5px;
+      box-shadow: 0 4px 12px var(--soft-red-glow);
+      width: 100%;
+    }
+
+    /* Baseline Stacked Pause Button */
+    .btn-pause-stacked {
+      background: linear-gradient(135deg, rgba(255, 159, 10, 0.12), rgba(255, 159, 10, 0.18));
+      border: 1px solid rgba(255, 159, 10, 0.4);
+      color: var(--amber);
+      padding: 8px 0;
+      font-size: 11px;
+      width: 100%;
+    }
+    .btn-pause-stacked.is-paused {
+      background: linear-gradient(135deg, #ff9f0a, #e67e00);
+      color: #000;
+      border: none;
+      box-shadow: 0 3px 10px rgba(255, 159, 10, 0.35);
+    }
+
+    /* Side-by-Side Dual Button Row (Variants) */
+    .dual-button-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      align-items: stretch;
+    }
+
+    /* Variant A: 50 / 50 Equal Split */
+    .dual-button-row.split-50-50 .btn-pause-side {
+      flex: 1;
+      padding: 9.5px 6px;
+      font-size: 11.5px;
+      background: linear-gradient(135deg, rgba(255, 159, 10, 0.12), rgba(255, 159, 10, 0.2));
+      border: 1px solid rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+    }
+    .dual-button-row.split-50-50 .btn-pause-side.is-paused {
+      background: linear-gradient(135deg, #ff9f0a, #e67e00);
+      color: #000;
+      border-color: transparent;
+      box-shadow: 0 3px 10px rgba(255, 159, 10, 0.35);
+    }
+    .dual-button-row.split-50-50 .btn-clockout-side {
+      flex: 1;
+      padding: 9.5px 6px;
+      font-size: 11.5px;
+      background: linear-gradient(135deg, #ff5b5b, #e53935);
+      color: #ffffff;
+      box-shadow: 0 3px 10px var(--soft-red-glow);
+    }
+
+    /* Variant B: Asymmetric (35% Pause / 65% Clock Out) */
+    .dual-button-row.split-weighted .btn-pause-side {
+      flex: 0 0 36%;
+      padding: 9.5px 6px;
+      font-size: 11px;
+      background: linear-gradient(135deg, rgba(255, 159, 10, 0.12), rgba(255, 159, 10, 0.2));
+      border: 1px solid rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+    }
+    .dual-button-row.split-weighted .btn-pause-side.is-paused {
+      background: linear-gradient(135deg, #ff9f0a, #e67e00);
+      color: #000;
+      border-color: transparent;
+      box-shadow: 0 3px 10px rgba(255, 159, 10, 0.35);
+    }
+    .dual-button-row.split-weighted .btn-clockout-side {
+      flex: 1;
+      padding: 9.5px 8px;
+      font-size: 11.5px;
+      background: linear-gradient(135deg, #ff5252, #e53935);
+      color: #ffffff;
+      box-shadow: 0 4px 12px var(--soft-red-glow);
+    }
+
+    /* Variant C: Triple Strip (Pause + Clock Out + Discard Icon) */
+    .dual-button-row.split-triple .btn-pause-side {
+      flex: 1;
+      padding: 8.5px 4px;
+      font-size: 11px;
+      background: linear-gradient(135deg, rgba(255, 159, 10, 0.12), rgba(255, 159, 10, 0.2));
+      border: 1px solid rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+    }
+    .dual-button-row.split-triple .btn-pause-side.is-paused {
+      background: linear-gradient(135deg, #ff9f0a, #e67e00);
+      color: #000;
+      border-color: transparent;
+    }
+    .dual-button-row.split-triple .btn-clockout-side {
+      flex: 1.25;
+      padding: 8.5px 6px;
+      font-size: 11.5px;
+      background: linear-gradient(135deg, #ff5252, #e53935);
+      color: #ffffff;
+      box-shadow: 0 3px 10px var(--soft-red-glow);
+    }
+    .btn-discard-icon {
+      width: 36px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-secondary);
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .btn-discard-icon:hover {
+      background: rgba(255, 82, 82, 0.15);
+      border-color: rgba(255, 82, 82, 0.4);
+      color: var(--soft-red);
+    }
+
+    /* Discard Sprint Link */
+    .discard-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: color 0.15s;
+      text-decoration: none;
+      padding-top: 1px;
+    }
+    .discard-link:hover { color: var(--soft-red); }
+
+    /* Sprint History Section */
+    .sprint-history-section {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 8px;
+    }
+    .history-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .history-badge-count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+    .btn-copy-all {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: var(--accent);
+      cursor: pointer;
+      letter-spacing: 0.3px;
+    }
+    .btn-copy-all.copied {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* Sprint Cards List */
+    .sprints-scroll-area {
+      overflow-y: auto;
+      padding: 0 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      transition: max-height 0.25s ease;
+    }
+    /* Dynamic heights depending on variant */
+    .sprints-scroll-area.height-baseline { max-height: 195px; }
+    .sprints-scroll-area.height-compact-a { max-height: 247px; }
+    .sprints-scroll-area.height-compact-b { max-height: 247px; }
+    .sprints-scroll-area.height-compact-c { max-height: 275px; }
+
+    /* Sprint Card Item */
+    .sprint-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 7px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+    .sprint-card:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .sprint-num-badge {
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--accent);
+      border-radius: 5px;
+      display: grid;
+      place-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .sprint-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2.5px;
+      flex: 1;
+      min-width: 0;
+    }
+    .sprint-times {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .sprint-arrow { font-size: 9px; color: var(--text-secondary); }
+    .sprint-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+    .pause-pill-micro {
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(255, 159, 10, 0.15);
+      color: var(--amber);
+      padding: 1px 5px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .sprint-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .sprint-action-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      border: none;
+      font-size: 10px;
+      transition: all 0.15s ease;
+    }
+    .sprint-copy-btn {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--accent);
+    }
+    .sprint-copy-btn.copied {
+      background: var(--accent);
+      color: #000;
+    }
+    .sprint-del-btn {
+      background: rgba(255, 82, 82, 0.1);
+      color: rgba(255, 82, 82, 0.8);
+    }
+
+    /* Settings Strip */
+    .settings-strip {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Rationale Card on the Side */
+    .analysis-card {
+      width: 340px;
+      background: rgba(20, 27, 41, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    }
+    .analysis-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .metrics-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+    .metrics-table th {
+      text-align: left;
+      padding: 5px 0;
+      color: var(--text-secondary);
+      font-weight: 600;
+      border-bottom: 1px solid var(--divider);
+    }
+    .metrics-table td {
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .metrics-table .num {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      text-align: right;
+    }
+    .delta-gain {
+      color: #34d399;
+      font-weight: 700;
+    }
+    .variant-notes {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 10px 12px;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+    .key-insights {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+    .insight-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      line-height: 1.4;
+    }
+    .insight-icon {
+      color: var(--accent);
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* FLOATING SWITCHER (Per prototype skill specification) */
+    .floating-switcher {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 21, 34, 0.94);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 229, 255, 0.2);
+      border-radius: 40px;
+      display: flex;
+      align-items: center;
+      padding: 6px 14px;
+      gap: 14px;
+      z-index: 1000;
+    }
+    .switcher-nav-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-primary);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all 0.15s ease;
+    }
+    .switcher-nav-btn:hover {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+    .switcher-label-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      min-width: 220px;
+    }
+    .switcher-key {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+    .switcher-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    .switcher-hints {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Simulated macOS Menu Bar -->
+  <header class="macos-menubar">
+    <div class="menubar-left">
+      <span class="menubar-apple"></span>
+      <span>File</span>
+      <span>Edit</span>
+      <span>View</span>
+      <span>Window</span>
+      <span>Help</span>
+    </div>
+    <div class="menubar-right">
+      <div id="menubarPill" class="status-pill active" onclick="toggleSimState()">
+        <span class="pulse-dot"></span>
+        <span id="menubarLabel">00:42:15</span>
+      </div>
+      <span style="font-size: 12px; color: var(--text-secondary);">Wed 23:05</span>
+      <span style="font-size: 11px;">🔍</span>
+    </div>
+  </header>
+
+  <!-- Workspace Header Banner -->
+  <div class="workspace-banner">
+    <h1>
+      Vertical Compaction Prototype
+      <span class="badge-compaction">Interactive Layout Exploration</span>
+    </h1>
+    <p>Increasing visible capacity for <strong>Today's Sprints</strong> by placing Pause & Clock Out side-by-side</p>
+  </div>
+
+  <!-- Interactive Controls Bar -->
+  <div class="simulator-controls">
+    <div class="sim-group">
+      <span class="sim-label">Sprint State:</span>
+      <div class="sim-btn-group">
+        <button id="stateBtnRunning" class="sim-btn active mode-running" onclick="setTimerState('running')">▶ Running</button>
+        <button id="stateBtnPaused" class="sim-btn" onclick="setTimerState('paused')">⏸ Paused</button>
+        <button id="stateBtnIdle" class="sim-btn" onclick="setTimerState('idle')">⏹ Idle</button>
+      </div>
+    </div>
+
+    <div class="sim-group">
+      <span class="sim-label">Layout Mode:</span>
+      <div class="sim-btn-group">
+        <button id="btnViewSingle" class="sim-btn active" onclick="setViewMode('single')">Selected Variant</button>
+        <button id="btnViewCompare" class="sim-btn" onclick="setViewMode('compare')">Side-by-Side vs Baseline</button>
+      </div>
+    </div>
+
+    <div class="sim-group">
+      <span class="sim-label">Theme:</span>
+      <button class="sim-btn" onclick="toggleTheme()" id="themeBtn">☀️ Light Mode</button>
+    </div>
+
+    <div class="sim-group">
+      <span class="sim-label">Sprints Logged:</span>
+      <div class="sim-btn-group">
+        <button class="sim-btn" onclick="setSprintCount(2)">2</button>
+        <button class="sim-btn active" id="sprintCount5Btn" onclick="setSprintCount(5)">5 (Dense)</button>
+        <button class="sim-btn" onclick="setSprintCount(8)">8 (Overflow)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Comparison Area -->
+  <div class="viewports-wrapper">
+
+    <!-- Baseline Column (Hidden in single view unless Current is selected) -->
+    <div id="baselineColumn" class="mockup-column" style="display: none;">
+      <div class="column-header">
+        <span class="column-title">Current Layout (Stacked)</span>
+        <span class="space-baseline-pill">148px Action Area</span>
+      </div>
+
+      <div class="popover-container radial-glow" id="popoverBaseline">
+        <!-- Popover Header -->
+        <div class="pop-header">
+          <div>
+            <div class="pop-title">
+              SKEVAL TIMER <span class="tag-badge">MVP</span>
+            </div>
+            <div class="pop-date">Wed, Oct 8</div>
+          </div>
+          <div class="pop-status-badge" id="baseHeaderStatus">
+            <span class="pulse-dot"></span>
+            <span id="baseHeaderStatusText">RUNNING</span>
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Clock Area -->
+        <div class="clock-section">
+          <div class="big-timer" id="baseClockTimer">00:42:15</div>
+          <div class="timer-subtext" id="baseClockSubtext">
+            Today's Total: 03:15:20
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Daily Goal -->
+        <div class="goal-section">
+          <div class="goal-header">
+            <span>Daily Goal Target</span>
+            <span style="font-family: var(--font-mono); color: var(--accent);">3h 15m / 8h 00m</span>
+          </div>
+          <div class="goal-progress-bar">
+            <div class="goal-progress-fill"></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- BASELINE ACTION SECTION (VERTICAL STACK) -->
+        <div class="action-section" id="baseActionSection">
+          <div class="ts-grid">
+            <div class="ts-card highlighted-teal">
+              <span class="ts-label">START TIME</span>
+              <span class="ts-value active-teal" id="baseStartTime">10:15:00</span>
+            </div>
+            <div class="ts-card">
+              <span class="ts-label" id="baseBreakLabel">TOTAL BREAKS</span>
+              <span class="ts-value" id="baseBreakValue">00:05:00</span>
+            </div>
+          </div>
+
+          <!-- Vertical Stacked Pause Button -->
+          <div id="baseRunningActions" style="display: flex; flex-direction: column; gap: 9px; width: 100%;">
+            <button class="btn-action btn-pause-stacked" id="basePauseBtn" onclick="togglePauseSim()">
+              <span>⏸</span> <span>PAUSE</span>
+            </button>
+            <button class="btn-action btn-clockout-full" onclick="clockOutSim()">
+              <span>⏹</span> <span>CLOCK OUT & COPY</span>
+            </button>
+            <div class="discard-link" onclick="discardSim()">
+              <span>⊗ Discard current sprint</span>
+            </div>
+          </div>
+
+          <!-- Idle Single Button -->
+          <div id="baseIdleActions" style="display: none; width: 100%;">
+            <button class="btn-action btn-clockin" onclick="clockInSim()">
+              <span>▶</span> <span>CLOCK IN</span>
+            </button>
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Sprint History Area (Capped ScrollView) -->
+        <div class="sprint-history-section">
+          <div class="history-header">
+            <div class="history-title">
+              <span>TODAY'S SPRINTS</span>
+              <span class="history-badge-count" id="baseCountBadge">(5)</span>
+            </div>
+            <button class="btn-copy-all" onclick="copyAllSim(this)">
+              <span>⧉</span> <span>COPY ALL</span>
+            </button>
+          </div>
+
+          <div class="sprints-scroll-area height-baseline" id="baseSprintsList">
+            <!-- Sprints populated by JS -->
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Settings Strip -->
+        <div class="settings-strip">
+          <span>⚙ SETTINGS</span>
+          <span>›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Prototype Variant Column -->
+    <div class="mockup-column">
+      <div class="column-header">
+        <span class="column-title" id="activeVariantColTitle">Variant A: Balanced Dual-Action Bar</span>
+        <span class="space-saved-pill" id="activeSpaceSavedPill">+52px Reclaimed (+35%)</span>
+      </div>
+
+      <div class="popover-container radial-glow" id="popoverVariant">
+        <!-- Popover Header -->
+        <div class="pop-header">
+          <div>
+            <div class="pop-title">
+              SKEVAL TIMER <span class="tag-badge">MVP</span>
+            </div>
+            <div class="pop-date">Wed, Oct 8</div>
+          </div>
+          <div class="pop-status-badge" id="varHeaderStatus">
+            <span class="pulse-dot"></span>
+            <span id="varHeaderStatusText">RUNNING</span>
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Clock Area -->
+        <div class="clock-section" id="varClockSection">
+          <div class="big-timer" id="varClockTimer">00:42:15</div>
+          <div class="timer-subtext" id="varClockSubtext">
+            Today's Total: 03:15:20
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Daily Goal -->
+        <div class="goal-section">
+          <div class="goal-header">
+            <span>Daily Goal Target</span>
+            <span style="font-family: var(--font-mono); color: var(--accent);">3h 15m / 8h 00m</span>
+          </div>
+          <div class="goal-progress-bar">
+            <div class="goal-progress-fill"></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- VARIANT ACTION SECTION (SIDE-BY-SIDE BUTTONS) -->
+        <div class="action-section" id="varActionSection">
+          <div class="ts-grid">
+            <div class="ts-card highlighted-teal" id="varTsCardStart">
+              <span class="ts-label">START TIME</span>
+              <span class="ts-value active-teal" id="varStartTime">10:15:00</span>
+            </div>
+            <div class="ts-card" id="varTsCardBreak">
+              <span class="ts-label" id="varBreakLabel">TOTAL BREAKS</span>
+              <span class="ts-value" id="varBreakValue">00:05:00</span>
+            </div>
+          </div>
+
+          <!-- Dynamic Variant Buttons Container -->
+          <div id="varDynamicActionsSlot" style="width: 100%;">
+            <!-- Injected by renderVariantActions() -->
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Sprint History Area (Noticeably Larger Visible Height) -->
+        <div class="sprint-history-section">
+          <div class="history-header">
+            <div class="history-title">
+              <span>TODAY'S SPRINTS</span>
+              <span class="history-badge-count" id="varCountBadge">(5)</span>
+            </div>
+            <button class="btn-copy-all" onclick="copyAllSim(this)">
+              <span>⧉</span> <span>COPY ALL</span>
+            </button>
+          </div>
+
+          <div class="sprints-scroll-area height-compact-a" id="varSprintsList">
+            <!-- Sprints populated by JS -->
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <!-- Settings Strip -->
+        <div class="settings-strip">
+          <span>⚙ SETTINGS</span>
+          <span>›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Analysis and Dimension Breakdown Card -->
+    <div class="analysis-card">
+      <div class="analysis-title">
+        <span>📐 Vertical Space Breakdown</span>
+      </div>
+
+      <table class="metrics-table">
+        <thead>
+          <tr>
+            <th>Element</th>
+            <th>Baseline</th>
+            <th id="metricVariantHead">Variant A</th>
+            <th>Gain</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Action Section Height</td>
+            <td class="num">148 px</td>
+            <td class="num" id="metricActionHeight">96 px</td>
+            <td class="num delta-gain" id="metricActionGain">-52 px</td>
+          </tr>
+          <tr>
+            <td>Sprint List Visible Height</td>
+            <td class="num">195 px</td>
+            <td class="num" id="metricListHeight">247 px</td>
+            <td class="num delta-gain" id="metricListGain">+52 px</td>
+          </tr>
+          <tr>
+            <td>Sprint Cards Visible Without Scroll</td>
+            <td class="num">2.8 cards</td>
+            <td class="num" id="metricCardsVisible">4.2 cards</td>
+            <td class="num delta-gain" id="metricCardsGain">+1.4 cards</td>
+          </tr>
+          <tr>
+            <td>Button Layout Structure</td>
+            <td>Stacked</td>
+            <td id="metricStructure">Side-by-Side (50/50)</td>
+            <td class="delta-gain">✓ Compact</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="variant-notes" id="variantDescriptionBox">
+        <strong>Variant A (Balanced 50/50):</strong> Direct side-by-side pairing. Pause and Clock Out share equal horizontal width. Eliminates one full button row, expanding the sprint scroll area to display 4+ full sprint cards at a glance.
+      </div>
+
+      <div class="key-insights">
+        <div class="insight-item">
+          <span class="insight-icon">✦</span>
+          <span><strong>Zero Scroll Friction:</strong> In standard daily use (3 to 5 sprints), all sprints remain in full view without touching the trackpad.</span>
+        </div>
+        <div class="insight-item">
+          <span class="insight-icon">✦</span>
+          <span><strong>Ergonomic Target Size:</strong> Both buttons remain over 140px wide — plenty of click surface for macOS mouse/trackpad pointer.</span>
+        </div>
+        <div class="insight-item">
+          <span class="insight-icon">✦</span>
+          <span><strong>Preserves Idle Simplicity:</strong> When timer is idle, the single full-width "CLOCK IN" button is maintained.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FLOATING SWITCHER (Per prototype skill specification) -->
+  <nav class="floating-switcher" aria-label="Prototype Variant Switcher">
+    <button class="switcher-nav-btn" onclick="prevVariant()" title="Previous Variant (Left Arrow)">←</button>
+    <div class="switcher-label-wrapper" onclick="nextVariant()">
+      <span id="switcherKey" class="switcher-key">VARIANT A</span>
+      <span id="switcherName" class="switcher-name">Balanced Dual-Action Bar (50/50)</span>
+      <span class="switcher-hints">Use <kbd>←</kbd> <kbd>→</kbd> or click to switch variants</span>
+    </div>
+    <button class="switcher-nav-btn" onclick="nextVariant()" title="Next Variant (Right Arrow)">→</button>
+  </nav>
+
+  <script>
+    // --- Data & State ---
+    let currentVariant = 'A';
+    let timerState = 'running'; // 'running', 'paused', 'idle'
+    let viewMode = 'single';    // 'single', 'compare'
+    let sprintCount = 5;
+    let isLight = false;
+
+    let elapsedSeconds = 42 * 60 + 15;
+    let pauseSeconds = 5 * 60;
+
+    const VARIANTS = ['A', 'B', 'C', 'Current'];
+    const VARIANT_CONFIG = {
+      'A': {
+        name: 'Balanced Dual-Action Bar (50/50)',
+        colTitle: 'Variant A: Balanced Dual-Action Bar',
+        savedPill: '+52px Reclaimed (+35%)',
+        actionHeight: '96 px',
+        actionGain: '-52 px',
+        listHeight: '247 px',
+        listGain: '+52 px',
+        cardsVisible: '4.2 cards',
+        cardsGain: '+1.4 cards',
+        structure: 'Side-by-Side (50/50)',
+        scrollClass: 'height-compact-a',
+        clockCompact: false,
+        desc: '<strong>Variant A (Balanced 50/50):</strong> Direct side-by-side pairing. Pause and Clock Out share equal horizontal width (50% / 50%). Eliminates one full button row, expanding the sprint scroll area to display 4+ full sprint cards at a glance.'
+      },
+      'B': {
+        name: 'Weighted Action Bar (36% Pause / 64% Clock Out)',
+        colTitle: 'Variant B: Asymmetric Weighted Bar',
+        savedPill: '+52px Reclaimed (+35%)',
+        actionHeight: '96 px',
+        actionGain: '-52 px',
+        listHeight: '247 px',
+        listGain: '+52 px',
+        cardsVisible: '4.2 cards',
+        cardsGain: '+1.4 cards',
+        structure: 'Weighted 36% / 64%',
+        scrollClass: 'height-compact-b',
+        clockCompact: false,
+        desc: '<strong>Variant B (Asymmetric Hierarchy):</strong> Gives Clock Out & Copy greater visual prominence (64% width) while Pause remains a compact auxiliary toggle (36% width). Retains clear visual CTA weight.'
+      },
+      'C': {
+        name: 'Ultra-Compact Strip + Integrated Discard',
+        colTitle: 'Variant C: Ultra-Compact Triple Bar',
+        savedPill: '+80px Reclaimed (+55%)',
+        actionHeight: '68 px',
+        actionGain: '-80 px',
+        listHeight: '275 px',
+        listGain: '+80 px',
+        cardsVisible: '5.1 cards',
+        cardsGain: '+2.3 cards',
+        structure: 'Triple Strip (No Discard Link)',
+        scrollClass: 'height-compact-c',
+        clockCompact: true,
+        desc: '<strong>Variant C (Maximum Compaction):</strong> Combines Pause, Clock Out, and an inline Discard icon (✕) into a single row. Also tightens padding in the clock section. Gains 80 vertical pixels — fits 5+ sprints with zero scrolling!'
+      },
+      'Current': {
+        name: 'Current Baseline (Stacked)',
+        colTitle: 'Current Baseline (Stacked)',
+        savedPill: 'Baseline (148px)',
+        actionHeight: '148 px',
+        actionGain: '0 px',
+        listHeight: '195 px',
+        listGain: '0 px',
+        cardsVisible: '2.8 cards',
+        cardsGain: '0 cards',
+        structure: 'Vertical Stack',
+        scrollClass: 'height-baseline',
+        clockCompact: false,
+        desc: '<strong>Current Baseline:</strong> Pause is stacked directly on top of Clock Out & Copy, followed by Discard link. Consumes 148px of vertical height, forcing users to scroll after only 2 or 3 sprints.'
+      }
+    };
+
+    const SAMPLE_SPRINTS = [
+      { id: 1, index: 5, start: '14:30:10', end: '15:45:00', duration: '01:14:50', paused: null, effective: '15:45:00' },
+      { id: 2, index: 4, start: '13:00:22', end: '14:15:30', duration: '01:05:08', paused: '10m', effective: '14:05:30' },
+      { id: 3, index: 3, start: '11:15:00', end: '12:30:15', duration: '01:15:15', paused: null, effective: '12:30:15' },
+      { id: 4, index: 2, start: '09:40:05', end: '10:55:00', duration: '01:10:55', paused: '4m', effective: '10:51:00' },
+      { id: 5, index: 1, start: '08:15:12', end: '09:25:40', duration: '01:10:28', paused: null, effective: '09:25:40' },
+      { id: 6, index: 0, start: '07:00:00', end: '07:55:00', duration: '00:55:00', paused: null, effective: '07:55:00' },
+      { id: 7, index: -1, start: '06:00:00', end: '06:50:00', duration: '00:50:00', paused: '5m', effective: '06:45:00' },
+      { id: 8, index: -2, start: '05:00:00', end: '05:50:00', duration: '00:50:00', paused: null, effective: '05:50:00' }
+    ];
+
+    // --- URL Sync ---
+    function readUrlParam() {
+      const p = new URLSearchParams(window.location.search);
+      const v = p.get('variant');
+      if (v && VARIANT_CONFIG[v]) {
+        currentVariant = v;
+      }
+    }
+
+    function updateUrlParam(v) {
+      const url = new URL(window.location);
+      url.searchParams.set('variant', v);
+      window.history.replaceState({}, '', url);
+    }
+
+    // --- Switcher Logic ---
+    function setVariant(v) {
+      if (!VARIANT_CONFIG[v]) return;
+      currentVariant = v;
+      updateUrlParam(v);
+
+      const cfg = VARIANT_CONFIG[v];
+      document.getElementById('switcherKey').textContent = v === 'Current' ? 'CURRENT BASELINE' : `VARIANT ${v}`;
+      document.getElementById('switcherName').textContent = cfg.name;
+      document.getElementById('activeVariantColTitle').textContent = cfg.colTitle;
+      document.getElementById('activeSpaceSavedPill').textContent = cfg.savedPill;
+      document.getElementById('metricVariantHead').textContent = v === 'Current' ? 'Current' : `Variant ${v}`;
+
+      document.getElementById('metricActionHeight').textContent = cfg.actionHeight;
+      document.getElementById('metricActionGain').textContent = cfg.actionGain;
+      document.getElementById('metricListHeight').textContent = cfg.listHeight;
+      document.getElementById('metricListGain').textContent = cfg.listGain;
+      document.getElementById('metricCardsVisible').textContent = cfg.cardsVisible;
+      document.getElementById('metricCardsGain').textContent = cfg.cardsGain;
+      document.getElementById('metricStructure').textContent = cfg.structure;
+      document.getElementById('variantDescriptionBox').innerHTML = cfg.desc;
+
+      // Update scrollview max-height class
+      const list = document.getElementById('varSprintsList');
+      list.className = 'sprints-scroll-area ' + cfg.scrollClass;
+
+      // Clock section compaction (for Variant C)
+      const clockSec = document.getElementById('varClockSection');
+      if (cfg.clockCompact) {
+        clockSec.classList.add('compact-clock');
+      } else {
+        clockSec.classList.remove('compact-clock');
+      }
+
+      renderVariantActions();
+    }
+
+    function nextVariant() {
+      const idx = VARIANTS.indexOf(currentVariant);
+      const nextIdx = (idx + 1) % VARIANTS.length;
+      setVariant(VARIANTS[nextIdx]);
+    }
+
+    function prevVariant() {
+      const idx = VARIANTS.indexOf(currentVariant);
+      const prevIdx = (idx - 1 + VARIANTS.length) % VARIANTS.length;
+      setVariant(VARIANTS[prevIdx]);
+    }
+
+    // --- Render Actions for Selected Variant ---
+    function renderVariantActions() {
+      const slot = document.getElementById('varDynamicActionsSlot');
+      const actionSec = document.getElementById('varActionSection');
+
+      if (timerState === 'idle') {
+        slot.innerHTML = `
+          <button class="btn-action btn-clockin" onclick="clockInSim()">
+            <span>▶</span> <span>CLOCK IN</span>
+          </button>
+        `;
+        actionSec.classList.remove('compact-pad');
+        return;
+      }
+
+      const isPaused = timerState === 'paused';
+      const pauseText = isPaused ? 'RESUME' : 'PAUSE';
+      const pauseIcon = isPaused ? '▶' : '⏸';
+      const pauseClass = isPaused ? 'btn-pause-side is-paused' : 'btn-pause-side';
+
+      if (currentVariant === 'A') {
+        actionSec.classList.remove('compact-pad');
+        slot.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+            <div class="dual-button-row split-50-50">
+              <button class="btn-action ${pauseClass}" onclick="togglePauseSim()">
+                <span>${pauseIcon}</span> <span>${pauseText}</span>
+              </button>
+              <button class="btn-action btn-clockout-side" onclick="clockOutSim()">
+                <span>⏹</span> <span>CLOCK OUT & COPY</span>
+              </button>
+            </div>
+            <div class="discard-link" onclick="discardSim()">
+              <span>⊗ Discard current sprint</span>
+            </div>
+          </div>
+        `;
+      } else if (currentVariant === 'B') {
+        actionSec.classList.remove('compact-pad');
+        slot.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+            <div class="dual-button-row split-weighted">
+              <button class="btn-action ${pauseClass}" onclick="togglePauseSim()">
+                <span>${pauseIcon}</span> <span>${pauseText}</span>
+              </button>
+              <button class="btn-action btn-clockout-side" onclick="clockOutSim()">
+                <span>⏹</span> <span>CLOCK OUT & COPY</span>
+              </button>
+            </div>
+            <div class="discard-link" onclick="discardSim()">
+              <span>⊗ Discard current sprint</span>
+            </div>
+          </div>
+        `;
+      } else if (currentVariant === 'C') {
+        actionSec.classList.add('compact-pad');
+        slot.innerHTML = `
+          <div class="dual-button-row split-triple">
+            <button class="btn-action ${pauseClass}" onclick="togglePauseSim()">
+              <span>${pauseIcon}</span> <span>${pauseText}</span>
+            </button>
+            <button class="btn-action btn-clockout-side" onclick="clockOutSim()">
+              <span>⏹</span> <span>CLOCK OUT</span>
+            </button>
+            <button class="btn-discard-icon" onclick="discardSim()" title="Discard current sprint">
+              ✕
+            </button>
+          </div>
+        `;
+      } else if (currentVariant === 'Current') {
+        actionSec.classList.remove('compact-pad');
+        slot.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 9px; width: 100%;">
+            <button class="btn-action btn-pause-stacked ${isPaused ? 'is-paused' : ''}" onclick="togglePauseSim()">
+              <span>${pauseIcon}</span> <span>${pauseText}</span>
+            </button>
+            <button class="btn-action btn-clockout-full" onclick="clockOutSim()">
+              <span>⏹</span> <span>CLOCK OUT & COPY</span>
+            </button>
+            <div class="discard-link" onclick="discardSim()">
+              <span>⊗ Discard current sprint</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // --- State Switching ---
+    function setTimerState(state) {
+      timerState = state;
+      document.querySelectorAll('.sim-btn-group .sim-btn').forEach(b => {
+        if (b.id && b.id.startsWith('stateBtn')) b.classList.remove('active');
+      });
+
+      if (state === 'running') {
+        document.getElementById('stateBtnRunning').classList.add('active');
+      } else if (state === 'paused') {
+        document.getElementById('stateBtnPaused').classList.add('active');
+      } else {
+        document.getElementById('stateBtnIdle').classList.add('active');
+      }
+
+      applyTimerStateUI();
+      renderVariantActions();
+    }
+
+    function applyTimerStateUI() {
+      const menubarPill = document.getElementById('menubarPill');
+      const menubarLabel = document.getElementById('menubarLabel');
+
+      const varBadge = document.getElementById('varHeaderStatus');
+      const varBadgeText = document.getElementById('varHeaderStatusText');
+      const varClockTimer = document.getElementById('varClockTimer');
+      const varClockSubtext = document.getElementById('varClockSubtext');
+
+      const baseBadge = document.getElementById('baseHeaderStatus');
+      const baseBadgeText = document.getElementById('baseHeaderStatusText');
+      const baseClockTimer = document.getElementById('baseClockTimer');
+      const baseClockSubtext = document.getElementById('baseClockSubtext');
+      const baseRunningActions = document.getElementById('baseRunningActions');
+      const baseIdleActions = document.getElementById('baseIdleActions');
+      const basePauseBtn = document.getElementById('basePauseBtn');
+
+      if (timerState === 'running') {
+        menubarPill.className = 'status-pill active';
+        menubarLabel.textContent = formatClock(elapsedSeconds);
+
+        varBadge.className = 'pop-status-badge';
+        varBadgeText.textContent = 'RUNNING';
+        varClockTimer.className = 'big-timer';
+        varClockTimer.textContent = formatClock(elapsedSeconds);
+        varClockSubtext.textContent = "Today's Total: 03:15:20";
+
+        baseBadge.className = 'pop-status-badge';
+        baseBadgeText.textContent = 'RUNNING';
+        baseClockTimer.className = 'big-timer';
+        baseClockTimer.textContent = formatClock(elapsedSeconds);
+        baseClockSubtext.textContent = "Today's Total: 03:15:20";
+
+        baseRunningActions.style.display = 'flex';
+        baseIdleActions.style.display = 'none';
+        basePauseBtn.className = 'btn-action btn-pause-stacked';
+        basePauseBtn.innerHTML = '<span>⏸</span> <span>PAUSE</span>';
+
+        document.getElementById('varBreakLabel').textContent = 'TOTAL BREAKS';
+        document.getElementById('varBreakValue').textContent = formatClock(pauseSeconds);
+        document.getElementById('varBreakValue').className = 'ts-value active-amber';
+        document.getElementById('baseBreakLabel').textContent = 'TOTAL BREAKS';
+        document.getElementById('baseBreakValue').textContent = formatClock(pauseSeconds);
+        document.getElementById('baseBreakValue').className = 'ts-value active-amber';
+
+      } else if (timerState === 'paused') {
+        menubarPill.className = 'status-pill paused';
+        menubarLabel.textContent = 'PAUSED ' + formatClock(pauseSeconds);
+
+        varBadge.className = 'pop-status-badge paused';
+        varBadgeText.textContent = 'PAUSED';
+        varClockTimer.className = 'big-timer paused';
+        varClockTimer.textContent = formatClock(elapsedSeconds);
+        varClockSubtext.innerHTML = `<span class="paused-pill-tag">⏸ PAUSED FOR ${formatClock(pauseSeconds)}</span>`;
+
+        baseBadge.className = 'pop-status-badge paused';
+        baseBadgeText.textContent = 'PAUSED';
+        baseClockTimer.className = 'big-timer paused';
+        baseClockTimer.textContent = formatClock(elapsedSeconds);
+        baseClockSubtext.innerHTML = `<span class="paused-pill-tag">⏸ PAUSED FOR ${formatClock(pauseSeconds)}</span>`;
+
+        baseRunningActions.style.display = 'flex';
+        baseIdleActions.style.display = 'none';
+        basePauseBtn.className = 'btn-action btn-pause-stacked is-paused';
+        basePauseBtn.innerHTML = '<span>▶</span> <span>RESUME</span>';
+
+        document.getElementById('varBreakLabel').textContent = 'PAUSED AT';
+        document.getElementById('varBreakValue').textContent = '10:57:15';
+        document.getElementById('varBreakValue').className = 'ts-value active-amber';
+        document.getElementById('baseBreakLabel').textContent = 'PAUSED AT';
+        document.getElementById('baseBreakValue').textContent = '10:57:15';
+        document.getElementById('baseBreakValue').className = 'ts-value active-amber';
+
+      } else { // idle
+        menubarPill.className = 'status-pill idle';
+        menubarLabel.textContent = '00:00:00';
+
+        varBadge.className = 'pop-status-badge idle';
+        varBadgeText.textContent = 'IDLE';
+        varClockTimer.className = 'big-timer idle';
+        varClockTimer.textContent = '00:00:00';
+        varClockSubtext.textContent = 'Ready to start your next sprint';
+
+        baseBadge.className = 'pop-status-badge idle';
+        baseBadgeText.textContent = 'IDLE';
+        baseClockTimer.className = 'big-timer idle';
+        baseClockTimer.textContent = '00:00:00';
+        baseClockSubtext.textContent = 'Ready to start your next sprint';
+
+        baseRunningActions.style.display = 'none';
+        baseIdleActions.style.display = 'block';
+
+        document.getElementById('varBreakLabel').textContent = 'PREV END';
+        document.getElementById('varBreakValue').textContent = '09:25:40';
+        document.getElementById('varBreakValue').className = 'ts-value';
+        document.getElementById('baseBreakLabel').textContent = 'PREV END';
+        document.getElementById('baseBreakValue').textContent = '09:25:40';
+        document.getElementById('baseBreakValue').className = 'ts-value';
+      }
+    }
+
+    // --- Format helper ---
+    function formatClock(totalSec) {
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    // --- Interactive Simulation Actions ---
+    function togglePauseSim() {
+      if (timerState === 'running') {
+        setTimerState('paused');
+      } else if (timerState === 'paused') {
+        setTimerState('running');
+      }
+    }
+
+    function clockInSim() {
+      elapsedSeconds = 0;
+      pauseSeconds = 0;
+      setTimerState('running');
+    }
+
+    function clockOutSim() {
+      // Simulate clipboard copy & add sprint
+      const newSprint = {
+        id: Date.now(),
+        index: sprintCount + 1,
+        start: '10:15:00',
+        end: '10:57:15',
+        duration: formatClock(elapsedSeconds),
+        paused: pauseSeconds > 0 ? `${Math.ceil(pauseSeconds / 60)}m` : null,
+        effective: '10:52:15'
+      };
+      SAMPLE_SPRINTS.unshift(newSprint);
+      sprintCount++;
+      setSprintCount(sprintCount);
+      setTimerState('idle');
+      showToast('Sprint completed & copied to clipboard! (Start & End tabs)');
+    }
+
+    function discardSim() {
+      if (confirm('Discard current in-progress sprint?')) {
+        setTimerState('idle');
+      }
+    }
+
+    function copyAllSim(btn) {
+      btn.classList.add('copied');
+      btn.innerHTML = '<span>✓</span> <span>COPIED</span>';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<span>⧉</span> <span>COPY ALL</span>';
+      }, 1400);
+    }
+
+    function toggleSimState() {
+      if (timerState === 'running') setTimerState('paused');
+      else if (timerState === 'paused') setTimerState('idle');
+      else setTimerState('running');
+    }
+
+    // --- View Modes ---
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById('btnViewSingle').classList.toggle('active', mode === 'single');
+      document.getElementById('btnViewCompare').classList.toggle('active', mode === 'compare');
+
+      const baseCol = document.getElementById('baselineColumn');
+      if (mode === 'compare') {
+        baseCol.style.display = 'flex';
+      } else {
+        baseCol.style.display = 'none';
+      }
+    }
+
+    // --- Populate Sprints ---
+    function setSprintCount(count) {
+      sprintCount = count;
+      document.querySelectorAll('.sim-group:nth-child(4) .sim-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById(`sprintCount${count}Btn`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      document.getElementById('varCountBadge').textContent = `(${count})`;
+      document.getElementById('baseCountBadge').textContent = `(${count})`;
+
+      renderSprintLists();
+    }
+
+    function renderSprintLists() {
+      const activeList = document.getElementById('varSprintsList');
+      const baseList = document.getElementById('baseSprintsList');
+      const sprintsToShow = SAMPLE_SPRINTS.slice(0, sprintCount);
+
+      const html = sprintsToShow.map((s, idx) => `
+        <div class="sprint-card">
+          <div class="sprint-num-badge">#${sprintsToShow.length - idx}</div>
+          <div class="sprint-info">
+            <div class="sprint-times">
+              <span>${s.start}</span>
+              <span class="sprint-arrow">→</span>
+              <span>${s.end}</span>
+            </div>
+            <div class="sprint-meta">
+              <span>${s.duration}${s.paused ? ' net' : ''}</span>
+              ${s.paused ? `<span class="pause-pill-micro">⏸ ${s.paused}</span>` : ''}
+              ${s.paused ? `<span>· End: ${s.effective}</span>` : ''}
+            </div>
+          </div>
+          <div class="sprint-actions">
+            <button class="sprint-action-btn sprint-copy-btn" onclick="copyRow(this)" title="Copy for spreadsheet">⧉</button>
+            <button class="sprint-action-btn sprint-del-btn" onclick="deleteRow(this)" title="Delete sprint">✕</button>
+          </div>
+        </div>
+      `).join('');
+
+      activeList.innerHTML = html;
+      baseList.innerHTML = html;
+    }
+
+    function copyRow(btn) {
+      btn.classList.add('copied');
+      btn.textContent = '✓';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = '⧉';
+      }, 1000);
+    }
+
+    function deleteRow(btn) {
+      const card = btn.closest('.sprint-card');
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        card.remove();
+      }, 150);
+    }
+
+    // --- Theme toggle ---
+    function toggleTheme() {
+      isLight = !isLight;
+      document.body.classList.toggle('light-theme', isLight);
+      document.getElementById('themeBtn').textContent = isLight ? '🌙 Dark Mode' : '☀️ Light Mode';
+    }
+
+    function showToast(msg) {
+      const t = document.createElement('div');
+      t.style.position = 'fixed';
+      t.style.top = '44px';
+      t.style.left = '50%';
+      t.style.transform = 'translateX(-50%)';
+      t.style.background = 'rgba(16, 185, 129, 0.95)';
+      t.style.color = '#fff';
+      t.style.padding = '8px 16px';
+      t.style.borderRadius = '20px';
+      t.style.fontSize = '12px';
+      t.style.fontWeight = '600';
+      t.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+      t.style.zIndex = '9999';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2200);
+    }
+
+    // --- Keyboard Navigation (Per prototype skill specification) ---
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (e.key === 'ArrowRight') nextVariant();
+      if (e.key === 'ArrowLeft') prevVariant();
+    });
+
+    // --- Timer Tick ---
+    setInterval(() => {
+      if (timerState === 'running') {
+        elapsedSeconds++;
+        document.getElementById('varClockTimer').textContent = formatClock(elapsedSeconds);
+        document.getElementById('baseClockTimer').textContent = formatClock(elapsedSeconds);
+        document.getElementById('menubarLabel').textContent = formatClock(elapsedSeconds);
+      } else if (timerState === 'paused') {
+        pauseSeconds++;
+        document.getElementById('varBreakValue').textContent = formatClock(pauseSeconds);
+        document.getElementById('baseBreakValue').textContent = formatClock(pauseSeconds);
+        document.getElementById('menubarLabel').textContent = 'PAUSED ' + formatClock(pauseSeconds);
+      }
+    }, 1000);
+
+    // --- Init ---
+    readUrlParam();
+    setVariant(currentVariant);
+    setTimerState('running');
+    setSprintCount(5);
+  </script>
+</body>
+</html>

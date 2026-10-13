@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skeval Timer — Menu Bar UI Prototype (Replacing Empty End Time)</title>
+  <style>
+    :root {
+      --bg-desktop: #0b0f19;
+      --menubar-bg: rgba(22, 27, 34, 0.85);
+      --popover-bg: #0d121d;
+      --card-bg: #141b29;
+      --card-border: #232f48;
+      --text-primary: #f1f5f9;
+      --text-secondary: #8493a8;
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.35);
+      --soft-red: #ff5252;
+      --amber: #ff9f0a;
+      --green: #10b981;
+      --divider: rgba(255, 255, 255, 0.08);
+      --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+      --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 20%, #151e33 0%, #080c14 100%);
+      min-height: 100vh;
+      font-family: var(--font-ui);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 120px;
+      user-select: none;
+    }
+
+    /* Top Simulated macOS Menu Bar */
+    .macos-menubar {
+      width: 100%;
+      height: 30px;
+      background: var(--menubar-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .menubar-left { display: flex; align-items: center; gap: 16px; font-weight: 600; }
+    .menubar-apple { font-size: 14px; opacity: 0.9; }
+    .menubar-right { display: flex; align-items: center; gap: 12px; }
+
+    /* Menu bar status item pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .status-pill.active {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+    }
+    .status-pill.paused {
+      background: rgba(255, 159, 10, 0.15);
+      border: 1px solid rgba(255, 159, 10, 0.45);
+      color: var(--amber);
+      box-shadow: 0 0 10px rgba(255, 159, 10, 0.25);
+    }
+    .status-pill.idle {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Workspace Header */
+    .workspace-banner {
+      margin: 24px 0 12px;
+      text-align: center;
+    }
+    .workspace-banner h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .workspace-banner p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Interactive Simulator Controls */
+    .simulator-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(20, 27, 41, 0.85);
+      padding: 8px 14px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .sim-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .sim-btn-group { display: flex; gap: 4px; }
+    .sim-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sim-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.05); }
+    .sim-btn.active {
+      background: rgba(0, 229, 255, 0.15);
+      border-color: rgba(0, 229, 255, 0.4);
+      color: var(--accent);
+    }
+    .sim-btn.active.paused-mode {
+      background: rgba(255, 159, 10, 0.15);
+      border-color: rgba(255, 159, 10, 0.4);
+      color: var(--amber);
+    }
+    .sim-btn.active.idle-mode {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    /* Main Container with 2 Columns: Popover Mockup + Variant Rationale */
+    .layout-container {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 36px;
+      max-width: 900px;
+      width: 100%;
+      padding: 0 20px;
+    }
+
+    /* Skeval Native Popover Shell */
+    .popover-container {
+      position: relative;
+      width: 330px;
+      background: var(--popover-bg);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    /* Popover Top Pointer Arrow */
+    .popover-arrow {
+      position: absolute;
+      top: -6px;
+      right: 48px;
+      width: 12px;
+      height: 12px;
+      background: var(--popover-bg);
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
+      border-left: 1px solid rgba(255, 255, 255, 0.14);
+      transform: rotate(45deg);
+      z-index: 2;
+    }
+
+    /* Popover Header */
+    .pop-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px 6px;
+    }
+    .header-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #34d399;
+    }
+    .header-badge.paused {
+      background: rgba(255, 159, 10, 0.12);
+      border-color: rgba(255, 159, 10, 0.35);
+      color: var(--amber);
+    }
+    .header-badge.idle {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--text-secondary);
+    }
+    .header-actions { display: flex; gap: 8px; color: var(--text-secondary); }
+    .icon-btn {
+      cursor: pointer;
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-content: center;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+    /* Timer Display */
+    .timer-display-area {
+      text-align: center;
+      padding: 12px 16px;
+    }
+    .big-timer {
+      font-family: var(--font-mono);
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      text-shadow: 0 0 20px var(--accent-glow);
+    }
+    .timer-subtext {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+
+    /* Goal Progress Bar */
+    .goal-section {
+      padding: 4px 16px 12px;
+    }
+    .goal-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 0.6px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .goal-progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .goal-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00b4d8, var(--accent));
+      box-shadow: 0 0 10px var(--accent-glow);
+      transition: width 0.3s ease;
+    }
+
+    /* ==================================================== */
+    /* PROTOTYPE AREA: The Dynamic Variants under Test     */
+    /* ==================================================== */
+    .prototype-test-slot {
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.15);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      position: relative;
+    }
+    .variant-badge-watermark {
+      position: absolute;
+      top: 4px;
+      right: 16px;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: var(--accent);
+      opacity: 0.85;
+      text-transform: uppercase;
+    }
+
+    /* Dual Cards Base Structure (used by A, B, D) */
+    .dual-cards-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .telemetry-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: all 0.2s ease;
+    }
+    .telemetry-card.highlight {
+      border-color: rgba(0, 229, 255, 0.4);
+      background: rgba(0, 229, 255, 0.04);
+    }
+    .telemetry-card.amber-glow {
+      border-color: rgba(255, 159, 10, 0.45);
+      background: rgba(255, 159, 10, 0.05);
+    }
+    .telemetry-card.green-glow {
+      border-color: rgba(16, 185, 129, 0.45);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .telemetry-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .telemetry-value {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .telemetry-sub {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-top: 1px;
+    }
+
+    /* Variant C: Unified Strip Style */
+    .unified-strip {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .strip-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .strip-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--divider);
+    }
+
+    /* Action Buttons */
+    .action-buttons-group {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn-pause {
+      width: 100%;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 159, 10, 0.4);
+      background: rgba(255, 159, 10, 0.12);
+      color: var(--amber);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-pause.resumed {
+      background: linear-gradient(135deg, rgba(255, 159, 10, 0.9), var(--amber));
+      color: #000;
+      border: none;
+    }
+    .btn-main {
+      width: 100%;
+      padding: 11px;
+      border-radius: 10px;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: 0.4px;
+    }
+    .btn-clockout {
+      background: linear-gradient(135deg, #ff6b6b, var(--soft-red));
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(255, 82, 82, 0.35);
+    }
+    .btn-clockin {
+      background: linear-gradient(135deg, #00c6ff, var(--accent));
+      color: #05101a;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    .btn-discard {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 3px 0;
+    }
+    .btn-discard:hover { color: #cbd5e1; }
+
+    /* Recent Sprints Section */
+    .history-section {
+      padding: 10px 16px 14px;
+      border-top: 1px solid var(--divider);
+    }
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .sprint-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .sprint-duration { font-weight: 600; color: #fff; }
+
+    /* Right Side Rationale Card */
+    .rationale-panel {
+      flex: 1;
+      background: rgba(20, 27, 41, 0.85);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+    .rationale-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--divider);
+      padding-bottom: 12px;
+    }
+    .rationale-tag {
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+    }
+    .rationale-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .rationale-desc {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: #94a3b8;
+      margin-bottom: 18px;
+    }
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .feature-list li {
+      font-size: 12.5px;
+      color: #cbd5e1;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.4;
+    }
+    .feature-icon {
+      color: var(--accent);
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 14px;
+    }
+    .comparison-table th, .comparison-table td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--divider);
+    }
+    .comparison-table th { color: var(--text-secondary); font-weight: 600; }
+    .comparison-table td { color: #e2e8f0; }
+
+    /* ==================================================== */
+    /* FLOATING SWITCHER BAR (Per /prototype UI.md spec)   */
+    /* ==================================================== */
+    .floating-switcher {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 18, 29, 0.94);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 40px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 229, 255, 0.2);
+      z-index: 1000;
+    }
+    .switcher-nav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.15s ease;
+    }
+    .switcher-nav-btn:hover {
+      background: rgba(0, 229, 255, 0.25);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: scale(1.06);
+    }
+    .switcher-label-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 280px;
+      cursor: pointer;
+    }
+    .switcher-key {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .switcher-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .switcher-hints {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    kbd {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Simulated macOS Menu Bar -->
+  <header class="macos-menubar">
+    <div class="menubar-left">
+      <span class="menubar-apple"></span>
+      <span>Finder</span>
+      <span>File</span>
+      <span>Edit</span>
+      <span>View</span>
+      <span>Window</span>
+      <span>Help</span>
+    </div>
+    <div class="menubar-right">
+      <span>Wi-Fi</span>
+      <span>100%</span>
+      <!-- Menu bar pill item -->
+      <div id="menubarPill" class="status-pill active" title="Click to inspect status pill">
+        <span class="pulse-dot"></span>
+        <span id="menubarPillText">00:42:18</span>
+      </div>
+      <span id="menubarClock">Sat 10:12 PM</span>
+    </div>
+  </header>
+
+  <!-- Title & Context -->
+  <div class="workspace-banner">
+    <h1>
+      <span>Skeval Timer</span>
+      <span style="font-size: 12px; font-weight: 600; padding: 2px 8px; background: rgba(0, 229, 255, 0.12); color: var(--accent); border-radius: 6px; border: 1px solid rgba(0, 229, 255, 0.3);">UI PROTOTYPE</span>
+    </h1>
+    <p>Exploring 4 radically different designs to replace the unused <code>--:--:--</code> "END TIME" slot</p>
+  </div>
+
+  <!-- Interactive State Simulator Controls -->
+  <div class="simulator-controls">
+    <span class="sim-label">Simulate App State:</span>
+    <div class="sim-btn-group">
+      <button class="sim-btn active" onclick="setAppState('active')">🟢 Active Sprint</button>
+      <button class="sim-btn" onclick="setAppState('paused')">🟡 Paused Sprint</button>
+      <button class="sim-btn" onclick="setAppState('idle')">⚪ Idle / Ready</button>
+      <button class="sim-btn" onclick="setAppState('goal_met')">🎯 Goal Met (100%)</button>
+    </div>
+  </div>
+
+  <!-- Layout: Popover Mockup + Rationale Panel -->
+  <main class="layout-container">
+
+    <!-- 1. The Popover View Mockup -->
+    <div class="popover-container">
+      <div class="popover-arrow"></div>
+
+      <!-- Header -->
+      <div class="pop-header">
+        <div id="popoverBadge" class="header-badge">
+          <span class="pulse-dot"></span>
+          <span id="popoverBadgeText">ACTIVE</span>
+        </div>
+        <div class="header-actions">
+          <div class="icon-btn" title="Themes">🎨</div>
+          <div class="icon-btn" title="Settings">⚙️</div>
+        </div>
+      </div>
+
+      <!-- Big Timer Display -->
+      <div class="timer-display-area">
+        <div id="popoverBigTimer" class="big-timer">00:42:18</div>
+        <div id="popoverTimerSub" class="timer-subtext">Today's Total: 03h 15m</div>
+      </div>
+
+      <!-- Goal Progress -->
+      <div class="goal-section">
+        <div class="goal-labels">
+          <span>DAILY GOAL TARGET</span>
+          <span id="goalLabelText">03h 15m / 8h 00m (41%)</span>
+        </div>
+        <div class="goal-progress-track">
+          <div id="goalProgressFill" class="goal-progress-fill" style="width: 41%;"></div>
+        </div>
+      </div>
+
+      <!-- THE TESTED PROTOTYPE AREA (Swapped by Variant A / B / C / D) -->
+      <section class="prototype-test-slot" id="prototypeSlot">
+        <!-- Rendered by JavaScript based on active variant & state -->
+      </section>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons-group">
+        <button id="btnPauseResume" class="btn-pause">
+          <span>⏸</span>
+          <span id="btnPauseText">PAUSE</span>
+          <span style="opacity: 0.6; font-size: 9px; font-family: var(--font-mono); margin-left: auto;">⌘⌥⇧P</span>
+        </button>
+
+        <button id="btnMainAction" class="btn-main btn-clockout">
+          <span>⏹</span>
+          <span id="btnMainText">CLOCK OUT &amp; COPY</span>
+          <span style="opacity: 0.6; font-size: 9px; font-family: var(--font-mono); margin-left: auto;">⌘⌥⇧C</span>
+        </button>
+
+        <button id="btnDiscard" class="btn-discard">
+          <span>✕ Discard current sprint</span>
+        </button>
+      </div>
+
+      <!-- Recent Sprints List -->
+      <div class="history-section">
+        <div class="history-header">
+          <span>TODAY'S SPRINTS</span>
+          <span>2 completed</span>
+        </div>
+        <div class="sprint-row">
+          <span>09:00 → 10:45</span>
+          <span class="sprint-duration">1h 45m</span>
+        </div>
+        <div class="sprint-row">
+          <span>11:00 → 12:30</span>
+          <span class="sprint-duration">1h 30m</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Rationale & Analysis Panel -->
+    <article class="rationale-panel" id="rationalePanel">
+      <!-- Injected by JavaScript -->
+    </article>
+
+  </main>
+
+  <!-- FLOATING SWITCHER (Per prototype skill specification) -->
+  <nav class="floating-switcher" aria-label="Prototype Variant Switcher">
+    <button class="switcher-nav-btn" onclick="prevVariant()" title="Previous Variant (Left Arrow)">←</button>
+    <div class="switcher-label-wrapper" onclick="nextVariant()">
+      <span id="switcherKey" class="switcher-key">VARIANT A</span>
+      <span id="switcherName" class="switcher-name">Projected Finish Time</span>
+      <span class="switcher-hints">Use <kbd>←</kbd> <kbd>→</kbd> or click to switch</span>
+    </div>
+    <button class="switcher-nav-btn" onclick="nextVariant()" title="Next Variant (Right Arrow)">→</button>
+  </nav>
+
+  <script>
+    // State Model
+    const VARIANTS = ['A', 'B', 'C', 'D'];
+    let currentVariant = 'A';
+    let appState = 'active'; // 'active', 'paused', 'idle', 'goal_met'
+
+    const VARIANT_DETAILS = {
+      A: {
+        name: "Projected Finish Time (Goal Forecast)",
+        badge: "Variant A — Predictive",
+        summary: "Replaces the blank 'END TIME' with a live calculation: <strong>EST. FINISH</strong>. It answers: <em>'If I keep working, what time of day will I hit my 8-hour goal and be done?'</em>",
+        features: [
+          { icon: "🎯", text: "<strong>Predictive Utility:</strong> Calculates <code>Now + Remaining Daily Goal</code> in real time. Eliminates mental arithmetic." },
+          { icon: "⚡️", text: "<strong>Live Dynamic Adjustment:</strong> If you pause or take a break, the finish time pushes back automatically." },
+          { icon: "🏆", text: "<strong>Completion State:</strong> When goal is reached (100%+), transforms into an emerald celebration pill: <code>GOAL MET 🎯</code>." },
+          { icon: "🔄", text: "<strong>When Idle:</strong> Displays projected finish time if you were to clock in right now." }
+        ],
+        table: [
+          ["Active Sprint", "START TIME: 09:30:00", "EST. FINISH: 05:45:00 PM (4h 45m left)"],
+          ["Paused", "START TIME: 09:30:00", "EST. FINISH: 05:45:00 PM (Paused)"],
+          ["Idle", "READY TO CLOCK IN", "FINISH AT: 06:15:00 PM if starting now"],
+          ["Goal Reached", "START TIME: 09:30:00", "GOAL REACHED 🎯 (Overtime logged)"]
+        ]
+      },
+      B: {
+        name: "Break & Pause Telemetry (Net Work vs Rest)",
+        badge: "Variant B — Rest-Aware",
+        summary: "Replaces 'END TIME' with a dedicated <strong>PAUSED / BREAK</strong> telemetry card, giving immediate transparency into downtime without digging into logs.",
+        features: [
+          { icon: "☕️", text: "<strong>Break Accountability:</strong> Shows total paused time during this current sprint (e.g., <code>05m 12s</code>) and pause count." },
+          { icon: "⏱️", text: "<strong>Active Net Work Clarity:</strong> Separates active focused work from breaks, perfectly aligned with the v1 pause-deduction engine." },
+          { icon: "📋", text: "<strong>When Idle:</strong> Shows <strong>LAST SPRINT</strong> duration and effective end time, confirming what was copied to clipboard." },
+          { icon: "🟡", text: "<strong>Pulsing Indicator:</strong> Highlights in warm amber while currently paused so the user never forgets the timer is stopped." }
+        ],
+        table: [
+          ["Active Sprint", "START TIME: 09:30:00", "TOTAL BREAKS: 05m 12s (2 pauses)"],
+          ["Paused", "START TIME: 09:30:00", "CURRENT PAUSE: 02m 15s (Pulsing amber)"],
+          ["Idle", "LAST STARTED: 11:00 AM", "LAST FINISHED: 12:30 PM (1h 30m)"],
+          ["Goal Reached", "START TIME: 09:30:00", "TOTAL BREAKS: 12m 40s (3 pauses)"]
+        ]
+      },
+      C: {
+        name: "Unified Telemetry Strip (Eliminate Dual Cards)",
+        badge: "Variant C — Compact HUD",
+        summary: "Abolishes the artificial 2-column card box layout completely! Instead of two clunky cards with an empty hole, provides a sleek, single glassmorphic HUD bar.",
+        features: [
+          { icon: "📐", text: "<strong>Vertical Space Saver:</strong> Reduces height by ~28px, making the popover tighter and leaving more room for the sprint history list." },
+          { icon: "💎", text: "<strong>Integrated Density:</strong> Shows Started At, Live Break Duration, and Daily Target in one continuous horizontal telemetry bar." },
+          { icon: "🎨", text: "<strong>Zero Empty State:</strong> No awkward blank <code>--:--:--</code> cards. Every pixel serves active information." },
+          { icon: "🚀", text: "<strong>Modern macOS Aesthetic:</strong> Feels like a polished Apple Developer / Menu Bar utility rather than a punch-clock form." }
+        ],
+        table: [
+          ["Active Sprint", "Started 09:30:00 AM", "Paused: 05m 12s", "Target: 41%"],
+          ["Paused", "Started 09:30:00 AM", "PAUSED: 02m 15s 🟡", "Target: 41%"],
+          ["Idle", "Ready for Sprint #3", "Last: 1h 30m (Copied ✓)", "Total: 3h 15m"],
+          ["Goal Reached", "Started 09:30:00 AM", "Goal Hit 🎯 8h 00m", "Surplus: +15m"]
+        ]
+      },
+      D: {
+        name: "Contextual Smart Recall (Dynamic Mode)",
+        badge: "Variant D — Adaptive Recall",
+        summary: "A context-adaptive card that transforms depending on state: shows <strong>Block Progress</strong> when working, <strong>Live Break Timer</strong> when paused, and <strong>Clipboard Recall</strong> when idle.",
+        features: [
+          { icon: "🧠", text: "<strong>Smart Context Switching:</strong> Never shows static dead information. The right card always displays what matters <em>now</em>." },
+          { icon: "📋", text: "<strong>Solves the Idle Dilemma:</strong> When idle, Card 2 shows <strong>COPIED END TIME</strong> (the exact timestamp on your clipboard), so you never wonder if you clicked Clock Out!" },
+          { icon: "⏳", text: "<strong>Block Pace Indicator:</strong> When active, shows progress toward standard 60m / 90m focus cycles." },
+          { icon: "🔍", text: "<strong>High Auditability:</strong> Perfect for freelancers or contractors who need to cross-check spreadsheets with what was just logged." }
+        ],
+        table: [
+          ["Active Sprint", "START TIME: 09:30:00", "FOCUS BLOCK: 42m / 60m (70%)"],
+          ["Paused", "PAUSED AT: 10:12:18", "ON BREAK: 02m 15s (Counting up)"],
+          ["Idle", "LAST START: 11:00:00", "LAST COPIED: 12:30:00 ✓ (To clipboard)"],
+          ["Goal Reached", "START TIME: 09:30:00", "DAILY GOAL: COMPLETED 🎯"]
+        ]
+      }
+    };
+
+    // Render Logic for the Prototype Area
+    function renderPrototypeSlot() {
+      const slot = document.getElementById('prototypeSlot');
+      const v = currentVariant;
+      let html = `<div class="variant-badge-watermark">Variant ${v}</div>`;
+
+      if (v === 'A') {
+        // Variant A: Projected Finish
+        let rightTitle = "EST. FINISH";
+        let rightVal = "05:45:00 PM";
+        let rightSub = "4h 45m remaining";
+        let rightClass = "highlight";
+
+        if (appState === 'paused') {
+          rightSub = "Paused (extends finish)";
+          rightClass = "amber-glow";
+        } else if (appState === 'idle') {
+          rightTitle = "FINISH AT (EST)";
+          rightVal = "06:15:00 PM";
+          rightSub = "If starting now (8h goal)";
+          rightClass = "";
+        } else if (appState === 'goal_met') {
+          rightTitle = "DAILY GOAL";
+          rightVal = "GOAL MET 🎯";
+          rightSub = "Overtime mode active";
+          rightClass = "green-glow";
+        }
+
+        const leftVal = (appState === 'idle') ? "--:--:--" : "09:30:00 AM";
+        const leftSub = (appState === 'idle') ? "Ready to clock in" : "Sprint started";
+
+        html += `
+          <div class="dual-cards-row">
+            <div class="telemetry-card ${appState !== 'idle' ? 'highlight' : ''}">
+              <div class="telemetry-title">START TIME</div>
+              <div class="telemetry-value">${leftVal}</div>
+              <div class="telemetry-sub">${leftSub}</div>
+            </div>
+            <div class="telemetry-card ${rightClass}">
+              <div class="telemetry-title">${rightTitle}</div>
+              <div class="telemetry-value" style="color: ${appState === 'goal_met' ? '#34d399' : (appState === 'paused' ? 'var(--amber)' : 'var(--accent)')};">${rightVal}</div>
+              <div class="telemetry-sub">${rightSub}</div>
+            </div>
+          </div>
+        `;
+      } else if (v === 'B') {
+        // Variant B: Break / Pause Telemetry
+        let rightTitle = "TOTAL BREAKS";
+        let rightVal = "05m 12s";
+        let rightSub = "2 pauses this sprint";
+        let rightClass = "";
+
+        if (appState === 'paused') {
+          rightTitle = "PAUSED AT";
+          rightVal = "10:12:18 AM";
+          rightSub = "Stepped away timestamp";
+          rightClass = "amber-glow";
+        } else if (appState === 'idle') {
+          rightTitle = "PREV END";
+          rightVal = "12:30:00 PM";
+          rightSub = "Copied to clipboard ✓";
+          rightClass = "";
+        } else if (appState === 'goal_met') {
+          rightSub = "12m breaks total today";
+          rightClass = "green-glow";
+        }
+
+        const leftVal = (appState === 'idle') ? "11:00:00 AM" : "09:30:00 AM";
+        const leftTitle = (appState === 'idle') ? "PREV SPRINT START" : "START TIME";
+
+        html += `
+          <div class="dual-cards-row">
+            <div class="telemetry-card ${appState !== 'idle' ? 'highlight' : ''}">
+              <div class="telemetry-title">${leftTitle}</div>
+              <div class="telemetry-value">${leftVal}</div>
+              <div class="telemetry-sub">${appState === 'idle' ? 'Sprint #2' : 'Active session'}</div>
+            </div>
+            <div class="telemetry-card ${rightClass}">
+              <div class="telemetry-title">${rightTitle}</div>
+              <div class="telemetry-value" style="color: ${appState === 'paused' ? 'var(--amber)' : (appState === 'idle' ? '#fff' : 'var(--accent)')};">${rightVal}</div>
+              <div class="telemetry-sub">${rightSub}</div>
+            </div>
+          </div>
+        `;
+      } else if (v === 'C') {
+        // Variant C: Unified Strip
+        let statusBadge = `<span style="color: #34d399; font-weight: 700;">● Active</span>`;
+        let centerText = `Net: <strong>42m 18s</strong>`;
+        let rightText = `Breaks: <strong>05m 12s</strong>`;
+
+        if (appState === 'paused') {
+          statusBadge = `<span style="color: var(--amber); font-weight: 700;">⏸ Paused</span>`;
+          centerText = `Break: <strong style="color: var(--amber);">02m 15s</strong>`;
+          rightText = `Net: <strong>42m 18s</strong>`;
+        } else if (appState === 'idle') {
+          statusBadge = `<span style="color: var(--text-secondary); font-weight: 600;">○ Idle</span>`;
+          centerText = `Last: <strong>1h 30m</strong>`;
+          rightText = `Copied <strong>12:30</strong> ✓`;
+        } else if (appState === 'goal_met') {
+          statusBadge = `<span style="color: #34d399; font-weight: 700;">🎯 Goal Met</span>`;
+          centerText = `Total: <strong>8h 15m</strong>`;
+          rightText = `Overtime: <strong>+15m</strong>`;
+        }
+
+        html += `
+          <div class="unified-strip">
+            <div class="strip-col">
+              <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">STATUS</div>
+              <div style="font-size: 11.5px; font-family: var(--font-mono); margin-top: 1px;">${statusBadge}</div>
+            </div>
+            <div class="strip-divider"></div>
+            <div class="strip-col" style="text-align: center;">
+              <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">SESSION</div>
+              <div style="font-size: 11.5px; font-family: var(--font-mono); color: #e2e8f0; margin-top: 1px;">${centerText}</div>
+            </div>
+            <div class="strip-divider"></div>
+            <div class="strip-col" style="text-align: right;">
+              <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">TELEMETRY</div>
+              <div style="font-size: 11.5px; font-family: var(--font-mono); color: var(--accent); margin-top: 1px;">${rightText}</div>
+            </div>
+          </div>
+        `;
+      } else if (v === 'D') {
+        // Variant D: Contextual Smart Recall
+        let card1Title = "START TIME";
+        let card1Val = "09:30:00 AM";
+        let card1Sub = "Sprint started";
+        let card2Title = "SPRINT PACE";
+        let card2Val = "42m / 60m";
+        let card2Sub = "70% of 1h focus block";
+        let card2Class = "highlight";
+
+        if (appState === 'paused') {
+          card1Title = "PAUSED AT";
+          card1Val = "10:12:18 AM";
+          card1Sub = "Current stop time";
+          card2Title = "LIVE BREAK";
+          card2Val = "02m 15s";
+          card2Sub = "Counting up...";
+          card2Class = "amber-glow";
+        } else if (appState === 'idle') {
+          card1Title = "LAST CLOCKED IN";
+          card1Val = "11:00:00 AM";
+          card1Sub = "Sprint #2";
+          card2Title = "LAST CLOCKED OUT";
+          card2Val = "12:30:00 PM";
+          card2Sub = "Copied to clipboard ✓";
+          card2Class = "green-glow";
+        } else if (appState === 'goal_met') {
+          card2Title = "DAILY TARGET";
+          card2Val = "100% ACHIEVED";
+          card2Sub = "8h target hit at 04:45 PM";
+          card2Class = "green-glow";
+        }
+
+        html += `
+          <div class="dual-cards-row">
+            <div class="telemetry-card ${appState !== 'idle' ? 'highlight' : ''}">
+              <div class="telemetry-title">${card1Title}</div>
+              <div class="telemetry-value">${card1Val}</div>
+              <div class="telemetry-sub">${card1Sub}</div>
+            </div>
+            <div class="telemetry-card ${card2Class}">
+              <div class="telemetry-title">${card2Title}</div>
+              <div class="telemetry-value" style="color: ${card2Class.includes('amber') ? 'var(--amber)' : (card2Class.includes('green') ? '#34d399' : 'var(--accent)')};">${card2Val}</div>
+              <div class="telemetry-sub">${card2Sub}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      slot.innerHTML = html;
+    }
+
+    // Update Overall Popover Views for Simulated State
+    function updateSimulatorState() {
+      const pill = document.getElementById('menubarPill');
+      const pillText = document.getElementById('menubarPillText');
+      const popBadge = document.getElementById('popoverBadge');
+      const popBadgeText = document.getElementById('popoverBadgeText');
+      const bigTimer = document.getElementById('popoverBigTimer');
+      const timerSub = document.getElementById('popoverTimerSub');
+      const btnPause = document.getElementById('btnPauseResume');
+      const btnPauseText = document.getElementById('btnPauseText');
+      const btnMain = document.getElementById('btnMainAction');
+      const btnMainText = document.getElementById('btnMainText');
+      const btnDiscard = document.getElementById('btnDiscard');
+      const goalFill = document.getElementById('goalProgressFill');
+      const goalLabel = document.getElementById('goalLabelText');
+
+      if (appState === 'active') {
+        pill.className = 'status-pill active';
+        pillText.textContent = '00:42:18';
+        popBadge.className = 'header-badge';
+        popBadgeText.textContent = 'ACTIVE';
+        bigTimer.textContent = '00:42:18';
+        timerSub.textContent = "Today's Total: 03h 15m";
+        btnPause.style.display = 'flex';
+        btnPause.className = 'btn-pause';
+        btnPauseText.textContent = 'PAUSE';
+        btnMain.className = 'btn-main btn-clockout';
+        btnMainText.textContent = 'CLOCK OUT & COPY';
+        btnDiscard.style.display = 'flex';
+        goalFill.style.width = '41%';
+        goalLabel.textContent = '03h 15m / 8h 00m (41%)';
+      } else if (appState === 'paused') {
+        pill.className = 'status-pill paused';
+        pillText.textContent = '00:02:15';
+        popBadge.className = 'header-badge paused';
+        popBadgeText.textContent = 'PAUSED';
+        bigTimer.textContent = '00:02:15';
+        timerSub.textContent = "Sprint work time: 00:42:18";
+        btnPause.style.display = 'flex';
+        btnPause.className = 'btn-pause resumed';
+        btnPauseText.textContent = 'RESUME';
+        btnMain.className = 'btn-main btn-clockout';
+        btnMainText.textContent = 'CLOCK OUT & COPY';
+        btnDiscard.style.display = 'flex';
+        goalFill.style.width = '41%';
+        goalLabel.textContent = '03h 15m / 8h 00m (41%)';
+      } else if (appState === 'idle') {
+        pill.className = 'status-pill idle';
+        pillText.textContent = '03:15:00';
+        popBadge.className = 'header-badge idle';
+        popBadgeText.textContent = 'IDLE';
+        bigTimer.textContent = '03:15:00';
+        timerSub.textContent = "Ready to start your next sprint";
+        btnPause.style.display = 'none';
+        btnMain.className = 'btn-main btn-clockin';
+        btnMainText.textContent = 'CLOCK IN';
+        btnDiscard.style.display = 'none';
+        goalFill.style.width = '41%';
+        goalLabel.textContent = '03h 15m / 8h 00m (41%)';
+      } else if (appState === 'goal_met') {
+        pill.className = 'status-pill active';
+        pillText.textContent = '08:15:20';
+        popBadge.className = 'header-badge';
+        popBadgeText.textContent = 'ACTIVE (OVERTIME)';
+        bigTimer.textContent = '01:15:20';
+        timerSub.textContent = "Today's Total: 08h 15m";
+        btnPause.style.display = 'flex';
+        btnPause.className = 'btn-pause';
+        btnPauseText.textContent = 'PAUSE';
+        btnMain.className = 'btn-main btn-clockout';
+        btnMainText.textContent = 'CLOCK OUT & COPY';
+        btnDiscard.style.display = 'flex';
+        goalFill.style.width = '100%';
+        goalFill.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
+        goalLabel.textContent = '08h 15m / 8h 00m (103% 🎯)';
+      }
+
+      renderPrototypeSlot();
+      renderRationale();
+    }
+
+    function setAppState(state) {
+      appState = state;
+      document.querySelectorAll('.sim-btn').forEach(btn => btn.classList.remove('active'));
+      const mapping = { active: 0, paused: 1, idle: 2, goal_met: 3 };
+      const targetBtn = document.querySelectorAll('.sim-btn')[mapping[state]];
+      if (targetBtn) targetBtn.classList.add('active');
+      updateSimulatorState();
+    }
+
+    // Render Rationale Panel
+    function renderRationale() {
+      const p = document.getElementById('rationalePanel');
+      const data = VARIANT_DETAILS[currentVariant];
+
+      let featuresHtml = data.features.map(f => `
+        <li>
+          <span class="feature-icon">${f.icon}</span>
+          <span>${f.text}</span>
+        </li>
+      `).join('');
+
+      let tableRows = data.table.map(row => `
+        <tr>
+          <td style="font-weight: 600; color: var(--text-secondary);">${row[0]}</td>
+          <td style="font-family: var(--font-mono); font-size: 11.5px;">${row[1]}</td>
+          <td style="font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">${row[2] || ''}</td>
+        </tr>
+      `).join('');
+
+      p.innerHTML = `
+        <div class="rationale-header">
+          <span class="rationale-tag">${data.badge}</span>
+          <span style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">URL: ?variant=${currentVariant}</span>
+        </div>
+        <h2 class="rationale-title">${data.name}</h2>
+        <p class="rationale-desc">${data.summary}</p>
+
+        <h3 style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;">Key Behavioral Features</h3>
+        <ul class="feature-list">${featuresHtml}</ul>
+
+        <h3 style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;">Behavior Matrix by State</h3>
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>Left Affordance</th>
+              <th>Right Replacement Affordance</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      `;
+    }
+
+    // Switcher Logic
+    function setVariant(v) {
+      if (!VARIANTS.includes(v)) return;
+      currentVariant = v;
+      document.getElementById('switcherKey').textContent = `VARIANT ${v}`;
+      document.getElementById('switcherName').textContent = VARIANT_DETAILS[v].name.split(' (')[0];
+
+      // Update URL search param per /prototype spec
+      const url = new URL(window.location);
+      url.searchParams.set('variant', v);
+      window.history.replaceState({}, '', url);
+
+      renderPrototypeSlot();
+      renderRationale();
+    }
+
+    function nextVariant() {
+      const idx = VARIANTS.indexOf(currentVariant);
+      const nextIdx = (idx + 1) % VARIANTS.length;
+      setVariant(VARIANTS[nextIdx]);
+    }
+
+    function prevVariant() {
+      const idx = VARIANTS.indexOf(currentVariant);
+      const prevIdx = (idx - 1 + VARIANTS.length) % VARIANTS.length;
+      setVariant(VARIANTS[prevIdx]);
+    }
+
+    // Keyboard navigation per /prototype spec
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (e.key === 'ArrowRight') {
+        nextVariant();
+      } else if (e.key === 'ArrowLeft') {
+        prevVariant();
+      }
+    });
+
+    // Initialize from URL search param if present
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const paramV = params.get('variant');
+      if (paramV && VARIANTS.includes(paramV.toUpperCase())) {
+        currentVariant = paramV.toUpperCase();
+      }
+      setVariant(currentVariant);
+      updateSimulatorState();
+    });
+  </script>
+</body>
+</html>

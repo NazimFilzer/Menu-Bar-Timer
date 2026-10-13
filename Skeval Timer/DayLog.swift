@@ -5,7 +5,7 @@ struct DayLog {
 
     init(sprints: [Sprint] = []) { self.sprints = sprints }
 
-    var completedSprints: [Sprint] { sprints.filter { !$0.isOpen } }
+    var completedSprints: [Sprint] { sprints.filter { !$0.isOpen }.sorted { $0.startTime < $1.startTime } }
     var openSprint: Sprint? { sprints.first { $0.isOpen } }
 
     var accumulatedTotal: TimeInterval {
@@ -24,5 +24,9 @@ struct DayLog {
 
     var completedSprintsDescending: [(index: Int, sprint: Sprint)] {
         completedSprints.enumerated().map { ($0.offset + 1, $0.element) }.reversed()
+    }
+
+    var clipboardText: String {
+        completedSprints.map(\.clipboardText).joined(separator: "\n")
     }
 }

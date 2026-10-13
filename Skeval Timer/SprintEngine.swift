@@ -57,6 +57,7 @@ enum SprintState: Equatable {
 enum RecoveryError: LocalizedError, Equatable {
     case invalidFormat
     case mustBeAfterStart(String)
+    case breakExceedsSprintTime
 
     var errorDescription: String? {
         switch self {
@@ -64,6 +65,8 @@ enum RecoveryError: LocalizedError, Equatable {
             return "Use HH:mm or HH:mm:ss"
         case .mustBeAfterStart(let start):
             return "Must be after \(start)"
+        case .breakExceedsSprintTime:
+            return "Break duration exceeds sprint time"
         }
     }
 }
@@ -98,7 +101,6 @@ final class SprintEngine {
     private var pauseStartedAt: Date? = nil
     private var totalPausedDuration: TimeInterval = 0
     private var pauseCount: Int = 0
-    private var activeResumedAt: Date? = nil
     private var willSleepObserver: Any? = nil
     private var didWakeObserver: Any? = nil
 
@@ -136,11 +138,12 @@ final class SprintEngine {
     }
 
     func clockIn(at now: Date = Date(), tag: String? = nil) {
+        guard case .idle = state else { return }
         let sprint = Sprint(startTime: now, tag: tag)
         resetPauseState()
         store.save(sprint: sprint)
         state = .active(sprint: sprint, elapsed: 0)
-        startTicker(resumedAt: now, baseElapsed: 0)
+        startTicker()
     }
 
     func setTag(_ tag: String?) {
@@ -166,13 +169,12 @@ final class SprintEngine {
         guard let sprint = state.currentSprint, sprint.isOpen else { return }
         var updated = sprint
 
-        if let interval = pendingSleepInterval {
-            totalPausedDuration += interval.duration
-            pauseCount += 1
-            pendingSleepInterval = nil
-        } else if state.isPaused, let pausedAt = pauseStartedAt {
-            totalPausedDuration += now.timeIntervalSince(pausedAt)
+        if state.isPaused, let pausedAt = pauseStartedAt {
+            totalPausedDuration += max(0, now.timeIntervalSince(pausedAt))
         }
+        if pendingSleepInterval != nil { pauseCount += 1 }
+        pendingSleepInterval = nil
+        sleepStartedAt = nil
 
         updated.endTime = now
         updated.pausedDuration = totalPausedDuration
@@ -190,10 +192,9 @@ final class SprintEngine {
 
     func pause(at now: Date = Date()) {
         guard case .active(var sprint, _) = state else { return }
-        let activeSpan = activeResumedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
-        let elapsed = elapsedAtPauseStart + activeSpan
         stopTicker()
-        elapsedAtPauseStart = elapsed
+        let exactElapsed = max(0, now.timeIntervalSince(sprint.startTime) - totalPausedDuration)
+        elapsedAtPauseStart = exactElapsed
         pauseStartedAt = now
         currentPauseElapsed = 0
         pauseCount += 1
@@ -204,15 +205,16 @@ final class SprintEngine {
         sprint.pauseCount = pauseCount
         store.save(sprint: sprint)
 
-        state = .paused(sprint: sprint, elapsed: elapsed)
+        state = .paused(sprint: sprint, elapsed: exactElapsed)
         startPauseTicker(startedAt: now)
     }
 
     func resume(at now: Date = Date()) {
-        guard case .paused(var sprint, _) = state else { return }
+        guard pendingSleepInterval == nil, sleepStartedAt == nil,
+              case .paused(var sprint, _) = state else { return }
         stopTicker()
         if let pausedAt = pauseStartedAt {
-            totalPausedDuration += now.timeIntervalSince(pausedAt)
+            totalPausedDuration += max(0, now.timeIntervalSince(pausedAt))
         }
         pauseStartedAt = nil
         currentPauseElapsed = 0
@@ -224,7 +226,7 @@ final class SprintEngine {
         store.save(sprint: sprint)
 
         state = .active(sprint: sprint, elapsed: elapsedAtPauseStart)
-        startTicker(resumedAt: now, baseElapsed: elapsedAtPauseStart)
+        startTicker()
     }
 
     func reset() {
@@ -255,7 +257,7 @@ final class SprintEngine {
         let gross = max(0, now.timeIntervalSince(sprint.startTime))
         let elapsed = max(0, gross - totalPausedDuration)
         state = .active(sprint: sprint, elapsed: elapsed)
-        startTicker(resumedAt: now, baseElapsed: elapsed)
+        startTicker()
     }
 
     func saveRecoveryEndTime(_ text: String) throws {
@@ -267,12 +269,17 @@ final class SprintEngine {
             throw RecoveryError.mustBeAfterStart(TimeFormatter.format(time: sprint.startTime))
         }
 
+        var recoveredPausedDuration = totalPausedDuration
         if sprint.isPaused, let pStart = sprint.pauseStartedAt, end > pStart {
-            totalPausedDuration += end.timeIntervalSince(pStart)
+            recoveredPausedDuration += max(0, end.timeIntervalSince(pStart))
+        }
+
+        guard end.timeIntervalSince(sprint.startTime) > recoveredPausedDuration else {
+            throw RecoveryError.breakExceedsSprintTime
         }
 
         sprint.endTime = end
-        sprint.pausedDuration = totalPausedDuration
+        sprint.pausedDuration = recoveredPausedDuration
         sprint.isPaused = false
         sprint.pauseStartedAt = nil
         sprint.pauseCount = pauseCount
@@ -295,8 +302,7 @@ final class SprintEngine {
 
     func handleSystemSleep(at now: Date = Date()) {
         guard case .active(var sprint, _) = state else { return }
-        let activeSpan = activeResumedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
-        let elapsed = elapsedAtPauseStart + activeSpan
+        let elapsed = max(0, now.timeIntervalSince(sprint.startTime) - totalPausedDuration)
         stopTicker()
         elapsedAtPauseStart = elapsed
         sleepStartedAt = now
@@ -332,27 +338,21 @@ final class SprintEngine {
         pauseStartedAt = nil
         currentPauseElapsed = 0
 
-        if countAsWork {
-            let newElapsed = elapsedAtPauseStart + interval.duration
-            sprint.isPaused = false
-            sprint.pauseStartedAt = nil
-            sprint.pausedDuration = totalPausedDuration
-            store.save(sprint: sprint)
-
-            state = .active(sprint: sprint, elapsed: newElapsed)
-            startTicker(resumedAt: now, baseElapsed: newElapsed)
-        } else {
+        // The timer stays held after waking until the user makes a choice.
+        let decisionPause = max(0, now.timeIntervalSince(interval.wakeAt))
+        totalPausedDuration += decisionPause
+        if !countAsWork {
             totalPausedDuration += interval.duration
             pauseCount += 1
-            sprint.isPaused = false
-            sprint.pauseStartedAt = nil
-            sprint.pausedDuration = totalPausedDuration
-            sprint.pauseCount = pauseCount
-            store.save(sprint: sprint)
-
-            state = .active(sprint: sprint, elapsed: elapsedAtPauseStart)
-            startTicker(resumedAt: now, baseElapsed: elapsedAtPauseStart)
         }
+        sprint.isPaused = false
+        sprint.pauseStartedAt = nil
+        sprint.pausedDuration = totalPausedDuration
+        sprint.pauseCount = pauseCount
+        store.save(sprint: sprint)
+        let elapsed = max(0, now.timeIntervalSince(sprint.startTime) - totalPausedDuration)
+        state = .active(sprint: sprint, elapsed: elapsed)
+        startTicker()
     }
 
     private func setupWorkspaceObservers() {
@@ -391,14 +391,13 @@ final class SprintEngine {
 
     // MARK: - Internal Ticker
 
-    private func startTicker(resumedAt: Date, baseElapsed: TimeInterval) {
+    private func startTicker() {
         stopTicker()
-        activeResumedAt = resumedAt
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard case .active(let sprint, _) = self.state, let start = self.activeResumedAt else { return }
-                let elapsed = baseElapsed + Date().timeIntervalSince(start)
+                guard case .active(let sprint, _) = self.state else { return }
+                let elapsed = max(0, Date().timeIntervalSince(sprint.startTime) - self.totalPausedDuration)
                 self.state = .active(sprint: sprint, elapsed: elapsed)
                 self.onTick?(elapsed)
             }
@@ -412,7 +411,7 @@ final class SprintEngine {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 guard case .paused = self.state, let start = self.pauseStartedAt else { return }
-                let pauseElapsed = Date().timeIntervalSince(start)
+                let pauseElapsed = max(0, Date().timeIntervalSince(start))
                 self.currentPauseElapsed = pauseElapsed
                 self.onPauseTick?(pauseElapsed)
             }
@@ -422,7 +421,6 @@ final class SprintEngine {
     private func stopTicker() {
         ticker?.invalidate()
         ticker = nil
-        activeResumedAt = nil
     }
 
     private func resetPauseState() {

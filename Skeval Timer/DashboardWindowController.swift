@@ -14,19 +14,20 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     init(vm: TimerViewModel) {
         self.vm = vm
 
-        let contentRect = NSRect(x: 0, y: 0, width: 920, height: 620)
+        let contentRect = NSRect(x: 0, y: 0, width: 1140, height: 780)
         let window = NSWindow(
             contentRect: contentRect,
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 800, height: 550)
+        window.minSize = NSSize(width: 1000, height: 650)
         window.title = "Skeval Timer Dashboard"
-        window.titleVisibility = .hidden
+        window.titleVisibility = .visible
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
-        window.center()
+        window.setFrameAutosaveName("SkevalDashboard")
+        if !window.setFrameUsingName("SkevalDashboard") { window.center() }
 
         let hostingView = NSHostingView(rootView: DashboardView(vm: vm))
         window.contentView = hostingView

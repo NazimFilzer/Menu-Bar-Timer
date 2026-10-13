@@ -6,6 +6,7 @@ struct WeeklyChartView: View {
     let dailyGoalLabel: String
     let theme: PopoverTheme
     @Binding var weekOffset: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredDay: DailyBarData? = nil
     @State private var selectedDay: DailyBarData? = nil
 
@@ -80,7 +81,7 @@ struct WeeklyChartView: View {
             HStack(spacing: 6) {
                 if weekOffset != 0 {
                     Button(action: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
                             weekOffset = 0
                             hoveredDay = nil
                             selectedDay = nil
@@ -99,7 +100,7 @@ struct WeeklyChartView: View {
 
                 // Previous Week Arrow
                 Button(action: {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
                         weekOffset -= 1
                         hoveredDay = nil
                         selectedDay = nil
@@ -127,7 +128,7 @@ struct WeeklyChartView: View {
                 // Next Week Arrow
                 Button(action: {
                     if weekOffset < 0 {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
                             weekOffset += 1
                             hoveredDay = nil
                             selectedDay = nil
@@ -218,81 +219,81 @@ struct WeeklyChartView: View {
         let isMetGoal = day.totalHours >= dailyGoalHours && dailyGoalHours > 0
         let isHovered = hoveredDay?.id == day.id || selectedDay?.id == day.id
 
-        return VStack(spacing: 6) {
-            // Hours Label on top of bar
-            Text(day.totalSeconds > 0 ? day.formattedDuration : "—")
-                .font(.system(size: 9, weight: day.isToday ? .bold : .medium, design: .monospaced))
-                .foregroundColor(day.isToday ? theme.neonTeal : (day.totalSeconds > 0 ? theme.textPrimary : theme.textSecondary.opacity(0.5)))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+        return Button {
+            selectedDay = selectedDay?.id == day.id ? nil : day
+        } label: {
+            VStack(spacing: 6) {
+                // Hours Label on top of bar
+                Text(day.totalSeconds > 0 ? day.formattedDuration : "—")
+                    .font(.system(size: 9, weight: day.isToday ? .bold : .medium, design: .monospaced))
+                    .foregroundColor(day.isToday ? theme.neonTeal : (day.totalSeconds > 0 ? theme.textPrimary : theme.textSecondary.opacity(0.5)))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
-            // Bar Track & Fill
-            ZStack(alignment: .bottom) {
-                // Background track
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(theme.cardBg.opacity(0.5))
-                    .frame(width: columnWidth, height: chartHeight)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(theme.cardBorder.opacity(isHovered ? 0.8 : 0.25), lineWidth: 1)
-                    )
-
-                // Filled Bar
-                if barHeight > 0 {
+                // Bar Track & Fill
+                ZStack(alignment: .bottom) {
+                    // Background track
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(
-                            LinearGradient(
-                                colors: barGradientColors(isToday: day.isToday, isMetGoal: isMetGoal, isHovered: isHovered),
-                                startPoint: .top,
-                                endPoint: .bottom
+                        .fill(theme.cardBg.opacity(0.5))
+                        .frame(width: columnWidth, height: chartHeight)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(theme.cardBorder.opacity(isHovered ? 0.8 : 0.25), lineWidth: 1)
+                        )
+
+                    // Filled Bar
+                    if barHeight > 0 {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(
+                                LinearGradient(
+                                    colors: barGradientColors(isToday: day.isToday, isMetGoal: isMetGoal, isHovered: isHovered),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
-                        .frame(width: columnWidth, height: barHeight)
-                        .shadow(
-                            color: day.isToday ? theme.neonTeal.opacity(0.4) : (isMetGoal ? Color.teal.opacity(0.3) : Color.clear),
-                            radius: isHovered ? 6 : 3,
-                            x: 0,
-                            y: 0
-                        )
-                }
-            }
-            .frame(width: columnWidth, height: chartHeight)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    hoveredDay = hovering ? day : nil
-                }
-            }
-            .onTapGesture {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                    if selectedDay?.id == day.id {
-                        selectedDay = nil
-                    } else {
-                        selectedDay = day
+                            .frame(width: columnWidth, height: barHeight)
+                            .shadow(
+                                color: day.isToday ? theme.neonTeal.opacity(0.4) : (isMetGoal ? Color.teal.opacity(0.3) : Color.clear),
+                                radius: isHovered ? 6 : 3,
+                                x: 0,
+                                y: 0
+                            )
                     }
                 }
-            }
+                .frame(width: columnWidth, height: chartHeight)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+                        hoveredDay = hovering ? day : nil
+                    }
+                }
 
-            // X-Axis Day & Date Label
-            VStack(spacing: 2) {
-                Text(day.dayOfWeekLabel)
-                    .font(.system(size: 10, weight: day.isToday ? .heavy : .semibold, design: .rounded))
-                    .foregroundColor(day.isToday ? theme.neonTeal : theme.textPrimary)
 
-                Text(day.dayNumberLabel)
-                    .font(.system(size: 9, weight: .regular, design: .monospaced))
-                    .foregroundColor(day.isToday ? theme.neonTeal : theme.textSecondary)
+                // X-Axis Day & Date Label
+                VStack(spacing: 2) {
+                    Text(day.dayOfWeekLabel)
+                        .font(.system(size: 10, weight: day.isToday ? .heavy : .semibold, design: .rounded))
+                        .foregroundColor(day.isToday ? theme.neonTeal : theme.textPrimary)
+
+                    Text(day.dayNumberLabel)
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundColor(day.isToday ? theme.neonTeal : theme.textSecondary)
+                }
+                .padding(.vertical, 3)
+                .padding(.horizontal, 6)
+                .background(day.isToday ? theme.neonTeal.opacity(0.18) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(day.isToday ? theme.neonTeal.opacity(0.5) : Color.clear, lineWidth: 1)
+                )
             }
-            .padding(.vertical, 3)
-            .padding(.horizontal, 6)
-            .background(day.isToday ? theme.neonTeal.opacity(0.18) : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(day.isToday ? theme.neonTeal.opacity(0.5) : Color.clear, lineWidth: 1)
-            )
+            .frame(width: columnWidth)
         }
-        .frame(width: columnWidth)
+        .buttonStyle(.plain)
+        .accessibilityLabel(TimeFormatter.format(headerDate: day.date))
+        .accessibilityValue("\(day.formattedDuration), \(day.formattedEarnings)")
+        .accessibilityAddTraits(selectedDay?.id == day.id ? .isSelected : [])
     }
 
     private func barGradientColors(isToday: Bool, isMetGoal: Bool, isHovered: Bool) -> [Color] {

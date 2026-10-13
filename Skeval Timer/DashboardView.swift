@@ -1,286 +1,199 @@
 import SwiftUI
 
-enum DashboardTab: String, CaseIterable, Identifiable {
-    case dashboard = "Dashboard"
-    case analytics = "Analytics"
-    case settings = "Settings"
+enum DashboardDestination: String, CaseIterable, Identifiable {
+    case today, week, month, analytics, settings
 
     var id: String { rawValue }
-
-    var iconName: String {
+    var title: String { rawValue.capitalized }
+    var icon: String {
         switch self {
-        case .dashboard: return "square.grid.2x2.fill"
-        case .analytics: return "chart.bar.xaxis"
-        case .settings: return "gearshape.fill"
+        case .today: return "clock"
+        case .week: return "calendar"
+        case .month: return "calendar.badge.clock"
+        case .analytics: return "chart.xyaxis.line"
+        case .settings: return "gearshape"
         }
     }
-}
-
-enum DashboardSubTab: String, CaseIterable, Identifiable {
-    case week = "Week"
-    case month = "Month"
-
-    var id: String { rawValue }
+    var subtitle: String {
+        switch self {
+        case .today: return "Your timer, earnings, and daily sprint history"
+        case .week: return "Weekly goals and daily work patterns"
+        case .month: return "Monthly totals and time by tag"
+        case .analytics: return "Trends, date ranges, and CSV reports"
+        case .settings: return "Goals, hourly rate, currency, and appearance"
+        }
+    }
+    var shortcut: KeyEquivalent {
+        KeyEquivalent(Character(String(Self.allCases.firstIndex(of: self)! + 1)))
+    }
 }
 
 struct DashboardView: View {
     @Bindable var vm: TimerViewModel
-    @State private var selectedTab: DashboardTab = .dashboard
-    @State private var selectedSubTab: DashboardSubTab = .week
+    @AppStorage("skevalDashboardDestination") private var destinationKey = DashboardDestination.today.rawValue
     @State private var themeManager = ThemeManager.shared
 
     private var theme: PopoverTheme { themeManager.theme }
+    private var destination: DashboardDestination {
+        DashboardDestination(rawValue: destinationKey) ?? .today
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Unified Top Toolbar
-            DashboardTopToolbar(
-                selectedTab: $selectedTab,
-                vm: vm,
-                theme: theme
-            )
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 180, ideal: 195, max: 230)
+        } detail: {
+            VStack(spacing: 0) {
+                DashboardToolbar(vm: vm, destination: destination, theme: theme)
+                Divider()
+                DashboardResolutionView(vm: vm)
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(theme.bgDark)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .tint(theme.neonTeal)
+        .preferredColorScheme(theme.isLight ? .light : .dark)
+        .onAppear { vm.checkAndHandleDayChange(); vm.refreshLogs() }
+    }
 
-            Divider().background(theme.dividerColor)
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Skeval Timer")
+                .font(.title3.bold())
+                .padding(.horizontal, 18)
+                .padding(.top, 24)
+            Text("Work and earnings")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 18)
+                .padding(.top, 4)
+                .padding(.bottom, 20)
 
-            // Content Area
-            ZStack {
-                theme.bgDark.ignoresSafeArea()
-
-                switch selectedTab {
-                case .dashboard:
-                    DashboardHomeContainer(
-                        vm: vm,
-                        selectedSubTab: $selectedSubTab,
-                        theme: theme
-                    )
-                case .analytics:
-                    AnalyticsDashboardView(
-                        vm: vm,
-                        theme: theme
-                    )
-                case .settings:
-                    DashboardSettingsView(
-                        vm: vm,
-                        theme: theme
-                    )
+            List {
+                ForEach(DashboardDestination.allCases) { item in
+                    Button {
+                        destinationKey = item.rawValue
+                    } label: {
+                        HStack(spacing: 10) {
+                            Label(item.title, systemImage: item.icon)
+                                .font(.system(size: 14, weight: destination == item ? .semibold : .regular))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                            Spacer()
+                        }
+                        .foregroundStyle(destination == item ? theme.textPrimary : theme.textSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .background(destination == item ? theme.neonTeal.opacity(0.16) : .clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(item.shortcut, modifiers: .command)
+                    .accessibilityAddTraits(destination == item ? .isSelected : [])
+                    .help("Open \(item.title), Command \(String(item.shortcut.character))")
+                    .listRowInsets(EdgeInsets(top: 3, leading: 6, bottom: 3, trailing: 6))
                 }
             }
+            .listStyle(.sidebar)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Keyboard shortcuts").font(.caption.bold())
+                Text("⌘1–5  Switch views\n⌘N  Add sprint\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(4)
+                Text(AppVersion.current).font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(18)
         }
-        .frame(minWidth: 800, minHeight: 550)
-        .preferredColorScheme(theme.isLight ? .light : .dark)
+        .background(theme.cardBg)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch destination {
+        case .today:
+            TodayDashboardView(vm: vm, theme: theme) { destinationKey = DashboardDestination.settings.rawValue }
+        case .week:
+            ScrollView { WeeklyDashboardView(vm: vm, theme: theme).padding(20) }
+        case .month:
+            ScrollView { MonthlyDashboardView(vm: vm, theme: theme).padding(20) }
+        case .analytics:
+            AnalyticsDashboardView(vm: vm, theme: theme)
+        case .settings:
+            DashboardSettingsView(vm: vm, theme: theme)
+        }
     }
 }
 
-// MARK: - Top Toolbar
-
-private struct DashboardTopToolbar: View {
-    @Binding var selectedTab: DashboardTab
-    let vm: TimerViewModel
+private struct DashboardToolbar: View {
+    @Bindable var vm: TimerViewModel
+    let destination: DashboardDestination
     let theme: PopoverTheme
-
-    private var dotColor: Color {
-        theme.statusColor(for: vm.state)
-    }
 
     var body: some View {
         HStack(spacing: 16) {
-            // Left Branding
-            HStack(spacing: 7) {
-                Text("SKEVAL TIMER")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textPrimary)
-                    .kerning(1.2)
-
-                Text("v2")
-                    .font(.system(size: 9, weight: .heavy, design: .rounded))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(theme.neonTeal.opacity(0.2))
-                    .foregroundColor(theme.neonTeal)
-                    .clipShape(Capsule())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(destination.title).font(.title2.bold()).foregroundStyle(theme.textPrimary)
+                Text(destination.subtitle).font(.subheadline).foregroundStyle(theme.textSecondary)
             }
-
-            Spacer()
-
-            // Centered Segmented Navigation
-            HStack(spacing: 4) {
-                ForEach(DashboardTab.allCases) { tab in
-                    let isSelected = selectedTab == tab
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selectedTab = tab
-                        }
-                    }) {
-                        HStack(spacing: 5) {
-                            Image(systemName: tab.iconName)
-                                .font(.system(size: 11))
-                            Text(tab.rawValue)
-                                .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .rounded))
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(isSelected ? theme.neonTeal.opacity(0.18) : Color.clear)
-                        .foregroundColor(isSelected ? theme.neonTeal : theme.textSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(isSelected ? theme.neonTeal.opacity(0.5) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(vm.statusTitle.capitalized).font(.caption.bold()).foregroundStyle(theme.statusColor(for: vm.state))
+                Text(vm.currentElapsedLabel).font(.system(.body, design: .monospaced)).monospacedDigit()
+            }
+            .accessibilityElement(children: .combine)
+            if vm.isRunning {
+                Button(vm.isPaused ? "Resume" : "Pause", systemImage: vm.isPaused ? "play.fill" : "pause.fill") {
+                    if vm.isPaused { vm.resumeTimer() } else { vm.pause() }
                 }
+                .disabled(vm.hasPendingSleepResolution)
+                .help("Pause or resume, Command Option Shift P")
             }
-            .padding(3)
-            .background(theme.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
-
-            Spacer()
-
-            // Right Status & Quick Timer Pill
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: dotColor.opacity(0.8), radius: vm.isRunning ? 6 : 0)
-
-                Text(vm.statusTitle)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(dotColor)
-
-                if vm.isRunning {
-                    Text(vm.currentElapsedLabel)
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(theme.textPrimary)
-
-                    if let tag = vm.currentTag, !tag.isEmpty {
-                        Text("#\(tag)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(theme.neonTeal.opacity(0.18))
-                            .foregroundColor(theme.neonTeal)
-                            .clipShape(Capsule())
-                    }
-                }
+            Button(vm.isRunning ? "Clock out" : "Clock in", systemImage: vm.isRunning ? "stop.fill" : "play.fill") {
+                if vm.isRunning { vm.clockOut() } else { vm.clockIn() }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(theme.cardBg)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(theme.cardBorder, lineWidth: 1))
+            .buttonStyle(.borderedProminent)
+            .disabled(vm.recoveryMode || vm.hasPendingSleepResolution)
+            .help("Clock in or out, Command Option Shift C")
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(theme.cardBg.opacity(0.7))
-    }
-}
-
-// MARK: - Dashboard Home Sub-Container (Week / Month)
-
-private struct DashboardHomeContainer: View {
-    @Bindable var vm: TimerViewModel
-    @Binding var selectedSubTab: DashboardSubTab
-    let theme: PopoverTheme
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Sub-navigation bar [ Week | Month ]
-            HStack {
-                HStack(spacing: 4) {
-                    ForEach(DashboardSubTab.allCases) { subTab in
-                        let isSelected = selectedSubTab == subTab
-                        Button(action: {
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                selectedSubTab = subTab
-                            }
-                        }) {
-                            Text(subTab.rawValue)
-                                .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .rounded))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 4.5)
-                                .background(isSelected ? theme.neonTeal.opacity(0.2) : Color.clear)
-                                .foregroundColor(isSelected ? theme.neonTeal : theme.textSecondary)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(2)
-                .background(theme.cardBg)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(theme.cardBorder, lineWidth: 1))
-
-                Spacer()
-
-                // Currency / Hourly Rate summary
-                HStack(spacing: 6) {
-                    Text("Hourly Rate:")
-                        .font(.system(size: 11, weight: .regular, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-                    Text(EarningsCalculator.format(amount: vm.goal.hourlyRate, currencySymbol: vm.goal.currencySymbol) + "/hr")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(theme.neonTeal)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(theme.cardBg.opacity(0.6))
-                .clipShape(Capsule())
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-
-            Divider().background(theme.dividerColor)
-
-            // Dynamic view based on Week / Month
-            ScrollView {
-                VStack(spacing: 20) {
-                    if selectedSubTab == .week {
-                        WeeklyDashboardView(vm: vm, theme: theme)
-                    } else {
-                        MonthlyDashboardView(vm: vm, theme: theme)
-                    }
-                }
-                .padding(20)
-            }
-        }
-    }
-}
-
-// MARK: - Reusable Dashboard Metric Card
-
-struct MetricCardView: View {
-    let title: String
-    let value: String
-    let subtitle: String
-    let icon: String
-    let theme: PopoverTheme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
-                    .kerning(0.8)
-                Spacer()
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.neonTeal)
-            }
-
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .monospaced))
-                .foregroundColor(theme.textPrimary)
-
-            Text(subtitle)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundColor(theme.textSecondary)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .controlSize(.large)
+        .padding(20)
         .background(theme.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
+    }
+}
+
+private struct DashboardResolutionView: View {
+    @Bindable var vm: TimerViewModel
+
+    var body: some View {
+        if vm.recoveryMode {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Finish or resume your recovered sprint").font(.headline)
+                HStack {
+                    TextField("End time, HH:mm:ss", text: $vm.recoveryEndText)
+                        .textFieldStyle(.roundedBorder).frame(width: 190)
+                        .accessibilityLabel("Recovered sprint end time")
+                    Button("Save end time") { vm.saveRecoveryEndTime() }
+                    Button("Resume sprint") { vm.resumeRecovery() }
+                }
+                if let error = vm.recoveryEndError { Text(error).foregroundStyle(.red) }
+            }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.12))
+        } else if let interval = vm.pendingSleepInterval {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Your Mac was asleep from \(interval.formattedWindow)").font(.headline)
+                Text("The timer is held. Choose how to record these \(interval.formattedDuration).")
+                HStack {
+                    Button("Count as work") { vm.resolveSleep(countAsWork: true) }
+                    Button("Count as paused") { vm.resolveSleep(countAsWork: false) }
+                }
+            }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.indigo.opacity(0.12))
+        }
     }
 }

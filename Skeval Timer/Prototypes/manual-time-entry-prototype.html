@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skeval Timer — Manual Start & End Time Input Prototype</title>
+  <style>
+    :root {
+      --bg-desktop: #080c14;
+      --menubar-bg: rgba(18, 24, 38, 0.85);
+      --popover-bg: #0d121d;
+      --card-bg: #141b29;
+      --card-border: #232f48;
+      --text-primary: #f1f5f9;
+      --text-secondary: #8493a8;
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.35);
+      --soft-red: #ff5252;
+      --soft-red-glow: rgba(255, 82, 82, 0.35);
+      --amber: #ff9f0a;
+      --amber-glow: rgba(255, 159, 10, 0.35);
+      --green: #10b981;
+      --green-glow: rgba(16, 185, 129, 0.35);
+      --divider: rgba(255, 255, 255, 0.08);
+      --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+      --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    body.light-theme {
+      --bg-desktop: #e2e8f0;
+      --menubar-bg: rgba(248, 250, 252, 0.88);
+      --popover-bg: #ffffff;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.25);
+      --divider: rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 15%, #151e33 0%, #060910 100%);
+      min-height: 100vh;
+      font-family: var(--font-ui);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 120px;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    body.light-theme {
+      background: radial-gradient(circle at 50% 15%, #f1f5f9 0%, #cbd5e1 100%);
+    }
+
+    /* Top macOS Menu Bar */
+    .macos-menubar {
+      width: 100%;
+      height: 32px;
+      background: var(--menubar-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .menubar-left { display: flex; align-items: center; gap: 16px; font-weight: 600; font-size: 13px; }
+    .menubar-right { display: flex; align-items: center; gap: 12px; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .status-pill.active {
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(0, 229, 255, 0.45);
+      color: var(--accent);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+    }
+    .status-pill.idle {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: var(--text-secondary);
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-pill.active .pulse-dot {
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.85); }
+    }
+
+    /* Workspace Header */
+    .workspace-banner {
+      margin: 22px 0 14px;
+      text-align: center;
+    }
+    .workspace-banner h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .badge-compaction {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+    .workspace-banner p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 5px;
+    }
+
+    /* Interactive Simulator Controls */
+    .simulator-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(20, 27, 41, 0.9);
+      padding: 8px 18px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 22px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .sim-group { display: flex; align-items: center; gap: 6px; }
+    .sim-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .sim-btn-group { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 3px; border-radius: 18px; }
+    .sim-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sim-btn:hover { color: var(--text-primary); }
+    .sim-btn.active {
+      background: rgba(0, 229, 255, 0.18);
+      border-color: rgba(0, 229, 255, 0.45);
+      color: var(--accent);
+    }
+
+    /* Layout Viewport */
+    .viewports-wrapper {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 32px;
+      max-width: 1200px;
+      width: 100%;
+      padding: 0 16px;
+      transition: all 0.3s ease;
+    }
+
+    /* Column Container */
+    .mockup-column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 330px;
+      padding: 0 4px;
+    }
+    .column-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .space-pill {
+      font-size: 10.5px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+
+    /* Popover Body (Exact 330px macOS SwiftUI replica) */
+    .popover-card {
+      width: 330px;
+      background: var(--popover-bg);
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Popover Header */
+    .pop-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--divider);
+    }
+    .pop-title-area { display: flex; flex-direction: column; gap: 2px; }
+    .pop-title-row { display: flex; align-items: center; gap: 6px; }
+    .pop-app-name {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1.1px;
+    }
+    .pop-badge-mvp {
+      font-size: 8.5px;
+      font-weight: 800;
+      background: rgba(0, 229, 255, 0.18);
+      color: var(--accent);
+      padding: 1px 5px;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+    }
+    .pop-date-sub {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .pop-header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pop-header-action-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pop-header-action-btn:hover {
+      background: rgba(0, 229, 255, 0.15);
+      border-color: var(--accent);
+      transform: scale(1.05);
+    }
+    .pop-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+    .pop-status-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .pop-status-badge.idle { color: var(--text-secondary); }
+    .pop-status-badge.idle .dot { background: var(--text-secondary); }
+    .pop-status-badge.active { color: var(--accent); }
+    .pop-status-badge.active .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+    /* Clock Section */
+    .pop-clock-section {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      border-bottom: 1px solid var(--divider);
+    }
+    .big-timer {
+      font-family: var(--font-mono);
+      font-size: 40px;
+      font-weight: 300;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+      color: var(--text-primary);
+    }
+    .big-timer.active {
+      color: var(--accent);
+      text-shadow: 0 2px 12px var(--accent-glow);
+    }
+    .clock-subtext {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Goal Progress Bar */
+    .pop-goal-section {
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .goal-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .goal-title {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+    }
+    .goal-earnings {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #34d399;
+    }
+    .goal-earnings span {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .goal-track {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .goal-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(0, 229, 255, 0.8), var(--accent));
+      box-shadow: 0 0 6px var(--accent-glow);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .goal-meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--text-secondary);
+    }
+
+    /* Action Section (Standard Live Timer) */
+    .pop-action-section {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .timestamp-cards-row {
+      display: flex;
+      gap: 8px;
+    }
+    .ts-card {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 7px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ts-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+    }
+    .ts-value {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .ts-value.active-teal {
+      color: var(--accent);
+    }
+
+    .btn-action {
+      width: 100%;
+      padding: 9px 0;
+      border-radius: 9px;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-clockin {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.9), var(--accent));
+      color: #050b14;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    .btn-clockin:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    .dual-button-row { display: flex; gap: 8px; width: 100%; }
+    .btn-pause-side {
+      flex: 1;
+      background: rgba(255, 159, 10, 0.12);
+      border: 1px solid rgba(255, 159, 10, 0.4);
+      color: var(--amber);
+    }
+    .btn-clockout-side {
+      flex: 1;
+      background: linear-gradient(135deg, #ff6b6b, var(--soft-red));
+      color: #fff;
+      box-shadow: 0 4px 12px var(--soft-red-glow);
+    }
+    .btn-discard-icon {
+      width: 34px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    /* History Section */
+    .pop-history-section {
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 8px;
+    }
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 16px 7px;
+    }
+    .history-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+    .history-title-row .icon { color: var(--accent); font-size: 11px; }
+    .history-count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+    .history-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-copy-all {
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: var(--accent);
+      padding: 3px 7px;
+      border-radius: 5px;
+      font-size: 9px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-copy-all.copied {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* Button for Manual Entry (Variant A Trigger) */
+    .btn-add-manual-pill {
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      color: var(--accent);
+      padding: 3px 7px;
+      border-radius: 5px;
+      font-size: 9px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s ease;
+    }
+    .btn-add-manual-pill:hover {
+      background: rgba(0, 229, 255, 0.22);
+      border-color: var(--accent);
+    }
+    .btn-add-manual-pill.active {
+      background: var(--accent);
+      color: #050b14;
+    }
+
+    .btn-plus-icon-header {
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 229, 255, 0.12);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: var(--accent);
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .btn-plus-icon-header:hover {
+      background: rgba(0, 229, 255, 0.22);
+      border-color: var(--accent);
+      transform: scale(1.05);
+    }
+
+    /* Sprint Cards List */
+    .sprints-scroll-area {
+      max-height: 230px;
+      overflow-y: auto;
+      padding: 2px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .sprints-scroll-area::-webkit-scrollbar { width: 4px; }
+    .sprints-scroll-area::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    .sprint-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 7px;
+      padding: 6px 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .sprint-card.manual-highlight {
+      border-color: rgba(0, 229, 255, 0.5);
+      background: rgba(0, 229, 255, 0.04);
+    }
+    .sprint-num-badge {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(0, 229, 255, 0.12);
+      width: 21px;
+      height: 21px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .sprint-num-badge.manual-tag {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      font-size: 8.5px;
+    }
+    .sprint-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .sprint-times {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sprint-arrow { color: var(--text-secondary); font-size: 9px; }
+    .sprint-meta {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .pause-pill-micro {
+      font-size: 8.5px;
+      background: rgba(255, 159, 10, 0.15);
+      color: var(--amber);
+      padding: 1px 4px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .manual-indicator-pill {
+      font-size: 8px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .sprint-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .sprint-action-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      border: none;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+    .sprint-action-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.12); }
+    .sprint-copy-btn:hover { color: var(--accent); }
+    .sprint-copy-btn.copied { background: var(--accent); color: #000; }
+    .sprint-del-btn:hover { color: var(--soft-red); background: rgba(255, 82, 82, 0.15); }
+
+    /* Settings section */
+    .pop-settings-footer {
+      border-top: 1px solid var(--divider);
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    /* ========================================================
+       VARIANT A SPECIFICS: ACCORDION HISTORY DRAWER
+       ======================================================== */
+    .variant-a-drawer {
+      background: rgba(13, 20, 33, 0.95);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      border-radius: 9px;
+      margin: 0 16px 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .drawer-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .drawer-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .drawer-inputs-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .time-input-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .time-input-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .compact-time-input {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 5px;
+      padding: 5px 6px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-primary);
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    .compact-time-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-glow);
+    }
+    .compact-time-input.is-invalid {
+      border-color: var(--soft-red);
+      color: var(--soft-red);
+    }
+
+    .drawer-presets-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .chip-preset {
+      font-size: 9px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      padding: 2px 6px;
+      border-radius: 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .chip-preset:hover {
+      background: rgba(0, 229, 255, 0.12);
+      border-color: rgba(0, 229, 255, 0.3);
+      color: var(--accent);
+    }
+
+    .drawer-footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 2px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .calc-duration-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .calc-duration-tag.error {
+      color: var(--soft-red);
+    }
+    .drawer-btn-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-drawer-cancel {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-drawer-save {
+      background: var(--accent);
+      border: none;
+      color: #050b14;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+    .btn-drawer-save:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ========================================================
+       VARIANT B SPECIFICS: ACTION AREA TABBED MORPH
+       ======================================================== */
+    .segmented-mode-bar {
+      display: flex;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .seg-mode-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 4px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .seg-mode-btn.active {
+      background: var(--card-bg);
+      color: var(--text-primary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+    .seg-mode-btn.active.manual {
+      color: var(--accent);
+      border-color: rgba(0, 229, 255, 0.3);
+    }
+
+    .var-b-input-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 7px 9px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.2s ease;
+    }
+    .var-b-input-card:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-glow);
+    }
+    .var-b-input-card .ts-input {
+      background: transparent;
+      border: none;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--accent);
+      width: 100%;
+      outline: none;
+    }
+    .var-b-options-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-secondary);
+      padding: 0 2px;
+    }
+    .var-b-break-input {
+      width: 32px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      text-align: center;
+      outline: none;
+    }
+    .btn-log-manual {
+      width: 100%;
+      padding: 9px 0;
+      border-radius: 9px;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.9), var(--accent));
+      color: #050b14;
+      box-shadow: 0 4px 14px var(--accent-glow);
+      transition: all 0.15s ease;
+    }
+    .btn-log-manual:hover { filter: brightness(1.1); }
+    .btn-log-manual:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ========================================================
+       VARIANT C SPECIFICS: FOCUSED MODAL SHEET OVERLAY
+       ======================================================== */
+    .sheet-modal-backdrop {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(5, 8, 14, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .sheet-card {
+      background: #111827;
+      border-top: 1px solid rgba(0, 229, 255, 0.35);
+      border-radius: 16px 16px 0 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
+      animation: sheetUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes sheetUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-handle-bar {
+      width: 36px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      align-self: center;
+      margin-bottom: 2px;
+    }
+    .sheet-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sheet-title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sheet-close-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .sheet-time-picker-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .picker-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .picker-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .picker-control-cluster {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .step-arrow-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .step-arrow-btn:hover { background: rgba(255, 255, 255, 0.15); }
+    .sheet-input-field {
+      width: 78px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 5px;
+      padding: 4px 6px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--accent);
+      text-align: center;
+      outline: none;
+    }
+    .sheet-impact-card {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .impact-header {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #34d399;
+    }
+    .impact-stats {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sheet-btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .btn-sheet-cancel {
+      flex: 1;
+      padding: 9px 0;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-secondary);
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-sheet-save {
+      flex: 2;
+      padding: 9px 0;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.9), var(--accent));
+      border: none;
+      color: #050b14;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+    .btn-sheet-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ========================================================
+       ANALYSIS & COMPARISON CARDS
+       ======================================================== */
+    .analysis-container {
+      max-width: 1040px;
+      width: 100%;
+      margin-top: 36px;
+      background: rgba(13, 18, 29, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .analysis-title {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .metrics-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .metrics-table th, .metrics-table td {
+      padding: 9px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--divider);
+    }
+    .metrics-table th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+    }
+    .metrics-table td.num { font-family: var(--font-mono); font-weight: 600; }
+    .metrics-table .delta-gain { color: #34d399; font-weight: 700; }
+    .variant-notes {
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.2);
+      padding: 12px 16px;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+    .variant-notes strong { color: var(--text-primary); }
+
+    /* ========================================================
+       FLOATING SWITCHER (Per prototype skill specification)
+       ======================================================== */
+    .floating-switcher {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 18, 29, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      border-radius: 40px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 229, 255, 0.2);
+      z-index: 1000;
+    }
+    .switcher-nav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .switcher-nav-btn:hover {
+      background: var(--accent);
+      color: #000;
+      transform: scale(1.1);
+    }
+    .switcher-label-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      padding: 0 8px;
+    }
+    .switcher-key {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .switcher-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .switcher-hints {
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      margin-top: 1px;
+    }
+    kbd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIMULATED MACOS MENU BAR -->
+  <header class="macos-menubar">
+    <div class="menubar-left">
+      <span style="font-size: 14px;"></span>
+      <span style="font-weight: 700;">Skeval Timer</span>
+      <span style="font-size: 12px; color: var(--text-secondary); font-weight: 400;">File &nbsp; Edit &nbsp; View &nbsp; Window &nbsp; Help</span>
+    </div>
+    <div class="menubar-right">
+      <div id="menubarPill" class="status-pill idle" onclick="showToast('Menu bar status item clicked')">
+        <span class="pulse-dot"></span>
+        <span id="menubarLabel">03:45:00</span>
+      </div>
+      <span style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">07:06 AM</span>
+    </div>
+  </header>
+
+  <!-- WORKSPACE BANNER -->
+  <div class="workspace-banner">
+    <h1>
+      <span>Manual Sprint Entry Prototype</span>
+      <span class="badge-compaction">3 Radical UI Variants</span>
+    </h1>
+    <p>Solving manual start & end time input in a constrained 330px macOS menu bar popover.</p>
+  </div>
+
+  <!-- INTERACTIVE SIMULATOR CONTROLS -->
+  <div class="simulator-controls">
+    <div class="sim-group">
+      <span class="sim-label">View Layout:</span>
+      <div class="sim-btn-group">
+        <button id="btnViewSingle" class="sim-btn active" onclick="setViewMode('single')">Single Variant</button>
+        <button id="btnViewCompare" class="sim-btn" onclick="setViewMode('compare')">Compare All 3</button>
+      </div>
+    </div>
+
+    <div class="sim-group">
+      <span class="sim-label">Timer State:</span>
+      <div class="sim-btn-group">
+        <button id="stateBtnIdle" class="sim-btn active" onclick="setTimerState('idle')">Idle</button>
+        <button id="stateBtnRunning" class="sim-btn" onclick="setTimerState('running')">Live Running</button>
+      </div>
+    </div>
+
+    <div class="sim-group">
+      <span class="sim-label">Preset Work Block:</span>
+      <div class="sim-btn-group">
+        <button class="sim-btn" onclick="applyQuickTimes('09:00:00', '10:30:00')">09:00 → 10:30 (1.5h)</button>
+        <button class="sim-btn" onclick="applyQuickTimes('11:15:00', '13:00:00')">11:15 → 13:00 (1.75h)</button>
+        <button class="sim-btn" onclick="applyQuickTimes('14:00:00', '16:00:00')">14:00 → 16:00 (2h)</button>
+      </div>
+    </div>
+
+    <div class="sim-group">
+      <button id="themeBtn" class="sim-btn" onclick="toggleTheme()" style="background: rgba(255,255,255,0.08); border-radius: 14px;">☀️ Light Mode</button>
+    </div>
+  </div>
+
+  <!-- VIEWPORTS WRAPPER -->
+  <div class="viewports-wrapper" id="viewportsWrapper">
+
+    <!-- COLUMN A: VARIANT A -->
+    <div class="mockup-column" id="colVariantA">
+      <div class="column-header">
+        <div class="column-title">
+          <span>Variant A: History Drawer</span>
+        </div>
+        <div class="space-pill">0px Idle · Accordion</div>
+      </div>
+
+      <!-- Popover Card A -->
+      <div class="popover-card">
+        <div class="pop-header">
+          <div class="pop-title-area">
+            <div class="pop-title-row">
+              <span class="pop-app-name">SKEVAL TIMER</span>
+              <span class="pop-badge-mvp">MVP</span>
+            </div>
+            <span class="pop-date-sub">Friday, 9 Oct 2026</span>
+          </div>
+          <div class="pop-header-right">
+            <div class="pop-status-badge idle" id="badgeA">
+              <span class="dot"></span>
+              <span id="badgeTextA">IDLE</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pop-clock-section">
+          <div class="big-timer" id="timerA">00:00:00</div>
+          <div class="clock-subtext">
+            <span>∑ Today's Total:</span>
+            <strong id="accLabelA" style="font-family: var(--font-mono); color: var(--text-primary);">03:45:00</strong>
+          </div>
+        </div>
+
+        <div class="pop-goal-section">
+          <div class="goal-header-row">
+            <span class="goal-title">Daily Target</span>
+            <div class="goal-earnings">
+              <strong id="earningsA">₹1,500</strong> <span>/ ₹3,200</span>
+            </div>
+          </div>
+          <div class="goal-track">
+            <div class="goal-fill" id="goalFillA" style="width: 47%;"></div>
+          </div>
+          <div class="goal-meta-row">
+            <span id="loggedProgressA">Logged: 3h 45m / 8h</span>
+            <span id="achievedPctA">47% achieved</span>
+          </div>
+        </div>
+
+        <div class="pop-action-section">
+          <div class="timestamp-cards-row">
+            <div class="ts-card">
+              <span class="ts-label">PREV START</span>
+              <span class="ts-value">11:15:00</span>
+            </div>
+            <div class="ts-card">
+              <span class="ts-label">PREV END</span>
+              <span class="ts-value active-teal">12:30:15</span>
+            </div>
+          </div>
+          <button class="btn-action btn-clockin" id="mainActionBtnA" onclick="toggleSimLiveTimer()">
+            <span>▶</span> <span>CLOCK IN</span>
+          </button>
+        </div>
+
+        <!-- Sprint History with Accordion Drawer -->
+        <div class="pop-history-section">
+          <div class="history-header">
+            <div class="history-title-row">
+              <span class="icon">▤</span>
+              <span>TODAY'S SPRINTS</span>
+              <span class="history-count" id="countBadgeA">(3)</span>
+            </div>
+            <div class="history-actions">
+              <button class="btn-add-manual-pill" id="btnAddManualA" onclick="toggleDrawerA()">
+                <span>+</span> <span>MANUAL</span>
+              </button>
+              <button class="btn-copy-all" onclick="copyAllSim(this)">
+                <span>⧉</span> <span>COPY ALL</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- The Drawer (Collapsible) -->
+          <div class="variant-a-drawer" id="drawerA" style="display: none;">
+            <div class="drawer-title-row">
+              <span class="drawer-title">
+                <span>✍️</span> <span>Log Completed Sprint</span>
+              </span>
+              <span style="font-size: 8.5px; color: var(--text-secondary);">Today</span>
+            </div>
+
+            <div class="drawer-inputs-row">
+              <div class="time-input-group">
+                <span class="time-input-label">Start Time</span>
+                <input type="text" id="inputStartA" class="compact-time-input" value="09:00:00" placeholder="HH:mm:ss" oninput="updateDrawerCalcA()" />
+              </div>
+              <span style="color: var(--text-secondary); margin-top: 14px; font-size: 11px;">→</span>
+              <div class="time-input-group">
+                <span class="time-input-label">End Time</span>
+                <input type="text" id="inputEndA" class="compact-time-input" value="10:30:00" placeholder="HH:mm:ss" oninput="updateDrawerCalcA()" />
+              </div>
+              <div class="time-input-group" style="max-width: 58px;">
+                <span class="time-input-label">Break (m)</span>
+                <input type="number" id="inputBreakA" class="compact-time-input" value="0" min="0" oninput="updateDrawerCalcA()" />
+              </div>
+            </div>
+
+            <div class="drawer-presets-row">
+              <span class="chip-preset" onclick="setPresetA(-30, 0)">Past 30m</span>
+              <span class="chip-preset" onclick="setPresetA(-60, 0)">Past 1h</span>
+              <span class="chip-preset" onclick="setPresetA(-120, 0)">Past 2h</span>
+              <span class="chip-preset" onclick="setPresetA(-45, -15)">45m ago</span>
+            </div>
+
+            <div class="drawer-footer-row">
+              <div class="calc-duration-tag" id="calcTagA">
+                <span>⏱</span> <span id="calcDurationA">01:30:00</span>
+                <span id="calcEarningsDeltaA" style="color: #34d399; font-size: 9px;">(+₹600)</span>
+              </div>
+              <div class="drawer-btn-actions">
+                <button class="btn-drawer-cancel" onclick="toggleDrawerA()">Cancel</button>
+                <button class="btn-drawer-save" id="btnSaveA" onclick="saveManualSprintA()">+ Add Sprint</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sprints List -->
+          <div class="sprints-scroll-area" id="sprintsListA"></div>
+        </div>
+
+        <div class="pop-settings-footer">
+          <span>⚙️ SETTINGS</span>
+          <span>›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN B: VARIANT B -->
+    <div class="mockup-column" id="colVariantB">
+      <div class="column-header">
+        <div class="column-title">
+          <span>Variant B: Action Area Tab Morph</span>
+        </div>
+        <div class="space-pill">0px Net Added · In-Place Swap</div>
+      </div>
+
+      <!-- Popover Card B -->
+      <div class="popover-card">
+        <div class="pop-header">
+          <div class="pop-title-area">
+            <div class="pop-title-row">
+              <span class="pop-app-name">SKEVAL TIMER</span>
+              <span class="pop-badge-mvp">MVP</span>
+            </div>
+            <span class="pop-date-sub">Friday, 9 Oct 2026</span>
+          </div>
+          <div class="pop-header-right">
+            <div class="pop-status-badge idle" id="badgeB">
+              <span class="dot"></span>
+              <span id="badgeTextB">IDLE</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pop-clock-section">
+          <div class="big-timer" id="timerB">00:00:00</div>
+          <div class="clock-subtext">
+            <span>∑ Today's Total:</span>
+            <strong id="accLabelB" style="font-family: var(--font-mono); color: var(--text-primary);">03:45:00</strong>
+          </div>
+        </div>
+
+        <div class="pop-goal-section">
+          <div class="goal-header-row">
+            <span class="goal-title">Daily Target</span>
+            <div class="goal-earnings">
+              <strong id="earningsB">₹1,500</strong> <span>/ ₹3,200</span>
+            </div>
+          </div>
+          <div class="goal-track">
+            <div class="goal-fill" id="goalFillB" style="width: 47%;"></div>
+          </div>
+          <div class="goal-meta-row">
+            <span id="loggedProgressB">Logged: 3h 45m / 8h</span>
+            <span id="achievedPctB">47% achieved</span>
+          </div>
+        </div>
+
+        <!-- ACTION SECTION: TABBED MORPH -->
+        <div class="pop-action-section" style="gap: 8px;">
+          <!-- Segmented Tab Switcher -->
+          <div class="segmented-mode-bar">
+            <button class="seg-mode-btn active" id="tabLiveB" onclick="setActionTabB('live')">
+              <span>⏱</span> <span>LIVE TIMER</span>
+            </button>
+            <button class="seg-mode-btn" id="tabManualB" onclick="setActionTabB('manual')">
+              <span>✍️</span> <span>MANUAL LOG</span>
+            </button>
+          </div>
+
+          <!-- Live Timer Mode Content -->
+          <div id="contentLiveB" style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="timestamp-cards-row">
+              <div class="ts-card">
+                <span class="ts-label">PREV START</span>
+                <span class="ts-value">11:15:00</span>
+              </div>
+              <div class="ts-card">
+                <span class="ts-label">PREV END</span>
+                <span class="ts-value active-teal">12:30:15</span>
+              </div>
+            </div>
+            <button class="btn-action btn-clockin" onclick="toggleSimLiveTimer()">
+              <span>▶</span> <span>CLOCK IN</span>
+            </button>
+          </div>
+
+          <!-- Manual Mode Content (Morphed In-Place) -->
+          <div id="contentManualB" style="display: none; flex-direction: column; gap: 8px;">
+            <div class="timestamp-cards-row">
+              <div class="var-b-input-card">
+                <span class="ts-label">START TIME</span>
+                <input type="text" id="inputStartB" class="ts-input" value="09:00:00" placeholder="HH:mm:ss" oninput="updateActionCalcB()" />
+              </div>
+              <div class="var-b-input-card">
+                <span class="ts-label">END TIME</span>
+                <input type="text" id="inputEndB" class="ts-input" value="10:30:00" placeholder="HH:mm:ss" oninput="updateActionCalcB()" />
+              </div>
+            </div>
+
+            <div class="var-b-options-row">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span>Break:</span>
+                <input type="number" id="inputBreakB" class="var-b-break-input" value="0" min="0" oninput="updateActionCalcB()" />
+                <span>min</span>
+              </div>
+              <div class="calc-duration-tag" id="calcTagB">
+                <span>⏱</span> <span id="calcDurationB">01:30:00 net</span>
+                <span id="calcEarningsDeltaB" style="color: #34d399; font-size: 9px;">(+₹600)</span>
+              </div>
+            </div>
+
+            <button class="btn-log-manual" id="btnSaveB" onclick="saveManualSprintB()">
+              <span>✍️</span> <span id="btnSaveTextB">LOG SPRINT (+1h 30m)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sprint History -->
+        <div class="pop-history-section">
+          <div class="history-header">
+            <div class="history-title-row">
+              <span class="icon">▤</span>
+              <span>TODAY'S SPRINTS</span>
+              <span class="history-count" id="countBadgeB">(3)</span>
+            </div>
+            <div class="history-actions">
+              <button class="btn-copy-all" onclick="copyAllSim(this)">
+                <span>⧉</span> <span>COPY ALL</span>
+              </button>
+            </div>
+          </div>
+          <div class="sprints-scroll-area" id="sprintsListB"></div>
+        </div>
+
+        <div class="pop-settings-footer">
+          <span>⚙️ SETTINGS</span>
+          <span>›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMN C: VARIANT C -->
+    <div class="mockup-column" id="colVariantC">
+      <div class="column-header">
+        <div class="column-title">
+          <span>Variant C: Native Sheet Modal</span>
+        </div>
+        <div class="space-pill">0px Permanent · Focused Flyout</div>
+      </div>
+
+      <!-- Popover Card C -->
+      <div class="popover-card">
+        <div class="pop-header">
+          <div class="pop-title-area">
+            <div class="pop-title-row">
+              <span class="pop-app-name">SKEVAL TIMER</span>
+              <span class="pop-badge-mvp">MVP</span>
+            </div>
+            <span class="pop-date-sub">Friday, 9 Oct 2026</span>
+          </div>
+          <div class="pop-header-right">
+            <div class="pop-status-badge idle" id="badgeC">
+              <span class="dot"></span>
+              <span id="badgeTextC">IDLE</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pop-clock-section">
+          <div class="big-timer" id="timerC">00:00:00</div>
+          <div class="clock-subtext">
+            <span>∑ Today's Total:</span>
+            <strong id="accLabelC" style="font-family: var(--font-mono); color: var(--text-primary);">03:45:00</strong>
+          </div>
+        </div>
+
+        <div class="pop-goal-section">
+          <div class="goal-header-row">
+            <span class="goal-title">Daily Target</span>
+            <div class="goal-earnings">
+              <strong id="earningsC">₹1,500</strong> <span>/ ₹3,200</span>
+            </div>
+          </div>
+          <div class="goal-track">
+            <div class="goal-fill" id="goalFillC" style="width: 47%;"></div>
+          </div>
+          <div class="goal-meta-row">
+            <span id="loggedProgressC">Logged: 3h 45m / 8h</span>
+            <span id="achievedPctC">47% achieved</span>
+          </div>
+        </div>
+
+        <div class="pop-action-section">
+          <div class="timestamp-cards-row">
+            <div class="ts-card">
+              <span class="ts-label">PREV START</span>
+              <span class="ts-value">11:15:00</span>
+            </div>
+            <div class="ts-card">
+              <span class="ts-label">PREV END</span>
+              <span class="ts-value active-teal">12:30:15</span>
+            </div>
+          </div>
+          <button class="btn-action btn-clockin" onclick="toggleSimLiveTimer()">
+            <span>▶</span> <span>CLOCK IN</span>
+          </button>
+        </div>
+
+        <div class="pop-history-section">
+          <div class="history-header">
+            <div class="history-title-row">
+              <span class="icon">▤</span>
+              <span>TODAY'S SPRINTS</span>
+              <span class="history-count" id="countBadgeC">(3)</span>
+            </div>
+            <div class="history-actions">
+              <button class="btn-copy-all" onclick="copyAllSim(this)">
+                <span>⧉</span> <span>COPY ALL</span>
+              </button>
+              <button class="btn-plus-icon-header" onclick="openSheetC()" title="Add sprint manually (+)">+</button>
+            </div>
+          </div>
+          <div class="sprints-scroll-area" id="sprintsListC"></div>
+        </div>
+
+        <div class="pop-settings-footer">
+          <span>⚙️ SETTINGS</span>
+          <span>›</span>
+        </div>
+
+        <!-- The Native macOS Sheet Overlay (Variant C) -->
+        <div class="sheet-modal-backdrop" id="sheetBackdropC" style="display: none;">
+          <div class="sheet-card">
+            <div class="sheet-handle-bar"></div>
+            <div class="sheet-header-row">
+              <span class="sheet-title">
+                <span>⏱</span> <span>Manual Sprint Entry</span>
+              </span>
+              <button class="sheet-close-btn" onclick="closeSheetC()">✕</button>
+            </div>
+
+            <div class="sheet-time-picker-box">
+              <!-- Start Time with Step Controls -->
+              <div class="picker-row">
+                <span class="picker-label">Start Time</span>
+                <div class="picker-control-cluster">
+                  <button class="step-arrow-btn" onclick="stepTimeC('start', -15)">-15m</button>
+                  <input type="text" id="sheetStartC" class="sheet-input-field" value="09:00:00" oninput="updateSheetCalcC()" />
+                  <button class="step-arrow-btn" onclick="stepTimeC('start', 15)">+15m</button>
+                </div>
+              </div>
+
+              <!-- End Time with Step Controls -->
+              <div class="picker-row">
+                <span class="picker-label">End Time</span>
+                <div class="picker-control-cluster">
+                  <button class="step-arrow-btn" onclick="stepTimeC('end', -15)">-15m</button>
+                  <input type="text" id="sheetEndC" class="sheet-input-field" value="10:30:00" oninput="updateSheetCalcC()" />
+                  <button class="step-arrow-btn" onclick="stepTimeC('end', 15)">+15m</button>
+                </div>
+              </div>
+
+              <!-- Break / Pause Deduct -->
+              <div class="picker-row">
+                <span class="picker-label">Break Deduction</span>
+                <div class="picker-control-cluster">
+                  <input type="number" id="sheetBreakC" class="sheet-input-field" style="width: 54px;" value="0" min="0" oninput="updateSheetCalcC()" />
+                  <span style="font-size: 11px; color: var(--text-secondary);">min</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Impact Preview -->
+            <div class="sheet-impact-card">
+              <span class="impact-header">Summary & Earnings Impact</span>
+              <div class="impact-stats">
+                <span id="sheetSummaryDurationC">Net: 01:30:00</span>
+                <span id="sheetSummaryDeltaC" style="color: #34d399;">+₹600.00</span>
+              </div>
+              <div style="font-size: 9.5px; color: var(--text-secondary); margin-top: 2px;" id="sheetGoalImpactC">
+                Today's Total: 3h 45m → 5h 15m (66% of goal)
+              </div>
+            </div>
+
+            <div class="sheet-btn-row">
+              <button class="btn-sheet-cancel" onclick="closeSheetC()">Cancel</button>
+              <button class="btn-sheet-save" id="btnSheetSaveC" onclick="saveManualSprintC()">+ Add to Day Log</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ANALYSIS & TRADEOFF BREAKDOWN -->
+  <div class="analysis-container">
+    <div class="analysis-title">
+      <span>📐 UI Space & Structural Tradeoff Comparison</span>
+      <span style="font-size: 12px; font-weight: 600; color: var(--accent);">Fixed Popover Width: 330px</span>
+    </div>
+
+    <table class="metrics-table">
+      <thead>
+        <tr>
+          <th>Design Dimension</th>
+          <th>Variant A (History Drawer)</th>
+          <th>Variant B (Action Tab Morph)</th>
+          <th>Variant C (Native Sheet Modal)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Idle Height Added</strong></td>
+          <td class="delta-gain">0 px (Header button)</td>
+          <td class="delta-gain">0 px (Reuses action row)</td>
+          <td class="delta-gain">0 px (Trigger in header)</td>
+        </tr>
+        <tr>
+          <td><strong>Active Entry Height</strong></td>
+          <td>Takes ~84px above sprints</td>
+          <td class="delta-gain">0 px net (in-place swap)</td>
+          <td>Overlays ~220px sheet</td>
+        </tr>
+        <tr>
+          <td><strong>Affordance Location</strong></td>
+          <td>Next to "TODAY'S SPRINTS"</td>
+          <td>Segmented pill above action</td>
+          <td>Header icon "+" or hotkey</td>
+        </tr>
+        <tr>
+          <td><strong>Live Timer Clashing</strong></td>
+          <td>Completely independent</td>
+          <td>Requires switching tab back</td>
+          <td>Completely independent</td>
+        </tr>
+        <tr>
+          <td><strong>Quick Presets / Steppers</strong></td>
+          <td>Relative chips (Past 30m, 1h)</td>
+          <td>Direct text + break input</td>
+          <td>±15m step buttons + presets</td>
+        </tr>
+        <tr>
+          <td><strong>Ergonomics & Density</strong></td>
+          <td>Tight, high information density</td>
+          <td>Zero height penalty, ultra-clean</td>
+          <td>Most relaxed, touch-friendly</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="variant-notes" id="variantNotesBox">
+      <strong>Engineering Recommendation:</strong><br/>
+      • <strong>Variant A (History Drawer)</strong> is the most intuitive for day-to-day workflow because the user is thinking "I want to add an entry to my history list." It consumes 0px of vertical space until opened, then slides away on save.<br/>
+      • <strong>Variant B (Action Tab Morph)</strong> is the most space-efficient for the 330px popover because it reuses the exact action footprint. Perfect if you prefer keeping the popover height 100% constant.<br/>
+      • <strong>Variant C (Native Sheet)</strong> is the most robust if you want advanced features like break deduction, ±15m steppers, and goal impact previews without cramping the main window.
+    </div>
+  </div>
+
+  <!-- FLOATING SWITCHER (Per prototype skill specification) -->
+  <nav class="floating-switcher" aria-label="Prototype Variant Switcher">
+    <button class="switcher-nav-btn" onclick="prevVariant()" title="Previous Variant (Left Arrow)">←</button>
+    <div class="switcher-label-wrapper" onclick="nextVariant()">
+      <span id="switcherKey" class="switcher-key">VARIANT A</span>
+      <span id="switcherName" class="switcher-name">Accordion History Drawer</span>
+      <span class="switcher-hints">Use <kbd>←</kbd> <kbd>→</kbd> or click to switch</span>
+    </div>
+    <button class="switcher-nav-btn" onclick="nextVariant()" title="Next Variant (Right Arrow)">→</button>
+  </nav>
+
+  <script>
+    // --- Data & State ---
+    let currentVariant = 'A';
+    let viewMode = 'single'; // 'single', 'compare'
+    let isLight = false;
+    let timerState = 'idle'; // 'idle', 'running'
+    let liveElapsed = 0;
+    let liveInterval = null;
+
+    // Hourly rate: ₹400/hr, Daily Goal: 8h (28,800s)
+    const HOURLY_RATE = 400;
+    const DAILY_GOAL_SEC = 8 * 3600;
+
+    let sprints = [
+      { id: 101, start: '11:15:00', end: '12:30:15', durationSec: 4515, pausedMin: 0, isManual: false },
+      { id: 102, start: '09:40:05', end: '10:55:00', durationSec: 4495, pausedMin: 4, isManual: false },
+      { id: 103, start: '08:15:12', end: '09:25:40', durationSec: 4228, pausedMin: 0, isManual: false }
+    ];
+
+    const VARIANTS = ['A', 'B', 'C'];
+    const VARIANT_CONFIG = {
+      'A': {
+        name: 'Accordion History Drawer',
+        desc: '<strong>Variant A (Accordion History Drawer):</strong> An inline collapsible card above the sprint list. Click "+ MANUAL" to expand, choose a preset or type times, see live duration and earnings, then save. Zero pixels consumed while closed; aligns mentally with the sprint log below it.'
+      },
+      'B': {
+        name: 'Action Area Tabbed Morph',
+        desc: '<strong>Variant B (Action Tab Morph):</strong> An in-place 2-segment switcher ("Live Timer" vs "Manual Log"). When switched, the live cards morph directly into Start & End inputs. Zero net height added to the popover — 100% space-neutral.'
+      },
+      'C': {
+        name: 'Native macOS Sheet Modal',
+        desc: '<strong>Variant C (Native Sheet Modal):</strong> A dedicated sheet sliding up with a backdrop blur. Triggered via the header "+" icon or "+ MANUAL" button. Provides plenty of breathing room for ±15m step buttons, break duration, and real-time goal impact preview.'
+      }
+    };
+
+    // --- Time Formatting Utilities ---
+    function formatClock(totalSec) {
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = Math.floor(totalSec % 60);
+      return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    function formatShort(totalSec) {
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+
+    function parseTimeStr(str) {
+      const parts = str.trim().split(':').map(Number);
+      if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+      if (parts[0] < 0 || parts[0] > 23 || parts[1] < 0 || parts[1] > 59) return null;
+      const s = parts.length >= 3 && !isNaN(parts[2]) ? parts[2] : 0;
+      if (s < 0 || s > 59) return null;
+      return parts[0] * 3600 + parts[1] * 60 + s;
+    }
+
+    function secToTimeStr(sec) {
+      sec = (sec + 86400) % 86400;
+      return formatClock(sec);
+    }
+
+    // --- URL Sync ---
+    function readUrlParam() {
+      const p = new URLSearchParams(window.location.search);
+      const v = p.get('variant');
+      if (v && VARIANT_CONFIG[v]) {
+        currentVariant = v;
+      }
+    }
+
+    function updateUrlParam(v) {
+      const url = new URL(window.location);
+      url.searchParams.set('variant', v);
+      window.history.replaceState({}, '', url);
+    }
+
+    // --- Switcher Logic ---
+    function setVariant(v) {
+      if (!VARIANT_CONFIG[v]) return;
+      currentVariant = v;
+      updateUrlParam(v);
+
+      const cfg = VARIANT_CONFIG[v];
+      document.getElementById('switcherKey').textContent = `VARIANT ${v}`;
+      document.getElementById('switcherName').textContent = cfg.name;
+      document.getElementById('variantNotesBox').innerHTML = cfg.desc;
+
+      if (viewMode === 'single') {
+        document.getElementById('colVariantA').style.display = (v === 'A') ? 'flex' : 'none';
+        document.getElementById('colVariantB').style.display = (v === 'B') ? 'flex' : 'none';
+        document.getElementById('colVariantC').style.display = (v === 'C') ? 'flex' : 'none';
+      }
+    }
+
+    function nextVariant() {
+      const idx = VARIANTS.indexOf(currentVariant);
+      setVariant(VARIANTS[(idx + 1) % VARIANTS.length]);
+    }
+
+    function prevVariant() {
+      const idx = VARIANTS.indexOf(currentVariant);
+      setVariant(VARIANTS[(idx - 1 + VARIANTS.length) % VARIANTS.length]);
+    }
+
+    // --- View Modes ---
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById('btnViewSingle').classList.toggle('active', mode === 'single');
+      document.getElementById('btnViewCompare').classList.toggle('active', mode === 'compare');
+
+      if (mode === 'compare') {
+        document.getElementById('colVariantA').style.display = 'flex';
+        document.getElementById('colVariantB').style.display = 'flex';
+        document.getElementById('colVariantC').style.display = 'flex';
+      } else {
+        setVariant(currentVariant);
+      }
+    }
+
+    // --- Render Sprints Across All Columns ---
+    function renderAll() {
+      const totalSec = sprints.reduce((acc, s) => acc + s.durationSec, 0) + (timerState === 'running' ? liveElapsed : 0);
+      const earnings = (totalSec / 3600) * HOURLY_RATE;
+      const progressFraction = Math.min(1.0, totalSec / DAILY_GOAL_SEC);
+      const pctAchieved = Math.round(progressFraction * 100);
+
+      ['A', 'B', 'C'].forEach(col => {
+        // Acc total label
+        document.getElementById(`accLabel${col}`).textContent = formatClock(totalSec);
+        // Earnings
+        document.getElementById(`earnings${col}`).textContent = `₹${Math.round(earnings).toLocaleString('en-IN')}`;
+        // Goal bar fill
+        document.getElementById(`goalFill${col}`).style.width = `${pctAchieved}%`;
+        // Meta row
+        document.getElementById(`loggedProgress${col}`).textContent = `Logged: ${formatShort(totalSec)} / 8h`;
+        document.getElementById(`achievedPct${col}`).textContent = `${pctAchieved}% achieved`;
+        // Count badge
+        document.getElementById(`countBadge${col}`).textContent = `(${sprints.length})`;
+
+        // Render List
+        const listEl = document.getElementById(`sprintsList${col}`);
+        listEl.innerHTML = sprints.map((s, idx) => `
+          <div class="sprint-card ${s.isManual ? 'manual-highlight' : ''}">
+            <div class="sprint-num-badge ${s.isManual ? 'manual-tag' : ''}">#${sprints.length - idx}</div>
+            <div class="sprint-info">
+              <div class="sprint-times">
+                <span>${s.start}</span>
+                <span class="sprint-arrow">→</span>
+                <span>${s.end}</span>
+                ${s.isManual ? '<span class="manual-indicator-pill">MANUAL</span>' : ''}
+              </div>
+              <div class="sprint-meta">
+                <span>${formatShort(s.durationSec)}</span>
+                ${s.pausedMin > 0 ? `<span class="pause-pill-micro">⏸ ${s.pausedMin}m</span>` : ''}
+                <span style="color: #34d399;">· ₹${Math.round((s.durationSec / 3600) * HOURLY_RATE)}</span>
+              </div>
+            </div>
+            <div class="sprint-actions">
+              <button class="sprint-action-btn sprint-copy-btn" onclick="copyRow(this, '${s.start}', '${s.end}')" title="Copy start and end">⧉</button>
+              <button class="sprint-action-btn sprint-del-btn" onclick="deleteSprint(${s.id})" title="Delete sprint">✕</button>
+            </div>
+          </div>
+        `).join('');
+      });
+
+      // Update calculations in open forms
+      updateDrawerCalcA();
+      updateActionCalcB();
+      updateSheetCalcC();
+    }
+
+    function deleteSprint(id) {
+      sprints = sprints.filter(s => s.id !== id);
+      renderAll();
+      showToast('Sprint deleted');
+    }
+
+    function copyRow(btn, start, end) {
+      btn.classList.add('copied');
+      btn.textContent = '✓';
+      navigator.clipboard?.writeText(`${start}\t${end}`);
+      showToast(`Copied to clipboard: ${start} → ${end}`);
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = '⧉';
+      }, 1000);
+    }
+
+    // --- Live Timer Simulation ---
+    function setTimerState(state) {
+      timerState = state;
+      document.getElementById('stateBtnIdle').classList.toggle('active', state === 'idle');
+      document.getElementById('stateBtnRunning').classList.toggle('active', state === 'running');
+
+      const pill = document.getElementById('menubarPill');
+      const menubarLabel = document.getElementById('menubarLabel');
+
+      if (state === 'running') {
+        pill.className = 'status-pill active';
+        if (!liveInterval) {
+          liveElapsed = 0;
+          liveInterval = setInterval(() => {
+            liveElapsed++;
+            const tStr = formatClock(liveElapsed);
+            ['A', 'B', 'C'].forEach(col => {
+              const timerEl = document.getElementById(`timer${col}`);
+              timerEl.textContent = tStr;
+              timerEl.classList.add('active');
+            });
+            menubarLabel.textContent = tStr;
+          }, 1000);
+        }
+        ['A', 'B', 'C'].forEach(col => {
+          document.getElementById(`badge${col}`).className = 'pop-status-badge active';
+          document.getElementById(`badgeText${col}`).textContent = 'RUNNING';
+        });
+      } else {
+        pill.className = 'status-pill idle';
+        clearInterval(liveInterval);
+        liveInterval = null;
+        liveElapsed = 0;
+        ['A', 'B', 'C'].forEach(col => {
+          const timerEl = document.getElementById(`timer${col}`);
+          timerEl.textContent = '00:00:00';
+          timerEl.classList.remove('active');
+          document.getElementById(`badge${col}`).className = 'pop-status-badge idle';
+          document.getElementById(`badgeText${col}`).textContent = 'IDLE';
+        });
+        const totalSec = sprints.reduce((acc, s) => acc + s.durationSec, 0);
+        menubarLabel.textContent = formatClock(totalSec);
+      }
+      renderAll();
+    }
+
+    function toggleSimLiveTimer() {
+      setTimerState(timerState === 'running' ? 'idle' : 'running');
+    }
+
+    // --- VARIANT A CONTROLS (Accordion Drawer) ---
+    function toggleDrawerA() {
+      const drawer = document.getElementById('drawerA');
+      const btn = document.getElementById('btnAddManualA');
+      const isVisible = drawer.style.display !== 'none';
+      drawer.style.display = isVisible ? 'none' : 'flex';
+      btn.classList.toggle('active', !isVisible);
+      if (!isVisible) updateDrawerCalcA();
+    }
+
+    function updateDrawerCalcA() {
+      const startSec = parseTimeStr(document.getElementById('inputStartA').value);
+      const endSec = parseTimeStr(document.getElementById('inputEndA').value);
+      const breakMin = Number(document.getElementById('inputBreakA').value) || 0;
+      const tag = document.getElementById('calcTagA');
+      const durText = document.getElementById('calcDurationA');
+      const earnText = document.getElementById('calcEarningsDeltaA');
+      const btnSave = document.getElementById('btnSaveA');
+
+      if (startSec === null || endSec === null) {
+        tag.className = 'calc-duration-tag error';
+        durText.textContent = 'Invalid format (HH:mm:ss)';
+        earnText.textContent = '';
+        btnSave.disabled = true;
+        return;
+      }
+
+      let netSec = endSec - startSec - (breakMin * 60);
+      if (netSec <= 0) {
+        tag.className = 'calc-duration-tag error';
+        durText.textContent = 'End must be > Start';
+        earnText.textContent = '';
+        btnSave.disabled = true;
+        return;
+      }
+
+      tag.className = 'calc-duration-tag';
+      durText.textContent = formatClock(netSec);
+      const deltaEarnings = Math.round((netSec / 3600) * HOURLY_RATE);
+      earnText.textContent = `(+₹${deltaEarnings})`;
+      btnSave.disabled = false;
+    }
+
+    function setPresetA(startOffsetMin, endOffsetMin) {
+      const now = new Date();
+      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const s = (nowSec + startOffsetMin * 60 + 86400) % 86400;
+      const e = (nowSec + endOffsetMin * 60 + 86400) % 86400;
+      document.getElementById('inputStartA').value = secToTimeStr(s);
+      document.getElementById('inputEndA').value = secToTimeStr(e);
+      document.getElementById('inputBreakA').value = '0';
+      updateDrawerCalcA();
+    }
+
+    function insertSprintSorted(newSprint) {
+      sprints.push(newSprint);
+      sprints.sort((a, b) => {
+        const aSec = parseTimeStr(a.start) ?? 0;
+        const bSec = parseTimeStr(b.start) ?? 0;
+        return bSec - aSec; // Descending: newest start time first
+      });
+    }
+
+    function saveManualSprintA() {
+      const start = document.getElementById('inputStartA').value.trim();
+      const end = document.getElementById('inputEndA').value.trim();
+      const startSec = parseTimeStr(start);
+      const endSec = parseTimeStr(end);
+      const breakMin = Number(document.getElementById('inputBreakA').value) || 0;
+
+      if (!startSec || !endSec || endSec <= startSec) return;
+      const netSec = endSec - startSec - (breakMin * 60);
+
+      insertSprintSorted({
+        id: Date.now(),
+        start: start,
+        end: end,
+        durationSec: netSec,
+        pausedMin: breakMin,
+        isManual: true
+      });
+
+      toggleDrawerA();
+      renderAll();
+      showToast(`✓ Sprint logged: ${start} → ${end} (${formatShort(netSec)})`);
+    }
+
+    // --- VARIANT B CONTROLS (Action Tab Morph) ---
+    function setActionTabB(tab) {
+      const isManual = tab === 'manual';
+      document.getElementById('tabLiveB').classList.toggle('active', !isManual);
+      document.getElementById('tabManualB').classList.toggle('active', isManual);
+      document.getElementById('tabManualB').classList.toggle('manual', isManual);
+      document.getElementById('contentLiveB').style.display = isManual ? 'none' : 'flex';
+      document.getElementById('contentManualB').style.display = isManual ? 'flex' : 'none';
+      if (isManual) updateActionCalcB();
+    }
+
+    function updateActionCalcB() {
+      const startSec = parseTimeStr(document.getElementById('inputStartB').value);
+      const endSec = parseTimeStr(document.getElementById('inputEndB').value);
+      const breakMin = Number(document.getElementById('inputBreakB').value) || 0;
+      const durText = document.getElementById('calcDurationB');
+      const earnText = document.getElementById('calcEarningsDeltaB');
+      const btnSave = document.getElementById('btnSaveB');
+      const btnSaveText = document.getElementById('btnSaveTextB');
+
+      if (startSec === null || endSec === null || endSec <= startSec) {
+        durText.textContent = 'Invalid times';
+        earnText.textContent = '';
+        btnSave.disabled = true;
+        btnSaveText.textContent = 'ENTER VALID TIMES';
+        return;
+      }
+
+      const netSec = endSec - startSec - (breakMin * 60);
+      durText.textContent = `${formatShort(netSec)} net`;
+      const deltaEarnings = Math.round((netSec / 3600) * HOURLY_RATE);
+      earnText.textContent = `(+₹${deltaEarnings})`;
+      btnSave.disabled = false;
+      btnSaveText.textContent = `LOG SPRINT (+${formatShort(netSec)})`;
+    }
+
+    function saveManualSprintB() {
+      const start = document.getElementById('inputStartB').value.trim();
+      const end = document.getElementById('inputEndB').value.trim();
+      const startSec = parseTimeStr(start);
+      const endSec = parseTimeStr(end);
+      const breakMin = Number(document.getElementById('inputBreakB').value) || 0;
+
+      if (!startSec || !endSec || endSec <= startSec) return;
+      const netSec = endSec - startSec - (breakMin * 60);
+
+      insertSprintSorted({
+        id: Date.now(),
+        start: start,
+        end: end,
+        durationSec: netSec,
+        pausedMin: breakMin,
+        isManual: true
+      });
+
+      setActionTabB('live');
+      renderAll();
+      showToast(`✓ Sprint logged in history: ${start} → ${end}`);
+    }
+
+    // --- VARIANT C CONTROLS (Sheet Modal) ---
+    function openSheetC() {
+      document.getElementById('sheetBackdropC').style.display = 'flex';
+      updateSheetCalcC();
+    }
+
+    function closeSheetC() {
+      document.getElementById('sheetBackdropC').style.display = 'none';
+    }
+
+    function stepTimeC(target, stepMins) {
+      const input = document.getElementById(target === 'start' ? 'sheetStartC' : 'sheetEndC');
+      const curSec = parseTimeStr(input.value) || 0;
+      const newSec = (curSec + stepMins * 60 + 86400) % 86400;
+      input.value = secToTimeStr(newSec);
+      updateSheetCalcC();
+    }
+
+    function updateSheetCalcC() {
+      const startSec = parseTimeStr(document.getElementById('sheetStartC').value);
+      const endSec = parseTimeStr(document.getElementById('sheetEndC').value);
+      const breakMin = Number(document.getElementById('sheetBreakC').value) || 0;
+      const durEl = document.getElementById('sheetSummaryDurationC');
+      const deltaEl = document.getElementById('sheetSummaryDeltaC');
+      const goalEl = document.getElementById('sheetGoalImpactC');
+      const btn = document.getElementById('btnSheetSaveC');
+
+      if (startSec === null || endSec === null || endSec <= startSec) {
+        durEl.textContent = 'Invalid duration';
+        deltaEl.textContent = '₹0';
+        goalEl.textContent = 'Please enter valid times where End is after Start';
+        btn.disabled = true;
+        return;
+      }
+
+      const netSec = endSec - startSec - (breakMin * 60);
+      durEl.textContent = `Net: ${formatClock(netSec)}`;
+      const deltaEarnings = (netSec / 3600) * HOURLY_RATE;
+      deltaEl.textContent = `+₹${deltaEarnings.toFixed(2)}`;
+
+      const currentTotalSec = sprints.reduce((acc, s) => acc + s.durationSec, 0);
+      const newTotalSec = currentTotalSec + netSec;
+      const newPct = Math.round((newTotalSec / DAILY_GOAL_SEC) * 100);
+      goalEl.textContent = `Today's Total: ${formatShort(currentTotalSec)} → ${formatShort(newTotalSec)} (${newPct}% of goal)`;
+      btn.disabled = false;
+    }
+
+    function saveManualSprintC() {
+      const start = document.getElementById('sheetStartC').value.trim();
+      const end = document.getElementById('sheetEndC').value.trim();
+      const startSec = parseTimeStr(start);
+      const endSec = parseTimeStr(end);
+      const breakMin = Number(document.getElementById('sheetBreakC').value) || 0;
+
+      if (!startSec || !endSec || endSec <= startSec) return;
+      const netSec = endSec - startSec - (breakMin * 60);
+
+      insertSprintSorted({
+        id: Date.now(),
+        start: start,
+        end: end,
+        durationSec: netSec,
+        pausedMin: breakMin,
+        isManual: true
+      });
+
+      closeSheetC();
+      renderAll();
+      showToast(`✓ Sprint logged via Sheet: ${start} → ${end}`);
+    }
+
+    // Quick presets applied globally
+    function applyQuickTimes(s, e) {
+      document.getElementById('inputStartA').value = s;
+      document.getElementById('inputEndA').value = e;
+      document.getElementById('inputStartB').value = s;
+      document.getElementById('inputEndB').value = e;
+      document.getElementById('sheetStartC').value = s;
+      document.getElementById('sheetEndC').value = e;
+      updateDrawerCalcA();
+      updateActionCalcB();
+      updateSheetCalcC();
+      showToast(`Preset times applied: ${s} → ${e}`);
+    }
+
+    // --- Theme toggle ---
+    function toggleTheme() {
+      isLight = !isLight;
+      document.body.classList.toggle('light-theme', isLight);
+      document.getElementById('themeBtn').textContent = isLight ? '🌙 Dark Mode' : '☀️ Light Mode';
+    }
+
+    function showToast(msg) {
+      const t = document.createElement('div');
+      t.style.position = 'fixed';
+      t.style.top = '44px';
+      t.style.left = '50%';
+      t.style.transform = 'translateX(-50%)';
+      t.style.background = 'rgba(16, 185, 129, 0.95)';
+      t.style.color = '#fff';
+      t.style.padding = '8px 16px';
+      t.style.borderRadius = '20px';
+      t.style.fontSize = '12px';
+      t.style.fontWeight = '600';
+      t.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+      t.style.zIndex = '9999';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2200);
+    }
+
+    // --- Keyboard Navigation (Per prototype skill specification) ---
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (e.key === 'ArrowRight') nextVariant();
+      if (e.key === 'ArrowLeft') prevVariant();
+    });
+
+    // --- Init ---
+    readUrlParam();
+    setVariant(currentVariant);
+    renderAll();
+  </script>
+</body>
+</html>

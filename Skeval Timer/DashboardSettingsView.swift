@@ -153,6 +153,7 @@ private struct BillingCard: View {
                             .foregroundColor(theme.neonTeal)
 
                         TextField("0.00", value: $vm.goal.hourlyRate, format: .number)
+                            .accessibilityLabel("Hourly rate")
                             .textFieldStyle(.plain)
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
                             .foregroundColor(theme.textPrimary)

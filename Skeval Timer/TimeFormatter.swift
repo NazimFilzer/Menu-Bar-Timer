@@ -19,7 +19,35 @@ enum TimeFormatter {
         return f
     }()
 
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    private static let shortDayTitleFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, d MMM"
+        return f
+    }()
+
+    private static let rupeeFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencySymbol = "₹"
+        f.maximumFractionDigits = 0
+        f.locale = Locale(identifier: "en_IN")
+        return f
+    }()
+
     private static let formatterLock = NSLock()
+
+    static func format(rupees amount: Double) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        let rounded = round(amount)
+        return rupeeFormatter.string(from: NSNumber(value: rounded)) ?? "₹\(Int(rounded))"
+    }
 
     static func format(duration: TimeInterval?) -> String {
         guard let d = duration else { return "in progress" }
@@ -83,17 +111,53 @@ enum TimeFormatter {
         return headerDateFormatter.string(from: headerDate)
     }
 
+    static func format(shortDate: Date) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        return shortDateFormatter.string(from: shortDate)
+    }
+
+    static func format(shortDayTitle: Date) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        return shortDayTitleFormatter.string(from: shortDayTitle)
+    }
+
+    static func format(relativeHeaderDate: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(relativeHeaderDate) {
+            return format(headerDate: relativeHeaderDate)
+        } else if cal.isDateInYesterday(relativeHeaderDate) {
+            return "Yesterday (\(format(shortDayTitle: relativeHeaderDate)))"
+        } else {
+            return format(headerDate: relativeHeaderDate)
+        }
+    }
+
+    static func format(menuItemTitle: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(menuItemTitle) {
+            return "Today (\(format(shortDate: menuItemTitle)))"
+        } else if cal.isDateInYesterday(menuItemTitle) {
+            return "Yesterday (\(format(shortDate: menuItemTitle)))"
+        } else {
+            return format(shortDayTitle: menuItemTitle)
+        }
+    }
+
     static func clipboardRow(start: Date, effectiveEnd: Date) -> String {
         "\(format(time: start))\t\(format(time: effectiveEnd))"
     }
 
     static func parseTime(_ text: String, on reference: Date) -> Date? {
-        let parts = text.trimmingCharacters(in: .whitespaces)
-            .split(separator: ":").compactMap { Int($0) }
-        guard parts.count >= 2 else { return nil }
-        guard parts[0] >= 0 && parts[0] < 24 && parts[1] >= 0 && parts[1] < 60 else { return nil }
-        let sec = parts.count >= 3 ? parts[2] : 0
-        guard sec >= 0 && sec < 60 else { return nil }
+        let pieces = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ":", omittingEmptySubsequences: false)
+        guard pieces.count == 2 || pieces.count == 3 else { return nil }
+        let parts = pieces.compactMap { Int($0) }
+        guard parts.count == pieces.count else { return nil }
+        guard (0..<24).contains(parts[0]), (0..<60).contains(parts[1]) else { return nil }
+        let sec = parts.count == 3 ? parts[2] : 0
+        guard (0..<60).contains(sec) else { return nil }
 
         var c = Calendar.current.dateComponents([.year, .month, .day], from: reference)
         c.hour = parts[0]

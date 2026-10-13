@@ -66,4 +66,12 @@ class GoalSettings {
         let m = Int((monthlyGoalHours - Double(h)) * 60)
         return m == 0 ? "\(h)h" : "\(h)h \(m)m"
     }
+    var hasHourlyRate: Bool { hourlyRate > 0 }
+    var targetEarnings: Double { dailyGoalHours * hourlyRate }
+    var targetEarningsLabel: String {
+        EarningsCalculator.format(amount: targetEarnings, currencySymbol: currencySymbol)
+    }
+    var hourlyRateLabel: String {
+        EarningsCalculator.format(amount: hourlyRate, currencySymbol: currencySymbol)
+    }
 }

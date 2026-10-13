@@ -128,7 +128,7 @@ struct AnalyticsDashboardView: View {
                         Text("From:")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(theme.textSecondary)
-                        DatePicker("", selection: $customStartDate, displayedComponents: [.date])
+                        DatePicker("Report start date", selection: $customStartDate, displayedComponents: [.date])
                             .labelsHidden()
                             .datePickerStyle(.compact)
                     }
@@ -137,7 +137,7 @@ struct AnalyticsDashboardView: View {
                         Text("To:")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(theme.textSecondary)
-                        DatePicker("", selection: $customEndDate, displayedComponents: [.date])
+                        DatePicker("Report end date", selection: $customEndDate, displayedComponents: [.date])
                             .labelsHidden()
                             .datePickerStyle(.compact)
                     }
@@ -467,7 +467,7 @@ struct AnalyticsDashboardView: View {
                     }
                     .buttonStyle(.plain)
 
-                    Text("\(selectedYear)")
+                    Text(String(selectedYear))
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.textPrimary)
                         .frame(minWidth: 44)
@@ -496,31 +496,25 @@ struct AnalyticsDashboardView: View {
 
             // Heatmap Grid Surface
             ZStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Month Headers Row (Aligned with columns)
-                    heatmapMonthHeadersRow
-
-                    // Days Grid (7 rows, 52-53 columns) + Day of Week labels on left
-                    HStack(alignment: .top, spacing: 6) {
-                        // Day of week labels (Mon, Wed, Fri)
-                        VStack(spacing: 2.5) {
-                            Text("Mon").font(.system(size: 8, weight: .semibold, design: .rounded)).foregroundColor(theme.textSecondary).frame(height: 10)
-                            Text("").frame(height: 10)
-                            Text("Wed").font(.system(size: 8, weight: .semibold, design: .rounded)).foregroundColor(theme.textSecondary).frame(height: 10)
-                            Text("").frame(height: 10)
-                            Text("Fri").font(.system(size: 8, weight: .semibold, design: .rounded)).foregroundColor(theme.textSecondary).frame(height: 10)
-                            Text("").frame(height: 10)
-                            Text("").frame(height: 10)
+                HStack(alignment: .top, spacing: 6) {
+                    VStack(spacing: 2.5) {
+                        ForEach(0..<7) { row in
+                            Text(["Mon", "", "Wed", "", "Fri", "", ""][row])
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(theme.textSecondary)
+                                .frame(width: 26, height: 10)
                         }
+                    }
+                    .padding(.top, 20)
+                    .accessibilityHidden(true)
 
-                        // 52-53 Week Columns
-                        ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            heatmapMonthHeadersRow
                             HStack(spacing: 2.5) {
-                                ForEach(Array(annualHeatmap.columns.enumerated()), id: \.offset) { colIdx, weekCells in
+                                ForEach(Array(annualHeatmap.columns.enumerated()), id: \.offset) { _, cells in
                                     VStack(spacing: 2.5) {
-                                        ForEach(weekCells) { cell in
-                                            heatmapCellView(cell: cell)
-                                        }
+                                        ForEach(cells) { cell in heatmapCellView(cell: cell) }
                                     }
                                 }
                             }
@@ -537,7 +531,7 @@ struct AnalyticsDashboardView: View {
 
             // Bottom Legend & Totals Footnote
             HStack {
-                Text("\(annualHeatmap.formattedYearDuration) logged in \(selectedYear) • \(annualHeatmap.formattedYearEarnings) earned")
+                Text("\(annualHeatmap.formattedYearDuration) logged in \(String(selectedYear)) • \(annualHeatmap.formattedYearEarnings) earned")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
 
@@ -571,20 +565,15 @@ struct AnalyticsDashboardView: View {
     }
 
     private var heatmapMonthHeadersRow: some View {
-        HStack(spacing: 0) {
-            // Indent for day of week labels
-            Spacer().frame(width: 26)
-
-            HStack(spacing: 0) {
-                ForEach(annualHeatmap.monthHeaders, id: \.columnIndex) { header in
-                    Text(header.monthName)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+        ZStack(alignment: .topLeading) {
+            ForEach(annualHeatmap.monthHeaders, id: \.columnIndex) { header in
+                Text(header.monthName)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(theme.textSecondary)
+                    .offset(x: CGFloat(header.columnIndex) * 12.5)
             }
         }
-        .frame(height: 12)
+        .frame(width: CGFloat(annualHeatmap.columns.count) * 12.5 - 2.5, height: 12, alignment: .topLeading)
     }
 
     private func heatmapCellView(cell: HeatmapDayCell) -> some View {
@@ -599,10 +588,12 @@ struct AnalyticsDashboardView: View {
             )
             .contentShape(Rectangle())
             .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    hoveredHeatmapCell = hovering ? cell : nil
-                }
+                hoveredHeatmapCell = hovering ? cell : nil
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(TimeFormatter.format(headerDate: cell.date))
+            .accessibilityValue("\(cell.formattedDuration), \(cell.formattedEarnings), \(cell.sprintCount) sprints")
+            .accessibilityHidden(!cell.isInSelectedYear)
     }
 
     private func heatmapColor(for level: Int) -> Color {

@@ -128,7 +128,7 @@ struct WeeklyDashboardView: View {
             // 1. Today's Hours
             MetricCardView(
                 title: "TODAY'S HOURS",
-                value: vm.todayLog.accumulatedShortLabel,
+                value: vm.totalTodayShortLabel,
                 subtitle: "Daily Target: \(vm.goal.goalLabel)",
                 icon: "clock.fill",
                 theme: theme

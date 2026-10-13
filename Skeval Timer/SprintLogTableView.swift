@@ -76,31 +76,15 @@ struct SprintLogTableView: View {
     }
 
     private var filteredSprints: [Sprint] {
-        allSprints.filter { sprint in
-            if !selectedTagFilter.matches(sprint: sprint) {
-                return false
-            }
+        allSprints.filter { selectedTagFilter.matches(sprint: $0) && matchesSearch($0) }
+    }
 
-            // Search query filtering
-            let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            if !query.isEmpty {
-                let dateStr = Self.tableDateFormatter.string(from: sprint.startTime).lowercased()
-                let startStr = sprint.startLabel.lowercased()
-                let endStr = sprint.endLabel.lowercased()
-                let durStr = sprint.durationLabel.lowercased()
-                let tagStr = (sprint.tag ?? "").lowercased()
-
-                let matches = dateStr.contains(query) ||
-                              startStr.contains(query) ||
-                              endStr.contains(query) ||
-                              durStr.contains(query) ||
-                              tagStr.contains(query) ||
-                              ("#" + tagStr).contains(query)
-                if !matches { return false }
-            }
-
-            return true
-        }
+    private func matchesSearch(_ sprint: Sprint) -> Bool {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return true }
+        let fields = [Self.tableDateFormatter.string(from: sprint.startTime), sprint.startLabel,
+                      sprint.endLabel, sprint.durationLabel, sprint.tag ?? "", "#" + (sprint.tag ?? "")]
+        return fields.contains { $0.lowercased().contains(query) }
     }
 
     var body: some View {
@@ -231,6 +215,7 @@ struct SprintLogTableView: View {
                     .shadow(color: theme.neonTeal.opacity(0.3), radius: 4, x: 0, y: 1)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut("n", modifiers: .command)
             }
         }
     }
@@ -349,6 +334,7 @@ struct SprintLogTableView: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Table Surface
@@ -371,7 +357,7 @@ struct SprintLogTableView: View {
                     .frame(minWidth: 80, alignment: .leading)
                 Spacer()
                 Text("ACTIONS")
-                    .frame(width: 85, alignment: .trailing)
+                    .frame(width: 100, alignment: .trailing)
             }
             .font(.system(size: 9, weight: .bold, design: .rounded))
             .foregroundColor(theme.textSecondary)
@@ -457,25 +443,27 @@ struct SprintLogTableView: View {
                 // Copy button
                 Button(action: { copySprint(sprint) }) {
                     Image(systemName: copiedSprintId == sprint.id ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 10))
+                        .font(.system(size: 12))
                         .foregroundColor(copiedSprintId == sprint.id ? Color.green : theme.textSecondary)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 30, height: 30)
                         .background(copiedSprintId == sprint.id ? Color.green.opacity(0.15) : theme.cardBorder.opacity(0.2))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
-                .help("Copy sprint to clipboard (start\\teffectiveEnd)")
+                .accessibilityLabel("Copy sprint starting at \(sprint.startLabel)")
+                .help("Copy start and effective end times")
 
                 // Edit button
                 Button(action: { editingSprint = sprint }) {
                     Image(systemName: "pencil")
                         .font(.system(size: 10))
                         .foregroundColor(theme.neonTeal)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 30, height: 30)
                         .background(theme.neonTeal.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Edit sprint starting at \(sprint.startLabel)")
                 .help("Edit sprint timestamps and tag")
 
                 // Delete button
@@ -486,14 +474,15 @@ struct SprintLogTableView: View {
                     Image(systemName: "trash")
                         .font(.system(size: 10))
                         .foregroundColor(Color.red.opacity(0.85))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 30, height: 30)
                         .background(Color.red.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Delete sprint starting at \(sprint.startLabel)")
                 .help("Delete sprint log")
             }
-            .frame(width: 85, alignment: .trailing)
+            .frame(width: 100, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
@@ -574,7 +563,7 @@ struct SprintFormFieldsView: View {
                     .foregroundColor(theme.textSecondary)
                     .frame(width: 90, alignment: .leading)
 
-                DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                DatePicker("Sprint date", selection: $selectedDate, displayedComponents: [.date])
                     .labelsHidden()
                 Spacer()
             }
@@ -585,7 +574,7 @@ struct SprintFormFieldsView: View {
                     .foregroundColor(theme.textSecondary)
                     .frame(width: 90, alignment: .leading)
 
-                DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
+                DatePicker("Start time", selection: $startTime, displayedComponents: [.hourAndMinute])
                     .labelsHidden()
                 Spacer()
             }
@@ -596,7 +585,7 @@ struct SprintFormFieldsView: View {
                     .foregroundColor(theme.textSecondary)
                     .frame(width: 90, alignment: .leading)
 
-                DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
+                DatePicker("End time", selection: $endTime, displayedComponents: [.hourAndMinute])
                     .labelsHidden()
                 Spacer()
             }
@@ -720,19 +709,14 @@ struct AddSprintModalView: View {
         _endTime = State(initialValue: end)
     }
 
-    private var grossDuration: TimeInterval {
-        let s = TimeFormatter.combine(date: selectedDate, time: startTime)
-        let e = TimeFormatter.combine(date: selectedDate, time: endTime, wrapIfBefore: s)
-        return max(0, e.timeIntervalSince(s))
+    private var validatedEntry: SprintEntry? {
+        let start = TimeFormatter.combine(date: selectedDate, time: startTime)
+        let end = TimeFormatter.combine(date: selectedDate, time: endTime, wrapIfBefore: start)
+        return try? SprintEntry(start: start, end: end, pausedDuration: TimeInterval(pauseMinutes * 60))
     }
 
-    private var netDuration: TimeInterval {
-        max(0, grossDuration - TimeInterval(pauseMinutes * 60))
-    }
-
-    private var isValid: Bool {
-        grossDuration > 0 && TimeInterval(pauseMinutes * 60) < grossDuration
-    }
+    private var netDuration: TimeInterval { validatedEntry?.netDuration ?? 0 }
+    private var isValid: Bool { validatedEntry != nil }
 
     private var estimatedEarnings: Double {
         EarningsCalculator.calculate(durationInSeconds: netDuration, hourlyRate: vm.goal.hourlyRate)
@@ -755,6 +739,7 @@ struct AddSprintModalView: View {
                         .foregroundColor(theme.textSecondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close sprint editor")
             }
 
             Divider().background(theme.dividerColor)
@@ -779,6 +764,7 @@ struct AddSprintModalView: View {
 
             HStack(spacing: 10) {
                 Button("Cancel", action: onDismiss)
+                    .keyboardShortcut(.cancelAction)
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
@@ -800,6 +786,7 @@ struct AddSprintModalView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isValid)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -848,19 +835,14 @@ struct EditSprintModalView: View {
         _tagText = State(initialValue: sprint.tag ?? "")
     }
 
-    private var grossDuration: TimeInterval {
-        let s = TimeFormatter.combine(date: selectedDate, time: startTime)
-        let e = TimeFormatter.combine(date: selectedDate, time: endTime, wrapIfBefore: s)
-        return max(0, e.timeIntervalSince(s))
+    private var validatedEntry: SprintEntry? {
+        let start = TimeFormatter.combine(date: selectedDate, time: startTime)
+        let end = TimeFormatter.combine(date: selectedDate, time: endTime, wrapIfBefore: start)
+        return try? SprintEntry(start: start, end: end, pausedDuration: TimeInterval(pauseMinutes * 60))
     }
 
-    private var netDuration: TimeInterval {
-        max(0, grossDuration - TimeInterval(pauseMinutes * 60))
-    }
-
-    private var isValid: Bool {
-        grossDuration > 0 && TimeInterval(pauseMinutes * 60) < grossDuration
-    }
+    private var netDuration: TimeInterval { validatedEntry?.netDuration ?? 0 }
+    private var isValid: Bool { validatedEntry != nil }
 
     private var estimatedEarnings: Double {
         EarningsCalculator.calculate(durationInSeconds: netDuration, hourlyRate: vm.goal.hourlyRate)
@@ -883,6 +865,7 @@ struct EditSprintModalView: View {
                         .foregroundColor(theme.textSecondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close sprint editor")
             }
 
             Divider().background(theme.dividerColor)
@@ -907,6 +890,7 @@ struct EditSprintModalView: View {
 
             HStack(spacing: 10) {
                 Button("Cancel", action: onDismiss)
+                    .keyboardShortcut(.cancelAction)
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
@@ -928,6 +912,7 @@ struct EditSprintModalView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isValid)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)

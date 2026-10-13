@@ -3,6 +3,14 @@ import AppKit
 import Observation
 import UserNotifications
 
+// MARK: - Version Tracking
+
+enum AppVersion {
+    static let current = "v2.0"
+    static let marketingVersion = "2.0"
+    static let buildNumber = "4"
+}
+
 @Observable
 @MainActor
 class TimerViewModel {
@@ -12,13 +20,24 @@ class TimerViewModel {
     var currentElapsed: TimeInterval = 0
     var currentPauseElapsed: TimeInterval = 0
     var todayLog: DayLog = DayLog()
+    var selectedDate: Date = Date()
+    var selectedDayLog: DayLog = DayLog()
     var lastCopiedId: UUID? = nil
+    var isAllCopied: Bool = false
     var logRevision: Int = 0
     var pendingTag: String = ""
+    var manualTagText: String = ""
 
     // Recovery inputs
     var recoveryEndText: String = ""
     var recoveryEndError: String? = nil
+
+    // Manual sprint entry inputs
+    var isManualEntryPresented: Bool = false
+    var manualStartText: String = ""
+    var manualEndText: String = ""
+    var manualBreakMinutesText: String = "0"
+    var manualEntryError: String? = nil
 
     var goal = GoalSettings.shared
     var isSettingsExpanded: Bool = false
@@ -28,21 +47,37 @@ class TimerViewModel {
 
     private var notifiedMilestones: Set<Int> = []
     private var lastNotifiedDayKey: String = TimeFormatter.format(dateKey: Date())
+    private var lastActiveDayKey: String = TimeFormatter.format(dateKey: Date())
+
+    func checkAndHandleDayChange(now: Date = Date()) {
+        let dayKey = TimeFormatter.format(dateKey: now)
+        guard dayKey != lastActiveDayKey else { return }
+        lastActiveDayKey = dayKey
+        lastNotifiedDayKey = dayKey
+        notifiedMilestones.removeAll()
+        selectedDate = now
+        todayLog = store.log(for: now)
+        selectedDayLog = todayLog
+        logRevision += 1
+    }
 
     // MARK: - Init
 
-    init(engine: SprintEngine? = nil, store: DayLogStore? = nil) {
+    init(engine: SprintEngine? = nil, store: DayLogStore? = nil, goal: GoalSettings? = nil) {
         let effectiveStore = store ?? DayLogStore.shared
         self.store = effectiveStore
+        self.goal = goal ?? .shared
         let effectiveEngine = engine ?? SprintEngine(store: effectiveStore)
         self.engine = effectiveEngine
 
         self.todayLog = effectiveStore.todayLog()
+        self.selectedDayLog = self.todayLog
+        self.pendingSleepInterval = effectiveEngine.pendingSleepInterval
         self.state = effectiveEngine.state
         self.currentElapsed = effectiveEngine.state.currentElapsed
         self.currentPauseElapsed = effectiveEngine.currentPauseElapsed
 
-        let goalSec = goal.dailyGoalSeconds
+        let goalSec = self.goal.dailyGoalSeconds
         if goalSec > 0 {
             let initialPct = Int((self.todayLog.accumulatedTotal / goalSec) * 100)
             for m in [50, 75, 100] where initialPct >= m {
@@ -55,38 +90,44 @@ class TimerViewModel {
 
     private func setupEngineCallbacks() {
         engine.onStateChanged = { [weak self] newState in
-            guard let self else { return }
-            self.state = newState
-            self.currentElapsed = newState.currentElapsed
-            if !newState.isPaused {
-                self.currentPauseElapsed = 0
-            }
-            self.todayLog = self.store.todayLog()
-            if !newState.isRecovery {
-                self.recoveryEndText = ""
-                self.recoveryEndError = nil
-            }
+            self?.handleStateChange(newState)
         }
 
         engine.onTick = { [weak self] elapsed in
             guard let self else { return }
             self.currentElapsed = elapsed
+            self.checkAndHandleDayChange()
             self.checkMilestoneNotifications()
         }
 
         engine.onPauseTick = { [weak self] pauseElapsed in
             self?.currentPauseElapsed = pauseElapsed
+            self?.checkAndHandleDayChange()
         }
 
         engine.onSprintCompleted = { [weak self] sprint in
             guard let self else { return }
-            self.todayLog = self.store.todayLog()
+            self.checkAndHandleDayChange()
+            self.refreshLogs()
             self.copy(sprint: sprint)
             self.checkMilestoneNotifications()
         }
-
         engine.onSleepIntervalDetected = { [weak self] interval in
+            self?.pendingSleepInterval = interval
             self?.sendSleepNotification(interval: interval)
+        }
+    }
+
+    private func handleStateChange(_ newState: SprintState) {
+        let sprintChanged = state.currentSprint != newState.currentSprint
+        state = newState
+        pendingSleepInterval = engine.pendingSleepInterval
+        currentElapsed = newState.currentElapsed
+        if !newState.isPaused { currentPauseElapsed = 0 }
+        if sprintChanged { refreshLogs() }
+        if !newState.isRecovery {
+            recoveryEndText = ""
+            recoveryEndError = nil
         }
     }
 
@@ -97,12 +138,10 @@ class TimerViewModel {
     var isPaused: Bool { state.isPaused }
     var recoveryMode: Bool { state.isRecovery }
     var isTicking: Bool { state.isRunning && !state.isPaused }
-    var pendingSleepInterval: SleepInterval? { engine.pendingSleepInterval }
-    var hasPendingSleepResolution: Bool { engine.pendingSleepInterval != nil }
-    var statusTitle: String {
-        if hasPendingSleepResolution { return "SLEEP HELD" }
-        return state.statusTitle
-    }
+    private(set) var pendingSleepInterval: SleepInterval?
+    var hasPendingSleepResolution: Bool { pendingSleepInterval != nil }
+    var statusTitle: String { hasPendingSleepResolution ? "SLEEP HELD" : state.statusTitle }
+    var currentTag: String? { currentSprint?.tag }
 
     var currentElapsedLabel: String {
         TimeFormatter.format(clock: currentElapsed)
@@ -116,6 +155,10 @@ class TimerViewModel {
         TimeFormatter.format(duration: engine.totalCurrentSprintPaused)
     }
 
+    var totalCurrentSprintPaused: TimeInterval {
+        engine.totalCurrentSprintPaused
+    }
+
     var hasMultiplePauses: Bool {
         engine.totalCurrentSprintPaused > currentPauseElapsed + 1
     }
@@ -127,55 +170,217 @@ class TimerViewModel {
         return acc > 0 ? todayLog.accumulatedShortLabel : ""
     }
 
+    var totalTodayElapsed: TimeInterval {
+        todayLog.accumulatedTotal + liveSprintElapsed(on: Date())
+    }
+
+    func liveSprintElapsed(on date: Date) -> TimeInterval {
+        guard isRunning, let sprint = currentSprint,
+              Calendar.current.isDate(sprint.startTime, inSameDayAs: date) else { return 0 }
+        return currentElapsed
+    }
+
+    var totalTodayShortLabel: String {
+        TimeFormatter.format(shortDuration: totalTodayElapsed)
+    }
+
     var progressFraction: Double {
         let g = goal.dailyGoalSeconds
         guard g > 0 else { return 0 }
-        return min(todayLog.accumulatedTotal / g, 1.0)
+        return min(totalTodayElapsed / g, 1.0)
     }
 
     var progressLabel: String {
-        "\(todayLog.accumulatedShortLabel) / \(goal.goalLabel)"
-    }
-
-    var currentTag: String? {
-        state.currentSprint?.tag
+        "\(totalTodayShortLabel) / \(goal.goalLabel)"
     }
 
     var todayEarnings: Double {
-        EarningsCalculator.calculate(sprints: todayLog.completedSprints, settings: goal)
+        guard goal.hasHourlyRate else { return 0.0 }
+        let hours = totalTodayElapsed / 3600.0
+        return hours * goal.hourlyRate
     }
 
     var todayEarningsLabel: String {
-        EarningsCalculator.formattedEarnings(sprints: todayLog.completedSprints, settings: goal)
+        EarningsCalculator.format(amount: todayEarnings, currencySymbol: goal.currencySymbol)
+    }
+
+    var targetEarningsLabel: String {
+        goal.targetEarningsLabel
+    }
+
+    var isDailyGoalReached: Bool {
+        let g = goal.dailyGoalSeconds
+        return g > 0 && totalTodayElapsed >= g
+    }
+
+    // MARK: - Past Days History Navigation
+
+    var isViewingToday: Bool {
+        Calendar.current.isDateInToday(selectedDate)
+    }
+
+    var selectedDayShortTitle: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(selectedDate) {
+            return "Today"
+        } else if cal.isDateInYesterday(selectedDate) {
+            return "Yesterday"
+        } else {
+            return TimeFormatter.format(shortDayTitle: selectedDate)
+        }
+    }
+
+    var headerDateSubtitle: String {
+        TimeFormatter.format(relativeHeaderDate: selectedDate)
+    }
+
+    var sprintsSectionTitle: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(selectedDate) {
+            return "TODAY'S SPRINTS"
+        } else if cal.isDateInYesterday(selectedDate) {
+            return "YESTERDAY'S SPRINTS"
+        } else {
+            return "\(TimeFormatter.format(shortDayTitle: selectedDate).uppercased())'S SPRINTS"
+        }
+    }
+
+    var displayedCompletedSprints: [Sprint] {
+        selectedDayLog.completedSprints
+    }
+
+    var displayedCompletedSprintsDescending: [(index: Int, sprint: Sprint)] {
+        selectedDayLog.completedSprintsDescending
+    }
+
+    var availablePastDates: [Date] {
+        let cal = Calendar.current
+        let today = Date()
+        return (0..<7).compactMap { offset in
+            cal.date(byAdding: .day, value: -offset, to: today)
+        }
+    }
+
+    func menuItemTitle(for date: Date) -> String {
+        let title = TimeFormatter.format(menuItemTitle: date)
+        let count = store.log(for: date).completedSprints.count
+        return count > 0 ? "\(title) (\(count))" : title
+    }
+
+    func selectDate(_ date: Date) {
+        selectedDate = date
+        todayLog = store.todayLog()
+        if isViewingToday {
+            selectedDayLog = todayLog
+        } else {
+            selectedDayLog = store.log(for: date)
+        }
+    }
+
+    func jumpToToday(now: Date = Date()) {
+        selectDate(now)
+    }
+
+    var desiredPopoverHeight: CGFloat {
+        var height: CGFloat
+        if isSettingsExpanded {
+            height = 780
+        } else {
+            height = 590
+        }
+        if recoveryMode || hasPendingSleepResolution {
+            height += 90
+        }
+        return height
+    }
+
+    var displayedAccumulatedTotal: TimeInterval {
+        if isViewingToday {
+            return totalTodayElapsed
+        } else {
+            return selectedDayLog.accumulatedTotal
+        }
+    }
+
+    var displayedTotalShortLabel: String {
+        TimeFormatter.format(shortDuration: displayedAccumulatedTotal)
+    }
+
+    var displayedProgressFraction: Double {
+        let g = goal.dailyGoalSeconds
+        guard g > 0 else { return 0 }
+        return min(displayedAccumulatedTotal / g, 1.0)
+    }
+
+    var displayedProgressLabel: String {
+        "\(displayedTotalShortLabel) / \(goal.goalLabel)"
+    }
+
+    var displayedEarnings: Double {
+        guard goal.hasHourlyRate else { return 0.0 }
+        let hours = displayedAccumulatedTotal / 3600.0
+        return hours * goal.hourlyRate
+    }
+
+    var displayedEarningsLabel: String {
+        EarningsCalculator.format(amount: displayedEarnings, currencySymbol: goal.currencySymbol)
+    }
+
+    var displayedGoalTitle: String {
+        let cal = Calendar.current
+        if cal.isDateInToday(selectedDate) {
+            return "Daily Target"
+        } else if cal.isDateInYesterday(selectedDate) {
+            return "Yesterday's Target"
+        } else {
+            return "\(TimeFormatter.format(shortDayTitle: selectedDate)) Target"
+        }
+    }
+
+    var isDisplayedGoalReached: Bool {
+        let g = goal.dailyGoalSeconds
+        return g > 0 && displayedAccumulatedTotal >= g
     }
 
     // MARK: - Actions
 
     func clockIn(tag: String? = nil) {
+        guard !isRunning, !recoveryMode else { return }
+        checkAndHandleDayChange()
+        jumpToToday()
         lastCopiedId = nil
-        let cleanExplicit = tag?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanPending = pendingTag.trimmingCharacters(in: .whitespacesAndNewlines)
-        let effectiveTag: String?
-        if let cleanExplicit = cleanExplicit, !cleanExplicit.isEmpty {
-            effectiveTag = cleanExplicit
-        } else if !cleanPending.isEmpty {
-            effectiveTag = cleanPending
-        } else {
-            effectiveTag = nil
-        }
+        isAllCopied = false
+        let effectiveTag = cleanTag(tag) ?? cleanTag(pendingTag)
         pendingTag = ""
         engine.clockIn(tag: effectiveTag)
-        todayLog = store.todayLog()
+        refreshLogs()
+    }
+
+    private func cleanTag(_ tag: String?) -> String? {
+        guard let text = tag?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return text
     }
 
     func setTag(_ tag: String?) {
-        engine.setTag(tag)
+        engine.setTag(cleanTag(tag))
+        refreshLogs()
+    }
+
+    func resolveSleep(countAsWork: Bool) {
+        engine.resolveSleepInterval(countAsWork: countAsWork)
+        pendingSleepInterval = engine.pendingSleepInterval
+        refreshLogs()
+    }
+
+    func refreshLogs() {
         todayLog = store.todayLog()
+        selectedDayLog = store.log(for: selectedDate)
+        logRevision += 1
     }
 
     func clockOut() {
         engine.clockOut()
-        todayLog = store.todayLog()
+        refreshLogs()
     }
 
     func pause() {
@@ -191,12 +396,13 @@ class TimerViewModel {
         recoveryEndText = ""
         recoveryEndError = nil
         notifiedMilestones = []
-        todayLog = store.todayLog()
+        isAllCopied = false
+        refreshLogs()
     }
 
     func resumeRecovery() {
         engine.resumeRecovery()
-        todayLog = store.todayLog()
+        refreshLogs()
     }
 
     func saveRecoveryEndTime() {
@@ -204,7 +410,7 @@ class TimerViewModel {
             try engine.saveRecoveryEndTime(recoveryEndText)
             recoveryEndText = ""
             recoveryEndError = nil
-            todayLog = store.todayLog()
+            refreshLogs()
         } catch {
             recoveryEndError = error.localizedDescription
         }
@@ -214,17 +420,13 @@ class TimerViewModel {
         engine.dismissRecovery()
         recoveryEndText = ""
         recoveryEndError = nil
-        todayLog = store.todayLog()
-    }
-
-    func resolveSleep(countAsWork: Bool) {
-        engine.resolveSleepInterval(countAsWork: countAsWork)
-        todayLog = store.todayLog()
+        refreshLogs()
     }
 
     func copy(sprint: Sprint) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(sprint.clipboardText, forType: .string)
+        isAllCopied = false
         lastCopiedId = sprint.id
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2))
@@ -256,8 +458,7 @@ class TimerViewModel {
         )
 
         store.save(sprint: sprint)
-        todayLog = store.todayLog()
-        logRevision += 1
+        refreshLogs()
         return sprint
     }
 
@@ -287,21 +488,120 @@ class TimerViewModel {
         )
 
         store.save(sprint: updatedSprint)
-        todayLog = store.todayLog()
-        logRevision += 1
+        refreshLogs()
         return updatedSprint
+    }
+
+    func copyAllDisplayedSprints() {
+        guard !selectedDayLog.completedSprints.isEmpty else { return }
+        let text = selectedDayLog.clipboardText
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        lastCopiedId = nil
+        isAllCopied = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            self?.isAllCopied = false
+        }
+    }
+
+    func copyAllTodaySprints() {
+        copyAllDisplayedSprints()
     }
 
     func delete(sprint: Sprint) {
         store.delete(sprint: sprint)
-        todayLog = store.todayLog()
-        logRevision += 1
+        refreshLogs()
+    }
+
+    // MARK: - Manual Sprint Entry
+
+    func openManualEntry() {
+        if manualEndText.isEmpty {
+            if isViewingToday {
+                manualEndText = TimeFormatter.format(time: Date())
+            } else if let last = selectedDayLog.completedSprints.last, let end = last.endTime {
+                manualEndText = TimeFormatter.format(time: end)
+            } else {
+                manualEndText = "10:00:00"
+            }
+        }
+        if manualStartText.isEmpty {
+            if let last = selectedDayLog.completedSprints.last {
+                manualStartText = last.endLabel
+            } else if isViewingToday {
+                manualStartText = TimeFormatter.format(time: Date().addingTimeInterval(-3600))
+            } else {
+                manualStartText = "09:00:00"
+            }
+        }
+        manualBreakMinutesText = "0"
+        manualEntryError = nil
+        isManualEntryPresented = true
+    }
+
+    func dismissManualEntry() {
+        isManualEntryPresented = false
+        manualEntryError = nil
+    }
+
+    func stepManualTime(isStart: Bool, minutes: Int) {
+        let reference = selectedDate
+        let currentText = isStart ? manualStartText : manualEndText
+        let baseDate = TimeFormatter.parseTime(currentText, on: reference) ?? reference
+        let newDate = baseDate.addingTimeInterval(TimeInterval(minutes * 60))
+        let formatted = TimeFormatter.format(time: newDate)
+        if isStart {
+            manualStartText = formatted
+        } else {
+            manualEndText = formatted
+        }
+        manualEntryError = nil
+    }
+
+    private func manualEntry() throws -> SprintEntry {
+        try SprintEntry(date: selectedDate, startText: manualStartText,
+                        endText: manualEndText, breakText: manualBreakMinutesText)
+    }
+
+    var manualComputedNetDuration: TimeInterval? {
+        try? manualEntry().netDuration
+    }
+
+    var manualComputedEarningsDelta: Double {
+        EarningsCalculator.calculate(durationInSeconds: manualComputedNetDuration ?? 0, hourlyRate: goal.hourlyRate)
+    }
+
+    @discardableResult
+    func saveManualSprint() -> Bool {
+        do {
+            let entry = try manualEntry()
+            let sprint = Sprint(startTime: entry.start, endTime: entry.end,
+                                pausedDuration: entry.pausedDuration,
+                                pauseCount: entry.pausedDuration > 0 ? 1 : 0,
+                                tag: cleanTag(manualTagText))
+            store.save(sprint: sprint)
+            refreshLogs()
+            if isViewingToday { checkMilestoneNotifications() }
+            copy(sprint: sprint)
+            isManualEntryPresented = false
+            manualStartText = ""
+            manualEndText = ""
+            manualTagText = ""
+            manualBreakMinutesText = "0"
+            manualEntryError = nil
+            return true
+        } catch {
+            manualEntryError = error.localizedDescription
+            return false
+        }
     }
 
     // MARK: - Milestone Notifications
 
     private func checkMilestoneNotifications() {
-        let goalSec = goal.dailyGoalSeconds
+        let goalSec = self.goal.dailyGoalSeconds
         guard goalSec > 0 else { return }
 
         let todayKey = TimeFormatter.format(dateKey: Date())
@@ -336,7 +636,6 @@ class TimerViewModel {
         )
         UNUserNotificationCenter.current().add(req)
     }
-
     private func sendSleepNotification(interval: SleepInterval) {
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
