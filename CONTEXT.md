@@ -36,6 +36,15 @@ Total duration a sprint spent in a paused state, excluded from net work duration
 ## Effective End Time
 The virtual end time `(endTime - pausedDuration)` formatted for clipboard export so
 external spreadsheets compute net work duration directly via simple subtraction.
+Used by the individual sprint copy action.
+
+## Daily timesheet row
+Copy All exports one tab-separated row for the selected day: first Login, last actual
+Logout, an empty Lunch cell, and Break in minutes. Only completed sprints contribute.
+Break is `(last logout - first login) - total net work`, including pauses and gaps
+between sprints, rounded to the nearest whole minute with 30 seconds rounding up.
+Stored work durations retain their precision. Date and Hours Worked belong to the
+destination sheet.
 
 ## Sprint Engine
 The stateful domain engine governing the lifecycle of a Sprint (`idle`, `active`, `paused`, `recovery`),

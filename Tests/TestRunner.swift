@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 // MARK: - Mini Test Assertion Framework
 
@@ -46,6 +47,15 @@ func testTimeFormatter() {
     // Short clock
     assertEqual(TimeFormatter.format(shortClock: 45), "0:45")
     assertEqual(TimeFormatter.format(shortClock: 3665), "1:01:05")
+
+    // Spreadsheet break minutes round to the nearest integer, with halves up.
+    assertEqual(TimeFormatter.format(breakMinutes: 0), "0")
+    assertEqual(TimeFormatter.format(breakMinutes: 36000), "600")
+    assertEqual(TimeFormatter.format(breakMinutes: 90), "2")
+    assertEqual(TimeFormatter.format(breakMinutes: 20), "0")
+    assertEqual(TimeFormatter.format(breakMinutes: 29), "0")
+    assertEqual(TimeFormatter.format(breakMinutes: 30), "1")
+    assertEqual(TimeFormatter.format(breakMinutes: 89), "1")
 
     // Parsing time
     let ref = Date(timeIntervalSince1970: 1700000000)
@@ -112,24 +122,58 @@ func testDayLogStoreWithInMemoryStorage() {
     assertEqual(updatedLog.sprints.count, 2)
     assertTrue(updatedLog.openSprint == nil)
 
-    // Verify dayLog.clipboardText formatting for two-column spreadsheet paste
-    let expectedAllText = "\(s1.clipboardText)\n\(s2.clipboardText)"
+    // One daily row: actual bounds, blank lunch, pauses plus inter-sprint gaps.
+    let expectedAllText = "\(s1.startLabel)\t\(s2.endLabel)\t\t8"
     assertEqual(updatedLog.clipboardText, expectedAllText)
 
     let rows = updatedLog.clipboardText.components(separatedBy: "\n")
-    assertEqual(rows.count, 2)
-    for (i, row) in rows.enumerated() {
-        let cols = row.components(separatedBy: "\t")
-        assertEqual(cols.count, 2, "Row \(i + 1) must have exactly 2 tab-separated columns (Start and End)")
-    }
+    assertEqual(rows.count, 1)
+    assertEqual(rows[0].components(separatedBy: "\t").count, 4)
     assertEqual(rows[0].components(separatedBy: "\t")[0], s1.startLabel)
-    assertEqual(rows[0].components(separatedBy: "\t")[1], s1.effectiveEndLabel)
-    assertEqual(rows[1].components(separatedBy: "\t")[0], s2.startLabel)
-    assertEqual(rows[1].components(separatedBy: "\t")[1], s2.effectiveEndLabel)
+    assertEqual(rows[0].components(separatedBy: "\t")[1], s2.endLabel)
+    assertEqual(rows[0].components(separatedBy: "\t")[2], "")
 
     // Empty day log
     let emptyLog = DayLog()
     assertEqual(emptyLog.clipboardText, "")
+}
+
+func testDailyTimesheetExport() {
+    print("Running daily timesheet export tests...")
+    let reference = Date(timeIntervalSince1970: 1791158400)
+    let login = TimeFormatter.parseTime("09:00:00", on: reference)!
+    let first = Sprint(startTime: login, endTime: login.addingTimeInterval(3600), pausedDuration: 600)
+    let last = Sprint(startTime: login.addingTimeInterval(7200), endTime: login.addingTimeInterval(10800), pausedDuration: 300)
+    // Open sprints have no logout and must not change the completed day's bounds.
+    let earlierOpen = Sprint(startTime: login.addingTimeInterval(-3600))
+    let laterOpen = Sprint(startTime: login.addingTimeInterval(14400))
+    let log = DayLog(sprints: [laterOpen, last, earlierOpen, first])
+    assertEqual(log.clipboardText, "09:00:00\t12:00:00\t\t75")
+    assertEqual(DayLog(sprints: [earlierOpen]).clipboardText, "")
+
+    let columns = log.clipboardText.components(separatedBy: "\t")
+    let breakSeconds = Double(columns[3])! * 60
+    assertEqual(10800 - breakSeconds, log.accumulatedTotal, "Subtracting the exported break must recover recorded net work")
+
+    let uninterrupted = Sprint(startTime: login, endTime: login.addingTimeInterval(3600))
+    assertEqual(DayLog(sprints: [uninterrupted]).clipboardText, "09:00:00\t10:00:00\t\t0")
+    let shortPause = Sprint(startTime: login, endTime: login.addingTimeInterval(3600), pausedDuration: 30)
+    assertEqual(DayLog(sprints: [shortPause]).clipboardText, "09:00:00\t10:00:00\t\t1")
+
+    // Manual entries may overlap. Logout is the maximum end, not the end of
+    // the sprint that started last, and the break must never be negative.
+    let spanning = Sprint(startTime: login, endTime: login.addingTimeInterval(14400))
+    assertEqual(DayLog(sprints: [last, spanning]).clipboardText, "09:00:00\t13:00:00\t\t0")
+
+    // A sprint crossing midnight still belongs to its start day.
+    let nightStart = TimeFormatter.parseTime("23:00:00", on: reference)!
+    let overnight = Sprint(startTime: nightStart, endTime: nightStart.addingTimeInterval(7200), pausedDuration: 900)
+    assertEqual(DayLog(sprints: [overnight]).clipboardText, "23:00:00\t01:00:00\t\t15")
+
+    // Export rounding does not change the precise recorded work duration.
+    let secondsPause = Sprint(startTime: login, endTime: login.addingTimeInterval(3600), pausedDuration: 20)
+    assertEqual(DayLog(sprints: [secondsPause]).clipboardText, "09:00:00\t10:00:00\t\t0")
+    assertEqual(secondsPause.duration, 3580)
 }
 
 @MainActor
@@ -656,9 +700,12 @@ func testPastDaysHistory() {
     assertEqual(vm.displayedGoalTitle, "Yesterday's Target")
     assertEqual(vm.displayedTotalShortLabel, "4h 0m")
 
-    // Verify copy all displayed sprints copies yesterday's 2 sprints
+    // Copy All must export the selected historical day's summary to the clipboard.
     let yestClipboard = vm.selectedDayLog.clipboardText
-    assertEqual(yestClipboard, "\(sYest1.clipboardText)\n\(sYest2.clipboardText)")
+    assertEqual(yestClipboard, "09:00:00\t16:00:00\t\t180")
+    vm.copyAllDisplayedSprints()
+    assertEqual(NSPasteboard.general.string(forType: .string), yestClipboard)
+    assertTrue(vm.isAllCopied)
 
     // Test saving manual sprint while viewing yesterday
     vm.manualStartText = "17:00:00"
@@ -680,6 +727,8 @@ func testPastDaysHistory() {
     assertEqual(vm.displayedAccumulatedTotal, 3600.0)
     assertEqual(vm.displayedEarnings, 500.0)
     assertEqual(vm.displayedGoalTitle, "Daily Target")
+    vm.copyAllDisplayedSprints()
+    assertEqual(NSPasteboard.general.string(forType: .string), "10:00:00\t11:00:00\t\t0")
 }
 
 @MainActor
@@ -858,6 +907,7 @@ struct TestMain {
         testAppVersion()
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
+        testDailyTimesheetExport()
         await MainActor.run {
             testSprintEngine()
             testRapidPauseResumeCycles()
