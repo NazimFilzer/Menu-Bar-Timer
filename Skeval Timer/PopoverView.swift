@@ -30,8 +30,16 @@ struct PopoverView: View {
 
                 Divider().background(theme.dividerColor)
 
+                if let error = vm.persistenceError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange).padding(12)
+                }
+
                 if vm.recoveryMode {
                     RecoveryBannerView(vm: vm, theme: theme)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                } else if vm.hasPendingSleepResolution, let interval = vm.pendingSleepInterval {
+                    SleepResolutionBannerView(vm: vm, interval: interval, theme: theme)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
@@ -144,27 +152,47 @@ private struct PopoverHeaderView: View {
                 .fixedSize()
                 .focusable(false)
                 .focusEffectDisabled()
-            }
+                    }
 
             Spacer()
 
             HStack(spacing: 6) {
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: dotColor.opacity(0.9), radius: vm.isRunning ? 8 : 0)
+                Button(action: {
+                    AppDelegate.openDashboard()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "macwindow")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(theme.neonTeal.opacity(0.12))
+                    .foregroundColor(theme.neonTeal)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(theme.neonTeal.opacity(0.3), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open dashboard")
+                .help("Open Dashboard Window")
 
-                Text(vm.statusTitle)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(dotColor)
-                    .textCase(.uppercase)
-                    .kerning(0.8)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(dotColor)
+                        .frame(width: 8, height: 8)
+                        .shadow(color: dotColor.opacity(0.9), radius: vm.isRunning ? 8 : 0)
+
+                    Text(vm.statusTitle)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(dotColor)
+                        .textCase(.uppercase)
+                        .kerning(0.8)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(theme.cardBg)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(theme.cardBorder, lineWidth: 1))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(theme.cardBg)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(theme.cardBorder, lineWidth: 1))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -190,6 +218,9 @@ private struct RecoveryBannerView: View {
                         .foregroundColor(theme.textSecondary)
                 }
             }
+
+            DatePicker("End date", selection: $vm.recoveryEndDate, displayedComponents: .date)
+                .font(.caption)
 
             HStack(spacing: 8) {
                 Button("Resume ▶") {
@@ -236,6 +267,69 @@ private struct RecoveryBannerView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color.orange.opacity(0.12))
+    }
+}
+
+// MARK: - Sleep Resolution Banner View
+
+private struct SleepResolutionBannerView: View {
+    @Bindable var vm: TimerViewModel
+    let interval: SleepInterval
+    let theme: PopoverTheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 5) {
+                Image(systemName: "powersleep")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color.indigo)
+
+                Text("Mac was asleep: \(interval.formattedWindow)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(theme.textPrimary)
+
+                Spacer()
+
+                Text(interval.formattedDuration)
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.indigo.opacity(0.2))
+                    .foregroundColor(Color.indigo)
+                    .clipShape(Capsule())
+            }
+
+            Text("Count duration as work or paused?")
+                .font(.system(size: 10, weight: .regular, design: .rounded))
+                .foregroundColor(theme.textSecondary)
+
+            HStack(spacing: 8) {
+                Button(action: {
+                    vm.resolveSleep(countAsWork: true)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "briefcase.fill")
+                            .font(.system(size: 9))
+                        Text("Count as Work")
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
+
+                Button(action: {
+                    vm.resolveSleep(countAsWork: false)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 9))
+                        Text("Count as Paused")
+                    }
+                }
+                .buttonStyle(PillButtonStyle(color: Color(white: 0.7), foregroundColor: .black))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.indigo.opacity(0.12))
     }
 }
 
@@ -365,6 +459,18 @@ private struct DailyGoalProgressView: View {
             }
             .frame(height: 6)
 
+            if vm.isViewingToday {
+                let catchUp = vm.catchUpSummary(for: .week)
+                HStack(spacing: 5) {
+                    Text(catchUp.compactLabel)
+                        .foregroundStyle(catchUp.isBehind ? Color.orange : theme.neonTeal)
+                    Spacer()
+                    Text("This week").foregroundStyle(theme.textSecondary)
+                }
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .help("Expected by today: \(catchUp.expectedLabel). Clocked this week: \(catchUp.clockedLabel). Includes the active sprint.")
+            }
+
             if vm.goal.hasHourlyRate {
                 HStack {
                     Text("Logged: \(vm.displayedTotalShortLabel) / \(vm.goal.goalLabel)")
@@ -417,8 +523,9 @@ private struct TimestampCard: View {
 // MARK: - Action Section View
 
 private struct ActionSectionView: View {
-    let vm: TimerViewModel
+    @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
+    @State private var liveTagInput: String = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -481,6 +588,90 @@ private struct ActionSectionView: View {
                 }
             }
 
+            // Tag Assignment Row
+            if vm.isRunning {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.neonTeal)
+
+                    if let tag = vm.currentTag, !tag.isEmpty {
+                        Text("#\(tag)")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                            .foregroundColor(theme.neonTeal)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2.5)
+                            .background(theme.neonTeal.opacity(0.14))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+
+                        Button(action: {
+                            vm.setTag(nil)
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        TextField("Add sprint tag (e.g. dev, client)...", text: $liveTagInput, onCommit: {
+                            let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            vm.setTag(clean.isEmpty ? nil : clean)
+                            liveTagInput = ""
+                        })
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10.5, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+
+                        if !liveTagInput.isEmpty {
+                            Button(action: {
+                                let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                                vm.setTag(clean.isEmpty ? nil : clean)
+                                liveTagInput = ""
+                            }) {
+                                Text("Set")
+                                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                    .foregroundColor(theme.neonTeal)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.cardBg.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textSecondary)
+                    Text("#")
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(theme.neonTeal)
+                    TextField("Sprint tag (optional)", text: $vm.pendingTag)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10.5, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+
+                    if !vm.pendingTag.isEmpty {
+                        Button(action: { vm.pendingTag = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.cardBg.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
+            }
+
             if vm.isRunning {
                 HStack(spacing: 8) {
                     Button(action: pauseResumeAction) {
@@ -531,7 +722,7 @@ private struct ActionSectionView: View {
                     }
                     .buttonStyle(PressedScaleButtonStyle())
                     .focusable(false)
-                    .disabled(vm.recoveryMode)
+                        .disabled(vm.recoveryMode)
                     .help("Clock Out & Copy (⌘⌥⇧C)")
 
                     Button(action: { vm.reset() }) {
@@ -545,7 +736,7 @@ private struct ActionSectionView: View {
                     }
                     .buttonStyle(PressedScaleButtonStyle())
                     .focusable(false)
-                    .disabled(vm.recoveryMode)
+                        .disabled(vm.recoveryMode)
                     .help("Discard current sprint")
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -651,7 +842,7 @@ private struct SprintHistorySectionView: View {
                         }
                         .buttonStyle(PressedScaleButtonStyle())
                         .focusable(false)
-                        .help("Copy this day's Login, Logout, blank Lunch, and Break (minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
+                        .help("Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
                     }
 
                     Button(action: {
@@ -669,7 +860,7 @@ private struct SprintHistorySectionView: View {
                     }
                     .buttonStyle(PressedScaleButtonStyle())
                     .focusable(false)
-                    .help("Add sprint manually (+)")
+                        .help("Add sprint manually (+)")
                 }
             }
             .padding(.horizontal, 16)
@@ -823,6 +1014,7 @@ private struct SettingsSectionView: View {
     @Binding var launchAtLogin: Bool
     @Bindable var themeManager: ThemeManager
     @State private var rateInput: String = ""
+    @State private var loginError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -898,7 +1090,7 @@ private struct SettingsSectionView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .focusable(false)
-                            }
+                                            }
                         }
                     }
 
@@ -922,7 +1114,7 @@ private struct SettingsSectionView: View {
                             .tint(theme.neonTeal)
                             .controlSize(.small)
                             .focusable(false)
-                        HStack {
+                                    HStack {
                             Text("1h")
                             Spacer()
                             Text("16h")
@@ -945,7 +1137,7 @@ private struct SettingsSectionView: View {
                             }
                             Spacer()
                             HStack(spacing: 3) {
-                                Text("₹")
+                                Text(vm.goal.currencySymbol)
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
                                     .foregroundColor(theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5))
                                 TextField("0", text: $rateInput)
@@ -963,12 +1155,12 @@ private struct SettingsSectionView: View {
                                             .stroke(theme.cardBorder, lineWidth: 1)
                                     )
                                     .focusable(false)
-                                    .onChange(of: rateInput) { _, newValue in
-                                        let filtered = newValue.filter { $0.isNumber }
+                                                        .onChange(of: rateInput) { _, newValue in
+                                        let filtered = newValue.filter { $0.isNumber || $0 == "." }
                                         if filtered != newValue {
                                             rateInput = filtered
                                         }
-                                        if let val = Double(filtered) {
+                                        if let val = Double(filtered), val.isFinite, val >= 0 {
                                             vm.goal.hourlyRate = val
                                         } else {
                                             vm.goal.hourlyRate = 0.0
@@ -981,7 +1173,7 @@ private struct SettingsSectionView: View {
                         }
                     }
                     .onAppear {
-                        rateInput = vm.goal.hourlyRate > 0 ? String(Int(vm.goal.hourlyRate)) : ""
+                        rateInput = vm.goal.hourlyRate > 0 ? String(vm.goal.hourlyRate) : ""
                     }
 
                     Divider().background(theme.dividerColor)
@@ -996,15 +1188,18 @@ private struct SettingsSectionView: View {
                                 .foregroundColor(theme.textSecondary)
                         }
                         Spacer()
-                        Toggle("", isOn: $launchAtLogin)
+                        Toggle("", isOn: Binding(get: { launchAtLogin }, set: { enabled in
+                            loginError = AppDelegate.setLaunchAtLogin(enabled)
+                            launchAtLogin = AppDelegate.isLaunchAtLoginEnabled
+                        }))
+                            .accessibilityLabel("Launch at login")
                             .toggleStyle(.switch)
                             .controlSize(.small)
                             .tint(theme.neonTeal)
                             .focusable(false)
-                            .onChange(of: launchAtLogin) { _, newValue in
-                                AppDelegate.setLaunchAtLogin(newValue)
-                            }
                     }
+
+                    if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
 
                     Divider().background(theme.dividerColor)
 
@@ -1070,7 +1265,7 @@ private struct SettingsSectionView: View {
                     }
                     .buttonStyle(.plain)
                     .focusable(false)
-                }
+                    }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
                 .transition(.opacity)
@@ -1165,6 +1360,7 @@ private struct ManualSprintSheetView: View {
                             .buttonStyle(StepperChipButtonStyle(theme: theme))
 
                         TextField("HH:mm:ss", text: $vm.manualStartText)
+                            .accessibilityLabel("Manual sprint start time")
                             .textFieldStyle(.plain)
                             .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                             .foregroundColor(theme.textPrimary)
@@ -1193,6 +1389,7 @@ private struct ManualSprintSheetView: View {
                             .buttonStyle(StepperChipButtonStyle(theme: theme))
 
                         TextField("HH:mm:ss", text: $vm.manualEndText)
+                            .accessibilityLabel("Manual sprint end time")
                             .textFieldStyle(.plain)
                             .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                             .foregroundColor(theme.textPrimary)
@@ -1218,6 +1415,7 @@ private struct ManualSprintSheetView: View {
 
                     HStack(spacing: 4) {
                         TextField("0", text: $vm.manualBreakMinutesText)
+                            .accessibilityLabel("Break minutes")
                             .textFieldStyle(.plain)
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .foregroundColor(theme.textPrimary)
@@ -1239,6 +1437,11 @@ private struct ManualSprintSheetView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
 
+            TextField("Optional project or client tag", text: $vm.manualTagText)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Manual sprint tag")
+                .font(.system(size: 12))
+
             if let netDuration = vm.manualComputedNetDuration {
                 HStack {
                     HStack(spacing: 4) {
@@ -1253,7 +1456,7 @@ private struct ManualSprintSheetView: View {
                     Spacer()
 
                     if vm.goal.hasHourlyRate {
-                        Text("+\(TimeFormatter.format(rupees: vm.manualComputedEarningsDelta))")
+                        Text("+\(EarningsCalculator.format(amount: vm.manualComputedEarningsDelta, currencySymbol: vm.goal.currencySymbol))")
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(earningsDeltaColor)
                     }
@@ -1278,6 +1481,7 @@ private struct ManualSprintSheetView: View {
                     }
                 }
                 .buttonStyle(PillButtonStyle(color: theme.cardBg, foregroundColor: theme.textSecondary))
+                .keyboardShortcut(.cancelAction)
                 .frame(maxWidth: .infinity)
                 .focusable(false)
 
@@ -1290,6 +1494,7 @@ private struct ManualSprintSheetView: View {
                 .frame(maxWidth: .infinity)
                 .focusable(false)
                 .disabled(vm.manualComputedNetDuration == nil)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(.horizontal, 16)

@@ -12,9 +12,12 @@ struct SkevalTimerApp: App {
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    static weak var shared: AppDelegate?
+
     var statusItem: NSStatusItem!
     var popover: NSPopover!
-    let vm = TimerViewModel()
+    var dashboardController: DashboardWindowController!
+    let vm: TimerViewModel
     private var presenter: StatusBarPresenter!
 
     // Global Carbon hotkeys & local monitor:
@@ -27,8 +30,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private var lastClockHotkeyTriggerTime: Date = .distantPast
     private var lastPauseHotkeyTriggerTime: Date = .distantPast
 
+    override init() {
+        vm = TimerViewModel()
+        super.init()
+    }
+
+    init(vm: TimerViewModel) {
+        self.vm = vm
+        super.init()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
         NSApp.setActivationPolicy(.accessory)
+        dashboardController = DashboardWindowController(vm: vm)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem.button {
@@ -53,6 +68,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         setupStateObservation()
         setupDayChangeObservers()
         updateStatusItem(force: true)
+
+        let workAction = UNNotificationAction(
+            identifier: "COUNT_WORK",
+            title: "Count as Work",
+            options: .foreground
+        )
+        let pauseAction = UNNotificationAction(
+            identifier: "COUNT_PAUSED",
+            title: "Count as Paused",
+            options: .foreground
+        )
+        let sleepCategory = UNNotificationCategory(
+            identifier: "SLEEP_RESOLUTION",
+            actions: [workAction, pauseAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([sleepCategory])
 
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
@@ -179,8 +212,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
-    func triggerClockToggle() {
-        let now = Date()
+    func triggerClockToggle(at now: Date = Date()) {
         guard now.timeIntervalSince(lastClockHotkeyTriggerTime) > 0.3 else { return }
         lastClockHotkeyTriggerTime = now
 
@@ -193,8 +225,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
     }
 
-    func triggerPauseToggle() {
-        let now = Date()
+    func triggerPauseToggle(at now: Date = Date()) {
         guard now.timeIntervalSince(lastPauseHotkeyTriggerTime) > 0.3 else { return }
         lastPauseHotkeyTriggerTime = now
 
@@ -283,23 +314,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         )
     }
 
+    // MARK: - Dashboard Window Management
+    static func openDashboard() {
+        if let popover = shared?.popover, popover.isShown {
+            popover.performClose(nil)
+        }
+        shared?.dashboardController.showDashboard()
+    }
+
+    static func closeDashboard() {
+        shared?.dashboardController.hideDashboard()
+    }
+
     // MARK: - Launch at Login (SMAppService)
 
     static var isLaunchAtLoginEnabled: Bool {
-        guard Bundle.main.bundlePath.hasPrefix("/Applications") else { return false }
-        return SMAppService.mainApp.status == .enabled
+        LaunchAtLoginHelper.isEnabled
     }
 
-    static func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            print("[LaunchAtLogin] Notice: SMAppService requires app to be in /Applications. \(error)")
-        }
+    @discardableResult
+    static func setLaunchAtLogin(_ enabled: Bool) -> String? {
+        LaunchAtLoginHelper.setEnabled(enabled)
     }
 
     // MARK: - UNUserNotificationCenterDelegate
@@ -310,6 +345,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor in
+            if response.actionIdentifier == "COUNT_WORK" {
+                self.vm.resolveSleep(countAsWork: true)
+            } else if response.actionIdentifier == "COUNT_PAUSED" {
+                self.vm.resolveSleep(countAsWork: false)
+            } else {
+                self.togglePopover()
+            }
+            completionHandler()
+        }
     }
 }
 
