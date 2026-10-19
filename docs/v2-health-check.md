@@ -12,8 +12,8 @@ The engine's deinitializer removed its workspace observers but left its timer re
 
 | Check | Result |
 | --- | --- |
-| `./scripts/run-tests.sh` | 39,825 of 39,825 assertions passed |
-| `./scripts/run-tests.sh --runtime-health` | 14 of 14 checks passed with a real AppKit event loop |
+| `./scripts/run-tests.sh` | 39,923 of 39,923 assertions passed |
+| `./scripts/run-tests.sh --runtime-health` | 20 of 20 checks passed with a real AppKit event loop |
 | Xcode Debug build with signing disabled | Passed |
 | Xcode Analyze with signing disabled | Passed |
 | `git diff --check` | Passed |

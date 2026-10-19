@@ -5,7 +5,7 @@ Audit date: 13 October 2026. Baseline: v2 at `99b038c`. All changes were made in
 ## Results
 
 - Baseline suite: 715 / 715 assertions passed.
-- Final suite, including new boundary and failure regressions: 2,476 / 2,476 assertions passed.
+- Audit suite, including boundary and failure regressions: 2,476 / 2,476 assertions passed. (Subsequent expansions covering finish forecasting, decimal earnings stability, timer disposal, and eye-break reminders bring the active suite to 39,923 / 39,923 assertions).
 - Xcode Debug and Release builds succeeded with code signing disabled.
 - Native UI flows were exercised using production views, an in-memory sprint store, and a separate settings suite.
 - Git whitespace checks passed.
@@ -35,7 +35,7 @@ CSV and clipboard effective end times deduct pauses. Their whole-second endpoint
 | Save and reload precision | Keeps exact fractional timestamps alongside backward-compatible ISO date fields, preventing subsecond work and pause drift. |
 | Sprint editing | Preserves exact pauses when editing a tag, supports explicit end-day offsets, and validates before changing stored data. |
 | Recovery | Accepts an explicit end date for overnight recovery and validates proposed work before saving. |
-| Sleep decisions | Persists the pause count, excludes time spent deciding after wake, holds conflicting controls, and refreshes the pause display immediately. |
+| Sleep decisions | Persists the pause count, holds conflicting controls, refreshes the pause display immediately, and credits decision delay as work if counted as work (or as paused time if counted as paused). |
 | Daily milestones | Uses work attributed to today, so a sprint carried across midnight cannot trigger the next day's milestones. |
 | Invalid numbers | Rejects invalid goals, rates, dates, and pauses; guards non-finite earnings and overflow; displays sub-minute work as seconds. |
 | Persistence failures | Protects an unreadable existing file from overwrite, exposes a warning, retains unsaved memory changes for retry, and serializes writes to prevent stale snapshots. |

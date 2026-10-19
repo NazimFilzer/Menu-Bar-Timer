@@ -51,6 +51,18 @@ _Avoid_: System Pause, Idle Gap
 
 The daily goal multiplied by scheduled working days from the start of the current Monday-based week or calendar month through today. Default working days are Monday–Friday; individual days off remove that day's expected hours. The shortfall subtracts completed sprint durations and the active sprint's net elapsed time within the period. Work logged on non-working days still counts. Extra work is shown as hours ahead. Recovery time is excluded until resolved. This target is independent of configured weekly and monthly goal totals.
 
+## Scheduled working days and days off
+The configurable weekdays (default Monday–Friday) and specific calendar dates marked as off. Used by catch-up calculations and weekly pacing to compute expected working days and remaining pace without altering stored sprints.
+
+## Finish-time forecast
+An estimated completion time displayed on the Today dashboard indicating when the Daily Goal will be met. Calculated as `now + remaining net work + upcoming breaks`. Hidden during unresolved sleep or recovery.
+
+## Upcoming breaks
+A temporary planning allowance (0–240 minutes, in 5-minute increments, default 0) factored into the Finish-time forecast. Does not modify sprint durations, pause the timer, or auto-clock-out. Resets on day rollover or app relaunch.
+
+## Eye-break reminder
+A non-intrusive notification reminding the user to rest their eyes (look at an object at least 20 feet away for 20 seconds, following the 20-20-20 rule) after a configured interval of active sprint work (20, 30, or 45 minutes). Piggybacks on the active engine tick without extra background timers or idle polling.
+
 ## Clock In
 User action that starts a new Sprint, recording `startTime = now`.
 
@@ -88,7 +100,6 @@ The persistence module managing day-grouped sprint logs behind a storage seam
 The menu bar visual presenter responsible for rendering state pills (idle, active, paused)
 and synchronizing with engine ticks.
 
-
 ## Version tracking
 
 - v2.0 is the current version on the v2 branch. It combines main's live daily earnings, recent-day history, manual entry, pause hotkey, exact timer math, and day rollover with v2's tags, dashboard editing, sleep resolution, weekly and monthly analytics, and CSV reports.
@@ -100,4 +111,4 @@ Daily totals include completed sprints plus the active sprint when its start day
 
 ## Sleep decision hold
 
-The timer stays held after wake until sleep is classified as work or paused. The time between wake and that decision counts as paused time in either case.
+The timer stays held after wake until sleep is classified as work or paused. When resolved as work, both the sleep interval and the decision delay count as work. When resolved as paused, both count as paused duration.
