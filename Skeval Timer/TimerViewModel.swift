@@ -42,7 +42,6 @@ class TimerViewModel {
     var manualEntryError: String? = nil
 
     var goal = GoalSettings.shared
-    var isSettingsExpanded: Bool = false
 
     let engine: SprintEngine
     let store: DayLogStore
@@ -297,12 +296,7 @@ class TimerViewModel {
     }
 
     var desiredPopoverHeight: CGFloat {
-        var height: CGFloat
-        if isSettingsExpanded {
-            height = 780
-        } else {
-            height = 590
-        }
+        var height: CGFloat = 590
         if recoveryMode { height += 120 }
         if hasPendingSleepResolution { height += 90 }
         if persistenceError != nil { height += 80 }

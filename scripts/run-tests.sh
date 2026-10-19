@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-python3 - <<'PY'
+python3 - "$@" <<'PY'
 from pathlib import Path
 import os
 import subprocess
+import sys
 import tempfile
 
 with tempfile.TemporaryDirectory(prefix='skeval-tests-') as directory:
@@ -22,9 +23,13 @@ with tempfile.TemporaryDirectory(prefix='skeval-tests-') as directory:
     xcode = '/Applications/Xcode.app/Contents/Developer'
     if Path(xcode).exists():
         environment.setdefault('DEVELOPER_DIR', xcode)
+    runtime_health = sys.argv[1:] == ['--runtime-health']
+    if sys.argv[1:] and not runtime_health:
+        raise SystemExit('Usage: scripts/run-tests.sh [--runtime-health]')
+    tests = ['HealthChecks/RuntimeHealthMain.swift'] if runtime_health else sorted(str(path) for path in Path('Tests').glob('*.swift'))
     subprocess.run(['xcrun', 'swiftc', '-parse-as-library', *sources,
-                    str(delegate), *sorted(str(path) for path in Path('Tests').glob('*.swift')),
+                    str(delegate), *tests,
                     '-o', str(binary)],
                    env=environment, check=True)
-    subprocess.run([str(binary)], env=environment, check=True)
+    subprocess.run([str(binary)], env=environment, check=True, timeout=45 if runtime_health else None)
 PY

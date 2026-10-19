@@ -1,11 +1,9 @@
 import SwiftUI
-import ServiceManagement
 
 // MARK: - Main Popover View
 
 struct PopoverView: View {
     @Bindable var vm: TimerViewModel
-    @State private var launchAtLogin = AppDelegate.isLaunchAtLoginEnabled
     @State private var themeManager = ThemeManager.shared
 
     private var theme: PopoverTheme { themeManager.theme }
@@ -61,12 +59,23 @@ struct PopoverView: View {
 
                 Divider().background(theme.dividerColor)
 
-                SettingsSectionView(
-                    vm: vm,
-                    theme: theme,
-                    launchAtLogin: $launchAtLogin,
-                    themeManager: themeManager
-                )
+                Button(action: { NSApp.terminate(nil) }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "power")
+                        Text("Quit Skeval Timer")
+                        Spacer()
+                        Text("⌘Q")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(theme.softRed)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
             }
 
             if vm.isManualEntryPresented {
@@ -905,7 +914,7 @@ private struct SprintHistorySectionView: View {
                     }
                     .padding(.horizontal, 16)
                 }
-                .frame(maxHeight: vm.isSettingsExpanded ? 160 : 340)
+                .frame(maxHeight: 340)
                 .contextMenu {
                     Button(vm.isViewingToday ? "Copy Today's Timesheet Row" : "Copy \(vm.selectedDayShortTitle)'s Timesheet Row") {
                         vm.copyAllDisplayedSprints()
@@ -1011,274 +1020,6 @@ private struct SprintCardRow: View {
         .background(theme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 7))
         .overlay(RoundedRectangle(cornerRadius: 7).stroke(theme.cardBorder, lineWidth: 1))
-    }
-}
-
-// MARK: - Settings Section View
-
-private struct SettingsSectionView: View {
-    @Bindable var vm: TimerViewModel
-    let theme: PopoverTheme
-    @Binding var launchAtLogin: Bool
-    @Bindable var themeManager: ThemeManager
-    @State private var rateInput: String = ""
-    @State private var loginError: String?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { vm.isSettingsExpanded.toggle() } }) {
-                HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textSecondary)
-                        Text("SETTINGS")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(theme.textPrimary)
-                            .kerning(0.8)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(theme.textSecondary)
-                        .rotationEffect(.degrees(vm.isSettingsExpanded ? 90 : 0))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-            .buttonStyle(.plain)
-            .focusable(false)
-
-            if vm.isSettingsExpanded {
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Theme")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundColor(theme.textPrimary)
-                            Spacer()
-                            Text(theme.isLight ? "Light Mode" : "Dark Mode")
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
-                                .foregroundColor(theme.textSecondary)
-                        }
-
-                        let themeColumns = [
-                            GridItem(.flexible(), spacing: 5),
-                            GridItem(.flexible(), spacing: 5),
-                            GridItem(.flexible(), spacing: 5),
-                            GridItem(.flexible(), spacing: 5)
-                        ]
-
-                        LazyVGrid(columns: themeColumns, spacing: 5) {
-                            ForEach(AppTheme.allCases) { appTheme in
-                                let isSelected = themeManager.current == appTheme
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        themeManager.current = appTheme
-                                    }
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Circle()
-                                            .fill(appTheme.theme.accentColor)
-                                            .frame(width: 6.5, height: 6.5)
-
-                                        Text(appTheme.displayName)
-                                            .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
-                                            .foregroundColor(isSelected ? theme.textPrimary : theme.textSecondary)
-                                            .lineLimit(1)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 5.5)
-                                    .background(isSelected ? appTheme.theme.cardBg : theme.cardBg.opacity(0.6))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(isSelected ? appTheme.theme.accentColor : theme.cardBorder, lineWidth: isSelected ? 1.5 : 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .focusable(false)
-                                            }
-                        }
-                    }
-
-                    Divider().background(theme.dividerColor)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Daily Goal")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundColor(theme.textPrimary)
-                            Spacer()
-                            Text(vm.goal.goalLabel)
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(theme.neonTeal)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(theme.neonTeal.opacity(0.12))
-                                .clipShape(Capsule())
-                        }
-                        Slider(value: $vm.goal.dailyGoalHours, in: 1...16, step: 0.5)
-                            .tint(theme.neonTeal)
-                            .controlSize(.small)
-                            .focusable(false)
-                                    HStack {
-                            Text("1h")
-                            Spacer()
-                            Text("16h")
-                        }
-                        .font(.system(size: 9, weight: .regular, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-                    }
-
-                    Divider().background(theme.dividerColor)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Hourly Rate")
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundColor(theme.textPrimary)
-                                Text("Earned money tracker")
-                                    .font(.system(size: 9.5, weight: .regular, design: .rounded))
-                                    .foregroundColor(theme.textSecondary)
-                            }
-                            Spacer()
-                            HStack(spacing: 3) {
-                                Text(vm.goal.currencySymbol)
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundColor(theme.isLight ? Color(red: 0.05, green: 0.6, blue: 0.35) : Color(red: 0.2, green: 0.85, blue: 0.5))
-                                TextField("0", text: $rateInput)
-                                    .textFieldStyle(.plain)
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                    .foregroundColor(theme.textPrimary)
-                                    .multilineTextAlignment(.trailing)
-                                    .frame(width: 55)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(theme.cardBg)
-                                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 5)
-                                            .stroke(theme.cardBorder, lineWidth: 1)
-                                    )
-                                    .focusable(false)
-                                                        .onChange(of: rateInput) { _, newValue in
-                                        let filtered = newValue.filter { $0.isNumber || $0 == "." }
-                                        if filtered != newValue {
-                                            rateInput = filtered
-                                        }
-                                        if let val = Double(filtered), val.isFinite, val >= 0 {
-                                            vm.goal.hourlyRate = val
-                                        } else {
-                                            vm.goal.hourlyRate = 0.0
-                                        }
-                                    }
-                                Text("/hr")
-                                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                                    .foregroundColor(theme.textSecondary)
-                            }
-                        }
-                    }
-                    .onAppear {
-                        rateInput = vm.goal.hourlyRate > 0 ? String(vm.goal.hourlyRate) : ""
-                    }
-
-                    Divider().background(theme.dividerColor)
-
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Launch at Login")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundColor(theme.textPrimary)
-                            Text("Start Skeval Timer when you log in")
-                                .font(.system(size: 10, weight: .regular, design: .rounded))
-                                .foregroundColor(theme.textSecondary)
-                        }
-                        Spacer()
-                        Toggle("", isOn: Binding(get: { launchAtLogin }, set: { enabled in
-                            loginError = AppDelegate.setLaunchAtLogin(enabled)
-                            launchAtLogin = AppDelegate.isLaunchAtLoginEnabled
-                        }))
-                            .accessibilityLabel("Launch at login")
-                            .toggleStyle(.switch)
-                            .controlSize(.small)
-                            .tint(theme.neonTeal)
-                            .focusable(false)
-                    }
-
-                    if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
-
-                    Divider().background(theme.dividerColor)
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "keyboard")
-                            .font(.system(size: 10))
-                            .foregroundColor(theme.textSecondary)
-                        Text("Clock In / Out:")
-                            .font(.system(size: 10, weight: .regular, design: .rounded))
-                            .foregroundColor(theme.textSecondary)
-                        Spacer()
-                        HStack(spacing: 3) {
-                            ForEach(["⌘", "⌥", "⇧", "C"], id: \.self) { key in
-                                Text(key)
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(theme.textPrimary)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(theme.cardBg)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.cardBorder, lineWidth: 1))
-                            }
-                        }
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(theme.textSecondary)
-                        Text("Pause / Resume:")
-                            .font(.system(size: 10, weight: .regular, design: .rounded))
-                            .foregroundColor(theme.textSecondary)
-                        Spacer()
-                        HStack(spacing: 3) {
-                            ForEach(["⌘", "⌥", "⇧", "P"], id: \.self) { key in
-                                Text(key)
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(theme.textPrimary)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(theme.cardBg)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.cardBorder, lineWidth: 1))
-                            }
-                        }
-                    }
-
-                    Divider().background(theme.dividerColor)
-
-                    Button(action: { NSApp.terminate(nil) }) {
-                        HStack {
-                            Image(systemName: "power")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("Quit Skeval Timer")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                            Spacer()
-                            Text("⌘Q")
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                .foregroundColor(theme.textSecondary)
-                        }
-                        .foregroundColor(theme.softRed)
-                        .padding(.vertical, 2)
-                    }
-                    .buttonStyle(.plain)
-                    .focusable(false)
-                    }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
-                .transition(.opacity)
-            }
-        }
     }
 }
 
