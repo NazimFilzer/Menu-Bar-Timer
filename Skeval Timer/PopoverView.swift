@@ -827,7 +827,7 @@ private struct SprintHistorySectionView: View {
                             .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
                         }
                         .buttonStyle(PressedScaleButtonStyle())
-                                .help("Copy all sprints for this day to clipboard (Start & End columns for spreadsheets)")
+                        .help("Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
                     }
 
                     Button(action: {
@@ -883,7 +883,7 @@ private struct SprintHistorySectionView: View {
                 }
                 .frame(maxHeight: vm.isSettingsExpanded ? 160 : 340)
                 .contextMenu {
-                    Button(vm.isViewingToday ? "Copy All Today's Sprints" : "Copy All \(vm.selectedDayShortTitle)'s Sprints") {
+                    Button(vm.isViewingToday ? "Copy Today's Timesheet Row" : "Copy \(vm.selectedDayShortTitle)'s Timesheet Row") {
                         vm.copyAllDisplayedSprints()
                     }
                 }

@@ -10,6 +10,12 @@ Manual sprint entry, editing, tags, clipboard copy, and CSV export are available
 
 If the Mac sleeps during a sprint, the timer holds until you decide whether sleep counts as work or paused time. Time spent waiting to make that decision counts as paused time.
 
+## Copy All
+
+In the Today dashboard or menu bar popover, select a day and click **Copy All**, then paste into your sheet's Login cell. The popover context menu exports the same row. The four tab-separated columns are Login, Logout, an empty Lunch cell, and Break in whole minutes.
+
+Login is the earliest completed sprint's start and Logout is the latest actual end. Break includes pauses and gaps between completed sprints, calculated as `logout - login - total net work` and rounded to the nearest minute, with 30 seconds rounding up. Running and unresolved recovery sprints are excluded. Date and Hours Worked stay in the sheet, and stored durations keep their precision.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |

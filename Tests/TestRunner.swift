@@ -1755,9 +1755,9 @@ func testPastDaysHistory() {
     assertEqual(vm.displayedGoalTitle, "Yesterday's Target")
     assertEqual(vm.displayedTotalShortLabel, "4h 0m")
 
-    // Verify copy all displayed sprints copies yesterday's 2 sprints
+    // Copy All summarizes the selected day into one four-column timesheet row.
     let yestClipboard = vm.selectedDayLog.clipboardText
-    assertEqual(yestClipboard, "\(sYest1.clipboardText)\n\(sYest2.clipboardText)")
+    assertEqual(yestClipboard, "09:00:00\t16:00:00\t\t180")
 
     // Test saving manual sprint while viewing yesterday
     vm.manualStartText = "17:00:00"
@@ -2077,6 +2077,7 @@ struct TestMain {
         defer { cleanUpAuditSettings() }
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
+        testDailyTimesheetExport()
         testSprintTaggingAndBackwardCompatibility()
         testGoalSettingsExpansion()
         testEarningsCalculator()
@@ -2093,6 +2094,7 @@ struct TestMain {
         testMetricsAudit()
         testPersistenceAudit()
         await MainActor.run {
+            testDailyTimesheetClipboard()
             testSprintEngine()
             testAppThemes()
             testRapidPauseResumeCycles()

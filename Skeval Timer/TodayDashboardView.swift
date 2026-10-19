@@ -35,7 +35,7 @@ struct TodayDashboardView: View {
                         vm.copyAllDisplayedSprints()
                     }
                     .disabled(vm.displayedCompletedSprints.isEmpty)
-                    .help("Copy start and effective end times for this day")
+                    .help("Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
                 }
                 SprintLogTableView(vm: vm, sprints: vm.displayedCompletedSprintsDescending.map(\.sprint),
                                    distinctTags: tags, defaultDate: vm.selectedDate,

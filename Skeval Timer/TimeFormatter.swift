@@ -44,6 +44,22 @@ enum TimeFormatter {
 
     private static let formatterLock = NSLock()
 
+    private static let breakMinutesFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.numberStyle = .decimal
+        f.usesGroupingSeparator = false
+        f.maximumFractionDigits = 0
+        f.roundingMode = .halfUp
+        return f
+    }()
+
+    static func format(breakMinutes duration: TimeInterval) -> String {
+        formatterLock.lock()
+        defer { formatterLock.unlock() }
+        return breakMinutesFormatter.string(from: NSNumber(value: max(0, duration) / 60)) ?? "0"
+    }
+
     static func format(rupees amount: Double) -> String {
         formatterLock.lock()
         defer { formatterLock.unlock() }
