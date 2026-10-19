@@ -391,13 +391,6 @@ private struct ClockSectionView: View {
                     Text("Today's Total: \(vm.todayLog.accumulatedLabel)")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
 
-                    if vm.goal.hourlyRate > 0 {
-                        Text("•")
-                            .foregroundColor(theme.textSecondary.opacity(0.5))
-                        Text(vm.todayEarningsLabel)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundColor(theme.neonTeal)
-                    }
                 }
                 .foregroundColor(theme.textSecondary)
                 .padding(.top, 2)
@@ -605,90 +598,6 @@ private struct ActionSectionView: View {
                 }
             }
 
-            // Tag Assignment Row
-            if vm.isRunning {
-                HStack(spacing: 6) {
-                    Image(systemName: "tag.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(theme.neonTeal)
-
-                    if let tag = vm.currentTag, !tag.isEmpty {
-                        Text("#\(tag)")
-                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                            .foregroundColor(theme.neonTeal)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2.5)
-                            .background(theme.neonTeal.opacity(0.14))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
-
-                        Button(action: {
-                            vm.setTag(nil)
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(theme.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        TextField("Add sprint tag (e.g. dev, client)...", text: $liveTagInput, onCommit: {
-                            let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                            vm.setTag(clean.isEmpty ? nil : clean)
-                            liveTagInput = ""
-                        })
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 10.5, design: .rounded))
-                        .foregroundColor(theme.textPrimary)
-
-                        if !liveTagInput.isEmpty {
-                            Button(action: {
-                                let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                                vm.setTag(clean.isEmpty ? nil : clean)
-                                liveTagInput = ""
-                            }) {
-                                Text("Set")
-                                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                                    .foregroundColor(theme.neonTeal)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(theme.cardBg.opacity(0.7))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
-            } else {
-                HStack(spacing: 6) {
-                    Image(systemName: "tag")
-                        .font(.system(size: 10))
-                        .foregroundColor(theme.textSecondary)
-                    Text("#")
-                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(theme.neonTeal)
-                    TextField("Sprint tag (optional)", text: $vm.pendingTag)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 10.5, design: .rounded))
-                        .foregroundColor(theme.textPrimary)
-
-                    if !vm.pendingTag.isEmpty {
-                        Button(action: { vm.pendingTag = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(theme.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(theme.cardBg.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
-            }
-
             if vm.isRunning {
                 HStack(spacing: 8) {
                     Button(action: pauseResumeAction) {
@@ -783,6 +692,88 @@ private struct ActionSectionView: View {
                 .focusable(false)
                 .disabled(vm.recoveryMode)
                 .help("Clock In (⌘⌥⇧C)")
+            }
+
+            // Tag Assignment Row
+            if vm.isRunning {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.neonTeal)
+
+                    if let tag = vm.currentTag, !tag.isEmpty {
+                        Text("#\(tag)")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                            .foregroundColor(theme.neonTeal)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2.5)
+                            .background(theme.neonTeal.opacity(0.14))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
+
+                        Button(action: { vm.setTag(nil) }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        TextField("Add sprint tag (e.g. dev, client)...", text: $liveTagInput, onCommit: {
+                            let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            vm.setTag(clean.isEmpty ? nil : clean)
+                            liveTagInput = ""
+                        })
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10.5, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+
+                        if !liveTagInput.isEmpty {
+                            Button(action: {
+                                let clean = liveTagInput.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                                vm.setTag(clean.isEmpty ? nil : clean)
+                                liveTagInput = ""
+                            }) {
+                                Text("Set")
+                                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                    .foregroundColor(theme.neonTeal)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.cardBg.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textSecondary)
+                    Text("#")
+                        .font(.system(size: 10.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(theme.neonTeal)
+                    TextField("Sprint tag (optional)", text: $vm.pendingTag)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 10.5, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+
+                    if !vm.pendingTag.isEmpty {
+                        Button(action: { vm.pendingTag = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(theme.cardBg.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
             }
         }
         .padding(.horizontal, 16)

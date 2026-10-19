@@ -20,9 +20,9 @@ struct TodayDashboardView: View {
                 metrics
                 dailyGoal
                 if vm.isViewingToday {
-                    FinishForecastCardView(vm: vm, theme: theme)
                     CatchUpCardView(summary: vm.catchUpSummary(for: .week),
                                     dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                    FinishForecastCardView(vm: vm, theme: theme)
                 }
                 if !vm.goal.hasHourlyRate {
                     HStack {
