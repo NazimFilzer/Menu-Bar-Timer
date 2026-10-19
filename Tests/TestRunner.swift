@@ -213,14 +213,14 @@ func testAppThemes() {
     print("Running AppTheme tests...")
 
     assertEqual(AppTheme.allCases.count, 8)
-    assertEqual(AppTheme.neon.displayName, "Neon")
+    assertEqual(AppTheme.citrus.displayName, "Citrus")
     assertEqual(AppTheme.sepia.displayName, "Sepia")
     assertEqual(AppTheme.nord.displayName, "Nord")
-    assertEqual(AppTheme.midnight.displayName, "Midnight")
+    assertEqual(AppTheme.cloud.displayName, "Cloud")
     assertEqual(AppTheme.matcha.displayName, "Matcha")
     assertEqual(AppTheme.forest.displayName, "Forest")
-    assertEqual(AppTheme.sunset.displayName, "Sunset")
-    assertEqual(AppTheme.abyss.displayName, "Abyss")
+    assertEqual(AppTheme.rose.displayName, "Rose")
+    assertEqual(AppTheme.lavender.displayName, "Lavender")
 
     // Verify Sepia theme attributes
     let sepia = PopoverTheme.sepia
@@ -241,10 +241,10 @@ func testAppThemes() {
     assertEqual(manager.theme.name, "Matcha")
     assertTrue(manager.theme.isLight)
 
-    manager.current = .neon
-    assertEqual(manager.current, .neon)
-    assertEqual(manager.theme.name, "Neon")
-    assertFalse(manager.theme.isLight)
+    manager.current = .citrus
+    assertEqual(manager.current, .citrus)
+    assertEqual(manager.theme.name, "Citrus")
+    assertTrue(manager.theme.isLight)
 }
 
 @MainActor
