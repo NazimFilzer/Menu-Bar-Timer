@@ -348,12 +348,14 @@ final class SprintEngine {
         currentPauseElapsed = 0
 
         // The timer stays held after waking until the user makes a choice.
+        // If counting as work, neither the sleep duration nor the decision time
+        // (time between wake and the button click) should count as pause —
+        // the entire held period counts as work.
         let decisionPause = max(0, now.timeIntervalSince(interval.wakeAt))
-        totalPausedDuration += decisionPause
         if !countAsWork {
-            totalPausedDuration += interval.duration
+            totalPausedDuration += interval.duration + decisionPause
         }
-        if countAsWork && decisionPause == 0 { pauseCount = max(0, pauseCount - 1) }
+        if countAsWork { pauseCount = max(0, pauseCount - 1) }
         sprint.isPaused = false
         sprint.pauseStartedAt = nil
         sprint.pausedDuration = totalPausedDuration

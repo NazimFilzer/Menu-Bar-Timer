@@ -146,9 +146,9 @@ func testLifecycleAudit() {
     engine.resolveSleepInterval(countAsWork: true, at: start.addingTimeInterval(900))
     engine.clockOut(at: start.addingTimeInterval(1200))
     let completed = store.log(for: start).completedSprints.first!
-    assertEqual(completed.duration, 900)
-    assertEqual(completed.pausedDuration, 300)
-    assertEqual(completed.pauseCount, 1, "Decision delay is a pause even when sleep counts as work")
+    assertEqual(completed.duration, 1200)
+    assertEqual(completed.pausedDuration, 0)
+    assertEqual(completed.pauseCount, 0, "No pause recorded when held time counts as work")
 
     // The editor's existing conversion must not erase subminute pauses.
     let exactPause = 75.5

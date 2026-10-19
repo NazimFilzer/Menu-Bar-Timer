@@ -2031,10 +2031,10 @@ func testSleepDecisionDelayAndRecoveryRetry() {
     engine.handleSystemSleep(at: start.addingTimeInterval(3900))
     engine.handleSystemWake(at: start.addingTimeInterval(4500))
     engine.resolveSleepInterval(countAsWork: true, at: start.addingTimeInterval(4800))
-    assertEqual(engine.state.currentElapsed, 900, "Only the sleep interval counts as work")
+    assertEqual(engine.state.currentElapsed, 1200, "The entire held interval including decision time counts as work")
     engine.clockOut(at: start.addingTimeInterval(5100))
-    assertEqual(store.log(for: start).completedSprints.last?.duration, 1200)
-    assertEqual(store.log(for: start).completedSprints.last?.pausedDuration, 300)
+    assertEqual(store.log(for: start).completedSprints.last?.duration, 1500)
+    assertEqual(store.log(for: start).completedSprints.last?.pausedDuration, 0)
 
     engine.clockIn(at: start.addingTimeInterval(7200))
     engine.handleSystemSleep(at: start.addingTimeInterval(7500))
