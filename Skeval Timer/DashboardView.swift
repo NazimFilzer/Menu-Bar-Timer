@@ -53,13 +53,7 @@ struct DashboardView: View {
         .navigationSplitViewStyle(.balanced)
         .tint(theme.neonTeal)
         .preferredColorScheme(theme.isLight ? .light : .dark)
-        .onAppear {
-            if DashboardDestination(rawValue: destinationKey) == nil {
-                destinationKey = DashboardDestination.today.rawValue
-            }
-            vm.checkAndHandleDayChange()
-            vm.refreshLogs()
-        }
+        .onAppear { vm.checkAndHandleDayChange(); vm.refreshLogs() }
     }
 
     private var sidebar: some View {

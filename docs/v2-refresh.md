@@ -16,7 +16,7 @@ Compared main at `1ca62ea` with the original v2 at `335fbc9`. The work is on the
 
 ## Daily use
 
-The dashboard keeps clock-in, clock-out, and pause controls visible on every page. Today provides live daily totals, editable sprint tags, a date picker with previous and next day controls, daily goal progress, and sprint history. Set the hourly rate and work goals from the menu bar popover.
+The dashboard keeps clock-in, clock-out, and pause controls visible on every page. Today provides live daily totals, editable sprint tags, a date picker with previous and next day controls, daily goal progress, and sprint history. Settings have been removed from the dashboard and menu bar popover. Existing saved preferences still apply.
 
 The selected page and window position persist. The sidebar can collapse using macOS's standard control. The window opens at 1140 × 780 and has a 1000 × 650 minimum size to fit the tables.
 
@@ -56,4 +56,4 @@ Extracted validation into `SprintEntry`, kept search matching in `matchesSearch`
 - Native sample-data preview checked for layout, page shortcuts, accessible chart values, Command N entry, and Escape dismissal.
 - Git whitespace checks passed.
 
-The sample-data preview uses an in-memory sprint store and separate goal settings. Release v2.0 was built and installed from `main` on October 19, 2026. The app was relaunched from `/Applications/Skeval Timer.app`.
+The sample-data preview uses an in-memory sprint store and separate goal settings. Release v2.0 is published from `main` and installed at `/Applications/Skeval Timer.app`.
