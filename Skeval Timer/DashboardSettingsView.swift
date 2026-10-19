@@ -17,7 +17,7 @@ struct DashboardSettingsView: View {
                     Text("Preferences & Settings")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
-                    Text("Configure your work targets, billing hourly rates, currency, and visual themes.")
+                    Text("Configure work targets, billing, eye-break reminders, and visual themes.")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                 }
@@ -32,6 +32,8 @@ struct DashboardSettingsView: View {
                     customCurrency: $customCurrency,
                     isCustomCurrency: $isCustomCurrency
                 )
+
+                EyeBreakSettingsCard(vm: vm, theme: theme)
 
                 // 3. App Theme & Appearance Section
                 ThemeCard(themeManager: themeManager, theme: theme)

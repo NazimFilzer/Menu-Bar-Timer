@@ -44,6 +44,9 @@ class TimerViewModel {
     var manualEntryError: String? = nil
 
     var goal = GoalSettings.shared
+    let eyeBreakSettings: EyeBreakSettings
+    private var eyeBreakReminder = EyeBreakReminder()
+    private let deliverEyeBreakNotification: () -> Void
 
     let engine: SprintEngine
     let store: DayLogStore
@@ -67,7 +70,10 @@ class TimerViewModel {
 
     // MARK: - Init
 
-    init(engine: SprintEngine? = nil, store: DayLogStore? = nil, goal: GoalSettings? = nil) {
+    init(engine: SprintEngine? = nil, store: DayLogStore? = nil, goal: GoalSettings? = nil,
+         eyeBreakSettings: EyeBreakSettings? = nil, deliverEyeBreakNotification: (() -> Void)? = nil) {
+        self.eyeBreakSettings = eyeBreakSettings ?? .shared
+        self.deliverEyeBreakNotification = deliverEyeBreakNotification ?? Self.sendEyeBreakNotification
         let effectiveStore = store ?? DayLogStore.shared
         self.store = effectiveStore
         self.goal = goal ?? .shared
@@ -91,6 +97,7 @@ class TimerViewModel {
             }
         }
 
+        eyeBreakReminder.restart(at: currentElapsed, settings: self.eyeBreakSettings)
         setupEngineCallbacks()
     }
 
@@ -102,6 +109,9 @@ class TimerViewModel {
         engine.onTick = { [weak self] elapsed in
             guard let self else { return }
             self.currentElapsed = elapsed
+            if self.isTicking && self.eyeBreakReminder.isDue(at: elapsed, settings: self.eyeBreakSettings) {
+                self.deliverEyeBreakNotification()
+            }
             self.checkAndHandleDayChange()
             self.checkMilestoneNotifications()
         }
@@ -126,6 +136,14 @@ class TimerViewModel {
 
     private func handleStateChange(_ newState: SprintState) {
         let sprintChanged = state.currentSprint != newState.currentSprint
+        // Reset on activity transitions, not every elapsed-time or tag update.
+        let activityChanged = state.isPaused != newState.isPaused
+            || state.isRunning != newState.isRunning
+            || state.isRecovery != newState.isRecovery
+            || state.currentSprint?.id != newState.currentSprint?.id
+        if activityChanged {
+            eyeBreakReminder.restart(at: newState.currentElapsed, settings: eyeBreakSettings)
+        }
         if newState.isRecovery && !state.isRecovery {
             recoveryEndDate = newState.currentSprint?.startTime ?? Date()
         }
@@ -622,6 +640,29 @@ class TimerViewModel {
             manualEntryError = error.localizedDescription
             return false
         }
+    }
+
+    // MARK: - Eye-break Notifications
+
+    func updateEyeBreakEnabled(_ enabled: Bool) {
+        eyeBreakSettings.isEnabled = enabled
+        eyeBreakReminder.restart(at: currentElapsed, settings: eyeBreakSettings)
+    }
+
+    func updateEyeBreakInterval(_ minutes: Int) {
+        eyeBreakSettings.intervalMinutes = minutes
+        eyeBreakReminder.restart(at: currentElapsed, settings: eyeBreakSettings)
+    }
+
+    private static func sendEyeBreakNotification() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Time for an eye break"
+        content.body = "Look away from your screen at something at least 20 feet (6 metres) away for 20 seconds. Blink naturally."
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(
+            identifier: "skeval.eye-break", content: content, trigger: nil
+        ))
     }
 
     // MARK: - Milestone Notifications

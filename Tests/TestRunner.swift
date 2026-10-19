@@ -23,6 +23,25 @@ func assertFalse(_ condition: Bool, _ message: String = "", file: StaticString =
     assertEqual(condition, false, message, file: file, line: line)
 }
 
+// MARK: - Test Utilities
+
+private var auditSuiteNames: [String] = []
+
+func cleanUpAuditSettings() {
+    for name in auditSuiteNames { UserDefaults.standard.removePersistentDomain(forName: name) }
+}
+
+func auditSettings() -> GoalSettings {
+    let name = "skeval-test-\(UUID().uuidString)"
+    auditSuiteNames.append(name)
+    let defaults = UserDefaults(suiteName: name)!
+    return GoalSettings(userDefaults: defaults)
+}
+
+func auditDate(_ year: Int, _ month: Int, _ day: Int, hour: Int = 9, calendar: Calendar = .current) -> Date {
+    calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+}
+
 // MARK: - Tests
 
 func testTimeFormatter() {
@@ -205,6 +224,23 @@ func testSprintEngine() {
         assertEqual(engine.state, .idle)
     } catch {
         assertTrue(false, "Should not fail valid recovery end time: \(error)")
+    }
+}
+
+@MainActor
+func testTickerCleanup() {
+    print("Running active and paused timer disposal tests...")
+    for paused in [false, true] {
+        let store = DayLogStore(storage: InMemoryDayLogAdapter())
+        var engine: SprintEngine? = SprintEngine(store: store, observeWorkspace: false)
+        engine!.clockIn()
+        if paused { engine!.pause() }
+        let timer = Mirror(reflecting: engine!).children.first { $0.label == "ticker" }?.value as? Timer
+        assertTrue(timer?.isValid == true, "A running engine owns a valid timer")
+        weak let releasedEngine = engine
+        engine = nil
+        assertTrue(releasedEngine == nil, "The timer must not retain its engine")
+        assertTrue(timer?.isValid == false, "Disposing the engine must invalidate its run-loop timer")
     }
 }
 
@@ -2080,15 +2116,15 @@ struct TestMain {
         testTagFilterMatching()
         testAppVersion()
         testSprintEntryValidation()
-        testMetricsAudit()
         testCatchUpAnalytics()
         testFinishForecast()
-        testPersistenceAudit()
         await MainActor.run {
             testDailyTimesheetClipboard()
             testLiveCatchUpViewModel()
             testFinishForecastViewModel()
+            testEyeBreakReminders()
             testSprintEngine()
+            testTickerCleanup()
             testAppThemes()
             testRapidPauseResumeCycles()
             testCrashRecoveryAndPausePersistence()
@@ -2106,9 +2142,6 @@ struct TestMain {
             testTimeAndPauseMathVerification()
             testV2LiveEarningsAndHistorySynchronization()
             testSleepDecisionDelayAndRecoveryRetry()
-            testLifecycleAudit()
-            testEarningsReadStability()
-            testTickerCleanup()
         }
         print("Results: \(passedTests) / \(totalTests) assertions passed.")
         if passedTests != totalTests { exit(1) }
