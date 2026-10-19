@@ -89,6 +89,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+
+        if CommandLine.arguments.contains("--show-dashboard") {
+            dashboardController.showDashboard()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

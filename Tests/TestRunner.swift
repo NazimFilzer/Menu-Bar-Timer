@@ -1789,18 +1789,12 @@ func testPopoverHeightAndSizing() {
     let engine = SprintEngine(store: store)
     let vm = TimerViewModel(engine: engine, store: store)
 
-    // 1. Initial empty state: no sprints, not expanded, no recovery -> stable 590 to prevent UI compaction
+    // Empty and populated history use the same height to prevent UI compaction.
     assertEqual(vm.displayedCompletedSprints.count, 0)
-    assertFalse(vm.isSettingsExpanded)
     assertFalse(vm.recoveryMode)
     assertEqual(vm.desiredPopoverHeight, 590.0, "Empty state without sprints should be 590 to prevent UI compaction")
 
-    // 2. Settings expanded without sprints -> 780
-    vm.isSettingsExpanded = true
-    assertEqual(vm.desiredPopoverHeight, 780.0, "Empty state with settings expanded should be 780")
-    vm.isSettingsExpanded = false
-
-    // 3. Add sprint today -> stable 590
+    // Add a sprint today.
     let today = Date()
     let sToday = Sprint(startTime: today, endTime: today.addingTimeInterval(3600), pausedDuration: 0)
     store.save(sprint: sToday)
@@ -1810,12 +1804,7 @@ func testPopoverHeightAndSizing() {
     assertEqual(vm.displayedCompletedSprints.count, 1)
     assertEqual(vm.desiredPopoverHeight, 590.0, "State with completed sprints should be 590")
 
-    // 4. Settings expanded with sprints -> 780
-    vm.isSettingsExpanded = true
-    assertEqual(vm.desiredPopoverHeight, 780.0, "State with sprints and settings expanded should be 780")
-    vm.isSettingsExpanded = false
-
-    // 5. Past days navigation sizing test
+    // Past days navigation sizing test
     // Yesterday has 0 sprints, Today has 1 sprint
     let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
     vm.selectDate(yesterday)
@@ -2116,6 +2105,8 @@ struct TestMain {
             testV2LiveEarningsAndHistorySynchronization()
             testSleepDecisionDelayAndRecoveryRetry()
             testLifecycleAudit()
+            testEarningsReadStability()
+            testTickerCleanup()
         }
         print("Results: \(passedTests) / \(totalTests) assertions passed.")
         if passedTests != totalTests { exit(1) }

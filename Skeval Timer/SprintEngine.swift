@@ -113,6 +113,7 @@ final class SprintEngine {
     }
 
     deinit {
+        ticker?.invalidate()
         if let o = willSleepObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(o)
         }
