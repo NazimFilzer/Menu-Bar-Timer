@@ -88,6 +88,7 @@ struct PopoverView: View {
             }
         }
         .frame(width: 330)
+        .focusEffectDisabled()
         .preferredColorScheme(theme.isLight ? .light : .dark)
     }
 }
@@ -149,6 +150,8 @@ private struct PopoverHeaderView: View {
                 }
                 .buttonStyle(.plain)
                 .fixedSize()
+                .focusable(false)
+                .focusEffectDisabled()
                     }
 
             Spacer()
@@ -224,6 +227,7 @@ private struct RecoveryBannerView: View {
                     vm.resumeRecovery()
                 }
                 .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
+                .focusable(false)
 
                 TextField("HH:mm:ss", text: $vm.recoveryEndText)
                     .textFieldStyle(.plain)
@@ -235,11 +239,13 @@ private struct RecoveryBannerView: View {
                     .background(theme.cardBg)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.orange.opacity(0.5), lineWidth: 1))
+                    .focusable(false)
 
                 Button("Save") {
                     vm.saveRecoveryEndTime()
                 }
                 .buttonStyle(PillButtonStyle(color: Color(white: 0.7)))
+                .focusable(false)
 
                 Spacer()
 
@@ -249,6 +255,7 @@ private struct RecoveryBannerView: View {
                         .foregroundColor(theme.textSecondary)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
 
             if let err = vm.recoveryEndError {
@@ -722,6 +729,7 @@ private struct ActionSectionView: View {
                         .shadow(color: theme.softRed.opacity(0.45), radius: 6, y: 2)
                     }
                     .buttonStyle(PressedScaleButtonStyle())
+                    .focusable(false)
                         .disabled(vm.recoveryMode)
                     .help("Clock Out & Copy (⌘⌥⇧C)")
 
@@ -735,6 +743,7 @@ private struct ActionSectionView: View {
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
                     }
                     .buttonStyle(PressedScaleButtonStyle())
+                    .focusable(false)
                         .disabled(vm.recoveryMode)
                     .help("Discard current sprint")
                 }
@@ -762,6 +771,7 @@ private struct ActionSectionView: View {
                     .shadow(color: theme.accentColor.opacity(0.45), radius: 8, y: 3)
                 }
                 .buttonStyle(PressedScaleButtonStyle())
+                .focusable(false)
                 .disabled(vm.recoveryMode)
                 .help("Clock In (⌘⌥⇧C)")
             }
@@ -839,6 +849,7 @@ private struct SprintHistorySectionView: View {
                             .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
                         }
                         .buttonStyle(PressedScaleButtonStyle())
+                        .focusable(false)
                         .help("Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
                     }
 
@@ -856,6 +867,7 @@ private struct SprintHistorySectionView: View {
                             .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.neonTeal.opacity(0.35), lineWidth: 1))
                     }
                     .buttonStyle(PressedScaleButtonStyle())
+                    .focusable(false)
                         .help("Add sprint manually (+)")
                 }
             }
@@ -978,6 +990,7 @@ private struct SprintCardRow: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
                 .help(isCopied ? "Copied" : (sprint.hasPause ? "Actual end: \(sprint.endLabel) · Spreadsheet end: \(sprint.effectiveEndLabel) (\(sprint.pausedLabel) pause deducted)" : "Copy"))
 
                 Button(action: onDelete) {
@@ -989,6 +1002,7 @@ private struct SprintCardRow: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
                 .help("Delete sprint")
             }
         }
@@ -1033,6 +1047,7 @@ private struct SettingsSectionView: View {
                 .padding(.vertical, 10)
             }
             .buttonStyle(.plain)
+            .focusable(false)
 
             if vm.isSettingsExpanded {
                 VStack(alignment: .leading, spacing: 12) {
@@ -1082,6 +1097,7 @@ private struct SettingsSectionView: View {
                                     )
                                 }
                                 .buttonStyle(.plain)
+                                .focusable(false)
                                             }
                         }
                     }
@@ -1105,6 +1121,7 @@ private struct SettingsSectionView: View {
                         Slider(value: $vm.goal.dailyGoalHours, in: 1...16, step: 0.5)
                             .tint(theme.neonTeal)
                             .controlSize(.small)
+                            .focusable(false)
                                     HStack {
                             Text("1h")
                             Spacer()
@@ -1145,6 +1162,7 @@ private struct SettingsSectionView: View {
                                         RoundedRectangle(cornerRadius: 5)
                                             .stroke(theme.cardBorder, lineWidth: 1)
                                     )
+                                    .focusable(false)
                                                         .onChange(of: rateInput) { _, newValue in
                                         let filtered = newValue.filter { $0.isNumber || $0 == "." }
                                         if filtered != newValue {
@@ -1186,6 +1204,7 @@ private struct SettingsSectionView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                             .tint(theme.neonTeal)
+                            .focusable(false)
                     }
 
                     if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
@@ -1253,6 +1272,7 @@ private struct SettingsSectionView: View {
                         .padding(.vertical, 2)
                     }
                     .buttonStyle(.plain)
+                    .focusable(false)
                     }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
@@ -1269,6 +1289,7 @@ private struct PressedScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .focusable(false)
     }
 }
 
@@ -1283,6 +1304,7 @@ private struct PillButtonStyle: ButtonStyle {
             .padding(.vertical, 5)
             .background(color.opacity(configuration.isPressed ? 0.7 : 1.0))
             .clipShape(Capsule())
+            .focusable(false)
     }
 }
 
@@ -1329,6 +1351,7 @@ private struct ManualSprintSheetView: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
 
             VStack(spacing: 7) {
@@ -1468,6 +1491,7 @@ private struct ManualSprintSheetView: View {
                 .buttonStyle(PillButtonStyle(color: theme.cardBg, foregroundColor: theme.textSecondary))
                 .keyboardShortcut(.cancelAction)
                 .frame(maxWidth: .infinity)
+                .focusable(false)
 
                 Button("Log Sprint") {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -1476,6 +1500,7 @@ private struct ManualSprintSheetView: View {
                 }
                 .buttonStyle(PillButtonStyle(color: theme.accentColor, foregroundColor: theme.actionButtonForeground))
                 .frame(maxWidth: .infinity)
+                .focusable(false)
                 .disabled(vm.manualComputedNetDuration == nil)
                 .keyboardShortcut(.defaultAction)
             }
