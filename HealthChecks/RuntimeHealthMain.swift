@@ -69,14 +69,30 @@ struct RuntimeHealthMain {
         dashboard.layoutSubtreeIfNeeded()
         popover.layoutSubtreeIfNeeded()
         expect(vm.logRevision == revision, "Rendering must not refresh persisted logs")
+        let forecastTime = Date()
+        let activeForecast = vm.finishForecast(now: forecastTime)
+        expect(activeForecast.status == .working && activeForecast.finishDate != nil,
+               "The rendered dashboard must expose an active finish forecast")
+        vm.plannedBreakMinutes = 30
+        let withBreak = vm.finishForecast(now: forecastTime)
+        expect(withBreak.finishDate?.timeIntervalSince(activeForecast.finishDate!) == 1800,
+               "Upcoming breaks must shift the forecast, not logged work")
+        expect(vm.logRevision == revision, "Changing a forecast allowance must not save work")
 
         engine.pause()
         let pausedEarnings = vm.todayEarningsLabel
         let ticksBeforePause = activeTicks
+        let pausedForecast = vm.finishForecast()
         await waitForTicks()
         expect(activeTicks == ticksBeforePause, "Active updates must stop during pause")
         expect((1...3).contains(pauseTicks), "Exactly one pause timer should drive updates")
         expect(vm.todayEarningsLabel == pausedEarnings, "Earnings must stay frozen while paused")
+        let laterForecast = vm.finishForecast()
+        expect(laterForecast.status == .resumeNow, "Paused estimates must be conditional on resuming now")
+        expect(laterForecast.remainingToday == pausedForecast.remainingToday,
+               "Pause ticks must not reduce remaining work")
+        expect(laterForecast.finishDate!.timeIntervalSince(pausedForecast.finishDate!) >= 2,
+               "A conditional paused ETA must move forward with wall time")
 
         for _ in 0..<100 {
             engine.resume()

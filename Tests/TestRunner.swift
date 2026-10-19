@@ -2082,10 +2082,12 @@ struct TestMain {
         testSprintEntryValidation()
         testMetricsAudit()
         testCatchUpAnalytics()
+        testFinishForecast()
         testPersistenceAudit()
         await MainActor.run {
             testDailyTimesheetClipboard()
             testLiveCatchUpViewModel()
+            testFinishForecastViewModel()
             testSprintEngine()
             testAppThemes()
             testRapidPauseResumeCycles()

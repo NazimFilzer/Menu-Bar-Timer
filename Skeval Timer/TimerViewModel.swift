@@ -27,6 +27,8 @@ class TimerViewModel {
     var logRevision: Int = 0
     private(set) var persistenceError: String?
     var pendingTag: String = ""
+    // Upcoming breaks only; a day rollover starts a fresh plan.
+    var plannedBreakMinutes: Int = 0
     var manualTagText: String = ""
 
     // Recovery inputs
@@ -54,6 +56,7 @@ class TimerViewModel {
         let dayKey = TimeFormatter.format(dateKey: now)
         guard dayKey != lastActiveDayKey else { return }
         lastActiveDayKey = dayKey
+        plannedBreakMinutes = 0
         lastNotifiedDayKey = dayKey
         notifiedMilestones.removeAll()
         selectedDate = now
@@ -195,6 +198,16 @@ class TimerViewModel {
         return CatchUpAnalytics.calculate(
             logs: store.allLogs(), period: period, referenceDate: now, settings: goal,
             liveSprint: isRunning ? currentSprint : nil, liveElapsed: currentElapsed
+        )
+    }
+
+    func finishForecast(now: Date = Date(), calendar: Calendar = .current) -> FinishForecast {
+        _ = logRevision
+        return FinishForecast.calculate(
+            logs: store.allLogs(), settings: goal, state: state,
+            sleepHeld: hasPendingSleepResolution || engine.sleepStartedAt != nil,
+            plannedBreakMinutes: plannedBreakMinutes,
+            now: now, calendar: calendar
         )
     }
 
