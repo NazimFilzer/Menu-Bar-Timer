@@ -7,6 +7,21 @@ class GoalSettings {
 
     private let userDefaults: UserDefaults
 
+    // Calendar weekday numbers: Sunday = 1, Monday = 2, … Saturday = 7.
+    var workingWeekdays: Set<Int> = [2, 3, 4, 5, 6] {
+        didSet {
+            guard !workingWeekdays.isEmpty, workingWeekdays.isSubset(of: Set(1...7)) else {
+                workingWeekdays = oldValue
+                return
+            }
+            userDefaults.set(workingWeekdays.sorted(), forKey: "skevalWorkingWeekdays")
+        }
+    }
+
+    var daysOff: Set<String> = [] {
+        didSet { userDefaults.set(daysOff.sorted(), forKey: "skevalDaysOff") }
+    }
+
     var dailyGoalHours: Double = 8.0 {
         didSet {
             guard Self.validGoal(dailyGoalHours, maximum: 24) else { dailyGoalHours = oldValue; return }
@@ -41,6 +56,10 @@ class GoalSettings {
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
+        let storedWeekdays = Set(userDefaults.array(forKey: "skevalWorkingWeekdays") as? [Int] ?? [])
+        workingWeekdays = !storedWeekdays.isEmpty && storedWeekdays.isSubset(of: Set(1...7))
+            ? storedWeekdays : [2, 3, 4, 5, 6]
+        daysOff = Set(userDefaults.stringArray(forKey: "skevalDaysOff") ?? [])
         let storedDaily = userDefaults.double(forKey: "skevalDailyGoalHours")
         dailyGoalHours = Self.validGoal(storedDaily, maximum: 24) ? storedDaily : 8.0
 
@@ -59,6 +78,11 @@ class GoalSettings {
 
     private static func validGoal(_ hours: Double, maximum: Double) -> Bool {
         hours.isFinite && (1.0 / 60.0...maximum).contains(hours)
+    }
+
+    func isWorkingDay(_ date: Date, calendar: Calendar = .current) -> Bool {
+        workingWeekdays.contains(calendar.component(.weekday, from: date))
+            && !daysOff.contains(TimeFormatter.format(dateKey: date, calendar: calendar))
     }
 
     private static func validRate(_ rate: Double) -> Bool {

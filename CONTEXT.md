@@ -47,6 +47,10 @@ _Avoid_: Category, Project, Kanban Task
 A contiguous period during an active Sprint when macOS was in a system sleep state, bounded by recorded sleep and wake timestamps.
 _Avoid_: System Pause, Idle Gap
 
+## Catch-up target
+
+The daily goal multiplied by scheduled working days from the start of the current Monday-based week or calendar month through today. Default working days are Monday–Friday; individual days off remove that day's expected hours. The shortfall subtracts completed sprint durations and the active sprint's net elapsed time within the period. Work logged on non-working days still counts. Extra work is shown as hours ahead. Recovery time is excluded until resolved. This target is independent of configured weekly and monthly goal totals.
+
 ## Clock In
 User action that starts a new Sprint, recording `startTime = now`.
 

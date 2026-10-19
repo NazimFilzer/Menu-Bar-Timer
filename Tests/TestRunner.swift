@@ -2092,9 +2092,11 @@ struct TestMain {
         testAppVersion()
         testSprintEntryValidation()
         testMetricsAudit()
+        testCatchUpAnalytics()
         testPersistenceAudit()
         await MainActor.run {
             testDailyTimesheetClipboard()
+            testLiveCatchUpViewModel()
             testSprintEngine()
             testAppThemes()
             testRapidPauseResumeCycles()

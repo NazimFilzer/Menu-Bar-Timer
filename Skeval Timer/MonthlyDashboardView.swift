@@ -51,6 +51,11 @@ struct MonthlyDashboardView: View {
             // Monthly Goal Progress Bar Card
             monthlyGoalProgressCardView(summary: summary)
 
+            if summary.isCurrentMonth {
+                CatchUpCardView(summary: vm.catchUpSummary(for: .month),
+                                dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+            }
+
             // 28–31 Day Interactive Bar Chart
             MonthlyChartView(
                 summary: summary,

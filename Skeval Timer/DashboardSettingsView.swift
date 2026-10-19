@@ -108,11 +108,67 @@ private struct ProductivityGoalsCard: View {
                     maxLabel: "300h",
                     theme: theme
                 )
+
+                Divider().background(theme.dividerColor)
+                WorkScheduleView(settings: vm.goal, theme: theme)
             }
             .padding(16)
             .background(theme.cardBg)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
+        }
+    }
+}
+
+private struct WorkScheduleView: View {
+    @Bindable var settings: GoalSettings
+    let theme: PopoverTheme
+    @State private var dayOff = Date()
+    private let weekdays = [(2, "Mon"), (3, "Tue"), (4, "Wed"), (5, "Thu"), (6, "Fri"), (7, "Sat"), (1, "Sun")]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Working days").font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.textPrimary)
+            Text("Catch-up target = daily goal × working days through today. Weekly and monthly goals are separate totals.")
+                .font(.system(size: 11, design: .rounded)).foregroundStyle(theme.textSecondary)
+            HStack(spacing: 8) {
+                ForEach(weekdays, id: \.0) { weekday, label in
+                    let selected = settings.workingWeekdays.contains(weekday)
+                    Button {
+                        if selected { settings.workingWeekdays.remove(weekday) }
+                        else { settings.workingWeekdays.insert(weekday) }
+                    } label: {
+                        Text(label).font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .frame(maxWidth: .infinity).padding(.vertical, 8)
+                            .foregroundStyle(selected ? theme.neonTeal : theme.textSecondary)
+                            .background(selected ? theme.neonTeal.opacity(0.12) : theme.bgDark,
+                                        in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selected && settings.workingWeekdays.count == 1)
+                    .accessibilityLabel("\(label) working day")
+                    .accessibilityValue(selected ? "Selected" : "Not selected")
+                }
+            }
+            HStack {
+                DatePicker("Day off", selection: $dayOff, displayedComponents: .date)
+                Spacer()
+                Button("Add day off") {
+                    settings.daysOff.insert(TimeFormatter.format(dateKey: dayOff))
+                }
+                .disabled(settings.daysOff.contains(TimeFormatter.format(dateKey: dayOff)))
+            }
+            .font(.system(size: 12, design: .rounded))
+            ForEach(settings.daysOff.sorted(), id: \.self) { dateKey in
+                HStack {
+                    Label(dateKey, systemImage: "calendar.badge.minus")
+                    Spacer()
+                    Button("Remove") { settings.daysOff.remove(dateKey) }
+                        .accessibilityLabel("Remove day off \(dateKey)")
+                }
+                .font(.system(size: 12, design: .rounded))
+            }
         }
     }
 }

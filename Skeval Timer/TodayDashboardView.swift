@@ -19,6 +19,10 @@ struct TodayDashboardView: View {
                 if vm.isViewingToday { sprintTag }
                 metrics
                 dailyGoal
+                if vm.isViewingToday {
+                    CatchUpCardView(summary: vm.catchUpSummary(for: .week),
+                                    dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                }
                 if !vm.goal.hasHourlyRate {
                     HStack {
                         Label("Set your hourly rate to track earnings.", systemImage: "banknote")

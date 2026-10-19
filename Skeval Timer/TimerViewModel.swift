@@ -191,6 +191,14 @@ class TimerViewModel {
         TimeFormatter.format(shortDuration: totalTodayElapsed)
     }
 
+    func catchUpSummary(for period: CatchUpPeriod, now: Date = Date()) -> CatchUpSummary {
+        _ = logRevision
+        return CatchUpAnalytics.calculate(
+            logs: store.allLogs(), period: period, referenceDate: now, settings: goal,
+            liveSprint: isRunning ? currentSprint : nil, liveElapsed: currentElapsed
+        )
+    }
+
     var progressFraction: Double {
         let g = goal.dailyGoalSeconds
         guard g > 0 else { return 0 }

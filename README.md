@@ -8,6 +8,8 @@ Open the dashboard from the menu bar popover. Use the sidebar to move between To
 
 Manual sprint entry, editing, tags, clipboard copy, and CSV export are available in the dashboard. The popover keeps quick timing controls, manual entry, and the most recent seven days. Earnings use the hourly rate and currency configured in Settings. Weekly, monthly, and report totals use completed sprints; daily totals also include the active sprint.
 
+Today and the current Week and Month show a catch-up card below goal progress. Its target is the daily goal multiplied by scheduled working days through today, minus all clocked work in that week or month. The active sprint counts toward catch-up, with breaks excluded. Work on days off still counts. Choose working weekdays and individual days off in Settings; the default is Monday–Friday. Weekly and monthly goal totals remain separate from this daily schedule calculation.
+
 If the Mac sleeps during a sprint, the timer holds until you decide whether sleep counts as work or paused time. Time spent waiting to make that decision counts as paused time.
 
 ## Copy All

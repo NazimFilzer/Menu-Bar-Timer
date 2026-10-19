@@ -460,6 +460,18 @@ private struct DailyGoalProgressView: View {
             }
             .frame(height: 6)
 
+            if vm.isViewingToday {
+                let catchUp = vm.catchUpSummary(for: .week)
+                HStack(spacing: 5) {
+                    Text(catchUp.compactLabel)
+                        .foregroundStyle(catchUp.isBehind ? Color.orange : theme.neonTeal)
+                    Spacer()
+                    Text("This week").foregroundStyle(theme.textSecondary)
+                }
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .help("Expected by today: \(catchUp.expectedLabel). Clocked this week: \(catchUp.clockedLabel). Includes the active sprint.")
+            }
+
             if vm.goal.hasHourlyRate {
                 HStack {
                     Text("Logged: \(vm.displayedTotalShortLabel) / \(vm.goal.goalLabel)")

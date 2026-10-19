@@ -51,6 +51,11 @@ struct WeeklyDashboardView: View {
             // Weekly Target Progress Bar Card
             weeklyTargetProgressCardView(summary: summary)
 
+            if summary.isCurrentWeek {
+                CatchUpCardView(summary: vm.catchUpSummary(for: .week),
+                                dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+            }
+
             // Interactive 7-Day Bar Chart
             WeeklyChartView(
                 summary: summary,
