@@ -40,8 +40,11 @@ while (($#)); do
   esac
 done
 
-if [[ ! -d "$DEVELOPER_DIR" ]]; then
-  echo "Xcode not found at $DEVELOPER_DIR. Install Xcode or set DEVELOPER_DIR." >&2
+if [[ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]]; then
+  DEVELOPER_DIR="$(/usr/bin/xcode-select -p 2>/dev/null || true)"
+fi
+if [[ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]]; then
+  echo "Xcode not found. Install Xcode or set DEVELOPER_DIR to its Developer directory." >&2
   exit 1
 fi
 if [[ "$DESTINATION" != /* || "$DESTINATION" == '/' || "$DESTINATION" == "$ROOT"/* ]]; then

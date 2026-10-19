@@ -12,8 +12,8 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/run-app.sh [--configuration Debug|Release] [--help]
 
-Builds Skeval Timer with Xcode and opens the built app. The default
-configuration is Debug. Set DEVELOPER_DIR to use a different Xcode install.
+Builds, signs, and launches the app. The default configuration is Debug.
+Set DEVELOPER_DIR to use a different Xcode install.
 EOF
 }
 
@@ -40,8 +40,11 @@ if [[ "$CONFIGURATION" != Debug && "$CONFIGURATION" != Release ]]; then
   echo 'Configuration must be Debug or Release.' >&2
   exit 2
 fi
-if [[ ! -d "$DEVELOPER_DIR" ]]; then
-  echo "Xcode not found at $DEVELOPER_DIR. Install Xcode or set DEVELOPER_DIR." >&2
+if [[ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]]; then
+  DEVELOPER_DIR="$(/usr/bin/xcode-select -p 2>/dev/null || true)"
+fi
+if [[ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]]; then
+  echo "Xcode not found. Install Xcode or set DEVELOPER_DIR to its Developer directory." >&2
   exit 1
 fi
 export DEVELOPER_DIR
@@ -59,7 +62,7 @@ APP="$DERIVED_DATA/Build/Products/$CONFIGURATION/Skeval Timer.app"
 bash "$ROOT/scripts/sign-app.sh" "$APP"
 # Do not leave a second writer running against the same production log.
 if pgrep -x 'Skeval Timer' >/dev/null; then
-  osascript -e 'tell application id "com.nazim.Skeval-Timer" to quit'
+  osascript -e 'tell application id "com.nazim.Skeval-Timer" to quit' || true
   for attempt in {1..50}; do
     if ! pgrep -x 'Skeval Timer' >/dev/null; then break; fi
     sleep 0.1
@@ -69,5 +72,19 @@ if pgrep -x 'Skeval Timer' >/dev/null; then
     exit 1
   fi
 fi
-open "$APP"
-echo "Opened $APP"
+if /usr/bin/pgrep -x 'Skeval Timer' >/dev/null; then
+  echo 'Timer is already running; bringing the existing app forward.'
+  /usr/bin/open -a "$APP"
+else
+  /usr/bin/open "$APP"
+fi
+
+for attempt in {1..50}; do
+  if /usr/bin/pgrep -x 'Skeval Timer' >/dev/null; then
+    echo "Running: $APP"
+    exit 0
+  fi
+  sleep 0.1
+done
+echo "Launch requested but no Skeval Timer process appeared: $APP" >&2
+exit 1
