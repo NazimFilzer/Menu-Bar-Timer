@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DashboardDestination: String, CaseIterable, Identifiable {
-    case today, week, month, analytics, settings
+    case today, week, month, analytics
 
     var id: String { rawValue }
     var title: String { rawValue.capitalized }
@@ -11,7 +11,6 @@ enum DashboardDestination: String, CaseIterable, Identifiable {
         case .week: return "calendar"
         case .month: return "calendar.badge.clock"
         case .analytics: return "chart.xyaxis.line"
-        case .settings: return "gearshape"
         }
     }
     var subtitle: String {
@@ -20,7 +19,6 @@ enum DashboardDestination: String, CaseIterable, Identifiable {
         case .week: return "Weekly goals and daily work patterns"
         case .month: return "Monthly totals and time by tag"
         case .analytics: return "Trends, date ranges, and CSV reports"
-        case .settings: return "Goals, hourly rate, currency, and appearance"
         }
     }
     var shortcut: KeyEquivalent {
@@ -55,7 +53,13 @@ struct DashboardView: View {
         .navigationSplitViewStyle(.balanced)
         .tint(theme.neonTeal)
         .preferredColorScheme(theme.isLight ? .light : .dark)
-        .onAppear { vm.checkAndHandleDayChange(); vm.refreshLogs() }
+        .onAppear {
+            if DashboardDestination(rawValue: destinationKey) == nil {
+                destinationKey = DashboardDestination.today.rawValue
+            }
+            vm.checkAndHandleDayChange()
+            vm.refreshLogs()
+        }
     }
 
     private var sidebar: some View {
@@ -101,7 +105,7 @@ struct DashboardView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Keyboard shortcuts").font(.caption.bold())
-                Text("⌘1–5  Switch views\n⌘N  Add sprint\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
+                Text("⌘1–4  Switch views\n⌘N  Add sprint\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
@@ -115,15 +119,13 @@ struct DashboardView: View {
     @ViewBuilder private var content: some View {
         switch destination {
         case .today:
-            TodayDashboardView(vm: vm, theme: theme) { destinationKey = DashboardDestination.settings.rawValue }
+            TodayDashboardView(vm: vm, theme: theme)
         case .week:
             ScrollView { WeeklyDashboardView(vm: vm, theme: theme).padding(20) }
         case .month:
             ScrollView { MonthlyDashboardView(vm: vm, theme: theme).padding(20) }
         case .analytics:
             AnalyticsDashboardView(vm: vm, theme: theme)
-        case .settings:
-            DashboardSettingsView(vm: vm, theme: theme)
         }
     }
 }

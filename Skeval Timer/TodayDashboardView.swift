@@ -3,7 +3,6 @@ import SwiftUI
 struct TodayDashboardView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
-    let openSettings: () -> Void
 
     private var dateSelection: Binding<Date> {
         Binding(get: { vm.selectedDate }, set: { vm.selectDate($0) })
@@ -22,15 +21,6 @@ struct TodayDashboardView: View {
                 if vm.isViewingToday {
                     CatchUpCardView(summary: vm.catchUpSummary(for: .week),
                                     dailyGoalLabel: vm.goal.goalLabel, theme: theme)
-                }
-                if !vm.goal.hasHourlyRate {
-                    HStack {
-                        Label("Set your hourly rate to track earnings.", systemImage: "banknote")
-                        Spacer()
-                        Button("Set hourly rate", action: openSettings)
-                    }
-                    .font(.subheadline).padding(16)
-                    .background(theme.cardBg).clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 HStack {
                     Text("\(vm.selectedDayShortTitle)'s sprints").font(.headline)
@@ -98,7 +88,7 @@ struct TodayDashboardView: View {
                            subtitle: vm.isViewingToday ? "Includes the active sprint" : "Completed sprints",
                            icon: "clock", theme: theme)
             MetricCardView(title: "EARNINGS", value: vm.displayedEarningsLabel,
-                           subtitle: vm.goal.hasHourlyRate ? "\(vm.goal.hourlyRateLabel) per hour" : "Set your hourly rate",
+                           subtitle: vm.goal.hasHourlyRate ? "\(vm.goal.hourlyRateLabel) per hour" : "Set in menu bar controls",
                            icon: "banknote", theme: theme)
             MetricCardView(title: "DAILY TARGET", value: vm.goal.goalLabel,
                            subtitle: vm.goal.hasHourlyRate ? vm.targetEarningsLabel : "Your daily work goal",
