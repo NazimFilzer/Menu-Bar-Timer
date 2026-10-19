@@ -2,40 +2,40 @@ import SwiftUI
 import Observation
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case neon = "neon"
+    case citrus = "citrus"
     case sepia = "sepia"
     case nord = "nord"
-    case midnight = "midnight"
+    case cloud = "cloud"
     case matcha = "matcha"
     case forest = "forest"
-    case sunset = "sunset"
-    case abyss = "abyss"
+    case rose = "rose"
+    case lavender = "lavender"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .neon: return "Neon"
+        case .citrus: return "Citrus"
         case .sepia: return "Sepia"
         case .nord: return "Nord"
-        case .midnight: return "Midnight"
+        case .cloud: return "Cloud"
         case .matcha: return "Matcha"
         case .forest: return "Forest"
-        case .sunset: return "Sunset"
-        case .abyss: return "Abyss"
+        case .rose: return "Rose"
+        case .lavender: return "Lavender"
         }
     }
 
     var theme: PopoverTheme {
         switch self {
-        case .neon: return PopoverTheme.neon
+        case .citrus: return PopoverTheme.citrus
         case .sepia: return PopoverTheme.sepia
         case .nord: return PopoverTheme.nord
-        case .midnight: return PopoverTheme.midnight
+        case .cloud: return PopoverTheme.cloud
         case .matcha: return PopoverTheme.matcha
         case .forest: return PopoverTheme.forest
-        case .sunset: return PopoverTheme.sunset
-        case .abyss: return PopoverTheme.abyss
+        case .rose: return PopoverTheme.rose
+        case .lavender: return PopoverTheme.lavender
         }
     }
 }
@@ -91,11 +91,12 @@ struct PopoverTheme: Equatable {
             switch name {
             case "Sepia": return Color(red: 0.90, green: 0.49, blue: 0.26)
             case "Nord": return Color(red: 0.92, green: 0.80, blue: 0.55)
-            case "Midnight": return Color(red: 1.0, green: 0.72, blue: 0.42)
+            case "Cloud": return Color(red: 0.55, green: 0.53, blue: 0.30)
+            case "Rose": return Color(red: 0.78, green: 0.43, blue: 0.32)
+            case "Citrus": return Color(red: 0.72, green: 0.48, blue: 0.12)
+            case "Lavender": return Color(red: 0.58, green: 0.43, blue: 0.70)
             case "Matcha": return Color(red: 0.85, green: 0.42, blue: 0.15)
             case "Forest": return Color(red: 0.95, green: 0.65, blue: 0.15)
-            case "Sunset": return Color(red: 1.0, green: 0.75, blue: 0.25)
-            case "Abyss": return Color(red: 1.0, green: 0.55, blue: 0.35)
             default: return Color(red: 1.0, green: 0.65, blue: 0.0)
             }
         case .active: return accentColor
@@ -103,16 +104,16 @@ struct PopoverTheme: Equatable {
         }
     }
 
-    static let neon = PopoverTheme(
-        name: "Neon",
-        isLight: false,
-        bgDark: Color(red: 0.05, green: 0.06, blue: 0.09),
-        cardBg: Color(red: 0.10, green: 0.12, blue: 0.16),
-        cardBorder: Color(white: 0.20, opacity: 0.4),
-        accentColor: Color(red: 0.22, green: 0.85, blue: 0.65),
-        softRed: Color(red: 0.98, green: 0.35, blue: 0.38),
-        textPrimary: Color(white: 0.95),
-        textSecondary: Color(white: 0.55)
+    static let citrus = PopoverTheme(
+        name: "Citrus",
+        isLight: true,
+        bgDark: Color(red: 1.0, green: 0.98, blue: 0.90),
+        cardBg: Color(white: 1.0),
+        cardBorder: Color(red: 0.91, green: 0.88, blue: 0.73),
+        accentColor: Color(red: 0.88, green: 0.70, blue: 0.30),
+        softRed: Color(red: 0.84, green: 0.35, blue: 0.31),
+        textPrimary: Color(red: 0.22, green: 0.19, blue: 0.11),
+        textSecondary: Color(red: 0.50, green: 0.46, blue: 0.32)
     )
 
     static let sepia = PopoverTheme(
@@ -139,16 +140,16 @@ struct PopoverTheme: Equatable {
         textSecondary: Color(red: 0.60, green: 0.64, blue: 0.70)
     )
 
-    static let midnight = PopoverTheme(
-        name: "Midnight",
-        isLight: false,
-        bgDark: Color(red: 0.07, green: 0.06, blue: 0.12),
-        cardBg: Color(red: 0.12, green: 0.09, blue: 0.19),
-        cardBorder: Color(red: 0.25, green: 0.20, blue: 0.38, opacity: 0.5),
-        accentColor: Color(red: 0.74, green: 0.58, blue: 0.98),
-        softRed: Color(red: 1.0, green: 0.47, blue: 0.78),
-        textPrimary: Color(red: 0.97, green: 0.97, blue: 0.95),
-        textSecondary: Color(red: 0.62, green: 0.58, blue: 0.71)
+    static let cloud = PopoverTheme(
+        name: "Cloud",
+        isLight: true,
+        bgDark: Color(red: 0.96, green: 0.97, blue: 0.99),
+        cardBg: Color(white: 1.0),
+        cardBorder: Color(red: 0.84, green: 0.87, blue: 0.92),
+        accentColor: Color(red: 0.42, green: 0.60, blue: 0.82),
+        softRed: Color(red: 0.86, green: 0.35, blue: 0.37),
+        textPrimary: Color(red: 0.13, green: 0.17, blue: 0.24),
+        textSecondary: Color(red: 0.43, green: 0.48, blue: 0.57)
     )
 
     static let matcha = PopoverTheme(
@@ -175,28 +176,28 @@ struct PopoverTheme: Equatable {
         textSecondary: Color(red: 0.48, green: 0.62, blue: 0.55)
     )
 
-    static let sunset = PopoverTheme(
-        name: "Sunset",
-        isLight: false,
-        bgDark: Color(red: 0.07, green: 0.05, blue: 0.11),
-        cardBg: Color(red: 0.12, green: 0.08, blue: 0.18),
-        cardBorder: Color(red: 0.28, green: 0.18, blue: 0.40, opacity: 0.5),
-        accentColor: Color(red: 1.0, green: 0.42, blue: 0.42),
-        softRed: Color(red: 1.0, green: 0.30, blue: 0.45),
-        textPrimary: Color(red: 1.0, green: 0.95, blue: 0.93),
-        textSecondary: Color(red: 0.68, green: 0.58, blue: 0.76)
+    static let rose = PopoverTheme(
+        name: "Rose",
+        isLight: true,
+        bgDark: Color(red: 1.0, green: 0.96, blue: 0.95),
+        cardBg: Color(white: 1.0),
+        cardBorder: Color(red: 0.93, green: 0.84, blue: 0.83),
+        accentColor: Color(red: 0.82, green: 0.53, blue: 0.55),
+        softRed: Color(red: 0.84, green: 0.32, blue: 0.36),
+        textPrimary: Color(red: 0.24, green: 0.15, blue: 0.16),
+        textSecondary: Color(red: 0.53, green: 0.40, blue: 0.41)
     )
 
-    static let abyss = PopoverTheme(
-        name: "Abyss",
-        isLight: false,
-        bgDark: Color(red: 0.03, green: 0.06, blue: 0.11),
-        cardBg: Color(red: 0.06, green: 0.11, blue: 0.19),
-        cardBorder: Color(red: 0.12, green: 0.22, blue: 0.35, opacity: 0.6),
-        accentColor: Color(red: 0.0, green: 0.82, blue: 1.0),
-        softRed: Color(red: 1.0, green: 0.45, blue: 0.45),
-        textPrimary: Color(red: 0.90, green: 0.96, blue: 0.99),
-        textSecondary: Color(red: 0.45, green: 0.58, blue: 0.70)
+    static let lavender = PopoverTheme(
+        name: "Lavender",
+        isLight: true,
+        bgDark: Color(red: 0.97, green: 0.95, blue: 0.99),
+        cardBg: Color(white: 1.0),
+        cardBorder: Color(red: 0.87, green: 0.83, blue: 0.92),
+        accentColor: Color(red: 0.64, green: 0.52, blue: 0.79),
+        softRed: Color(red: 0.85, green: 0.35, blue: 0.45),
+        textPrimary: Color(red: 0.19, green: 0.15, blue: 0.25),
+        textSecondary: Color(red: 0.46, green: 0.41, blue: 0.55)
     )
 }
 
@@ -210,16 +211,18 @@ extension PopoverTheme {
             return NSColor(red: 0.90, green: 0.66, blue: 0.35, alpha: 0.95)
         case "Nord":
             return NSColor(red: 0.53, green: 0.75, blue: 0.82, alpha: 0.95)
-        case "Midnight":
-            return NSColor(red: 0.74, green: 0.58, blue: 0.98, alpha: 0.95)
+        case "Cloud":
+            return NSColor(red: 0.42, green: 0.60, blue: 0.82, alpha: 0.95)
+        case "Rose":
+            return NSColor(red: 0.82, green: 0.53, blue: 0.55, alpha: 0.95)
         case "Matcha":
             return NSColor(red: 0.17, green: 0.48, blue: 0.30, alpha: 1.0)
         case "Forest":
             return NSColor(red: 0.18, green: 0.90, blue: 0.62, alpha: 0.95)
-        case "Sunset":
-            return NSColor(red: 1.0, green: 0.42, blue: 0.42, alpha: 0.95)
-        case "Abyss":
-            return NSColor(red: 0.0, green: 0.82, blue: 1.0, alpha: 0.95)
+        case "Citrus":
+            return NSColor(red: 0.88, green: 0.70, blue: 0.30, alpha: 0.95)
+        case "Lavender":
+            return NSColor(red: 0.64, green: 0.52, blue: 0.79, alpha: 0.95)
         default:
             return NSColor(red: 0.22, green: 0.85, blue: 0.65, alpha: 0.95)
         }
@@ -231,16 +234,10 @@ extension PopoverTheme {
             return NSColor(red: 0.90, green: 0.49, blue: 0.26, alpha: 0.95)
         case "Nord":
             return NSColor(red: 0.92, green: 0.80, blue: 0.55, alpha: 0.95)
-        case "Midnight":
-            return NSColor(red: 1.0, green: 0.72, blue: 0.42, alpha: 0.95)
         case "Matcha":
             return NSColor(red: 0.85, green: 0.42, blue: 0.15, alpha: 1.0)
         case "Forest":
             return NSColor(red: 0.95, green: 0.65, blue: 0.15, alpha: 0.95)
-        case "Sunset":
-            return NSColor(red: 1.0, green: 0.75, blue: 0.25, alpha: 0.95)
-        case "Abyss":
-            return NSColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)
         default:
             return NSColor(red: 1.0, green: 0.68, blue: 0.0, alpha: 0.95)
         }
@@ -248,6 +245,7 @@ extension PopoverTheme {
 
     func statusTextNSColor(isIdle: Bool) -> NSColor {
         if isIdle { return .white }
+        if ["Cloud", "Rose", "Citrus", "Lavender"].contains(name) { return .black }
         return isLight ? .white : .black
     }
 }
@@ -271,7 +269,13 @@ final class ThemeManager {
     }
 
     init() {
-        let saved = UserDefaults.standard.string(forKey: "skeval_app_theme") ?? AppTheme.neon.rawValue
-        self.current = AppTheme(rawValue: saved) ?? .neon
+        let saved = UserDefaults.standard.string(forKey: "skeval_app_theme") ?? AppTheme.citrus.rawValue
+        switch saved {
+        case "midnight": self.current = .cloud
+        case "sunset": self.current = .rose
+        case "neon": self.current = .citrus
+        case "abyss": self.current = .lavender
+        default: self.current = AppTheme(rawValue: saved) ?? .citrus
+        }
     }
 }
