@@ -34,6 +34,8 @@ Open `Skeval Timer.xcodeproj` in Xcode. The target requires macOS 26.2 or newer.
 
 Run the domain, persistence, analytics, and lifecycle tests with `./scripts/run-tests.sh`.
 
+Run `./scripts/run-preview.sh` to open a separate native preview app with disposable sample logs. It opens Week; on Tuesday, October 13, 2026, the sample shows 16h expected, 6h clocked, and 10h left to catch up. Use the app menu's "Show menu bar preview" action to inspect the quick controls. Preview preferences and logs are isolated from the installed timer.
+
 Build without signing:
 
 ```sh
