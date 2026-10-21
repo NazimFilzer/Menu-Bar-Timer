@@ -23,7 +23,6 @@ struct FinishForecast {
         sleepHeld: Bool = false, plannedBreakMinutes: Int = 0,
         now: Date = Date(), calendar: Calendar = .current
     ) -> FinishForecast {
-        let today = calendar.startOfDay(for: now)
         let todayKey = TimeFormatter.format(dateKey: now, calendar: calendar)
         let liveSprint = state.isRunning ? state.currentSprint : nil
         let liveSeconds = state.currentElapsed.isFinite ? max(0, state.currentElapsed) : 0
@@ -36,28 +35,17 @@ struct FinishForecast {
         let canProject = [.working, .startNow, .resumeNow].contains(status)
         let finish = canProject ? now.addingTimeInterval(remaining + plannedBreak) : nil
 
-        let dates = CatchUpPeriod.week.dates(containing: now, calendar: calendar)
-        let scheduled = dates.filter { settings.isWorkingDay($0, calendar: calendar) }
-        let remainingDates = scheduled.filter { $0 >= today }
-        let credited = CatchUpAnalytics.calculate(logs: logs, period: .week, referenceDate: now,
-                                                  settings: settings, liveSprint: liveSprint,
-                                                  liveElapsed: liveSeconds, calendar: calendar).clockedSeconds
-        let weeklyRemaining = max(0, Double(scheduled.count) * settings.dailyGoalSeconds - credited)
-        let pace = remainingDates.isEmpty ? nil : weeklyRemaining / Double(remainingDates.count)
-        // Scheduled-day clock time only, not a recommended work limit. Off-day or
-        // overnight work can still count under the existing start-day attribution.
-        let capacity = remainingDates.reduce(0.0) { total, date in
-            let end = calendar.date(byAdding: .day, value: 1, to: date) ?? date
-            return total + max(0, end.timeIntervalSince(max(date, now)))
-        }
+        let weeklyPace = PeriodPaceForecast.calculate(
+            logs: logs, period: .week, settings: settings, state: state, now: now, calendar: calendar
+        )
         return FinishForecast(
             status: status, remainingToday: remaining, plannedBreak: plannedBreak,
             finishDate: finish,
             finishesAfterToday: finish.map { !calendar.isDate($0, inSameDayAs: now) } ?? false,
-            weeklyRemaining: weeklyRemaining, remainingWorkingDays: remainingDates.count,
-            includesToday: remainingDates.contains(today), weeklySecondsPerDay: pace,
-            exceedsWeeklyCapacity: weeklyRemaining > capacity,
-            extraSecondsPerWorkingDay: pace.map { max(0, $0 - settings.dailyGoalSeconds) }
+            weeklyRemaining: weeklyPace.remainingSeconds, remainingWorkingDays: weeklyPace.remainingWorkingDays,
+            includesToday: weeklyPace.includesToday, weeklySecondsPerDay: weeklyPace.secondsPerWorkingDay,
+            exceedsWeeklyCapacity: weeklyPace.exceedsCapacity,
+            extraSecondsPerWorkingDay: weeklyPace.extraSecondsPerWorkingDay
         )
     }
 

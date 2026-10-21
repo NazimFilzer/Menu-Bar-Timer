@@ -229,6 +229,15 @@ class TimerViewModel {
         )
     }
 
+    func periodPaceForecast(for period: CatchUpPeriod, now: Date = Date(),
+                            calendar: Calendar = .current) -> PeriodPaceForecast {
+        _ = logRevision
+        return PeriodPaceForecast.calculate(
+            logs: store.allLogs(), period: period, settings: goal, state: state,
+            now: now, calendar: calendar
+        )
+    }
+
     var progressFraction: Double {
         let g = goal.dailyGoalSeconds
         guard g > 0 else { return 0 }

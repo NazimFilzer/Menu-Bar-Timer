@@ -54,6 +54,7 @@ struct MonthlyDashboardView: View {
             if summary.isCurrentMonth {
                 CatchUpCardView(summary: vm.catchUpSummary(for: .month),
                                 dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                PeriodPaceCardView(vm: vm, period: .month, theme: theme)
             }
 
             // 28–31 Day Interactive Bar Chart

@@ -54,6 +54,7 @@ struct WeeklyDashboardView: View {
             if summary.isCurrentWeek {
                 CatchUpCardView(summary: vm.catchUpSummary(for: .week),
                                 dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                PeriodPaceCardView(vm: vm, period: .week, theme: theme)
             }
 
             // Interactive 7-Day Bar Chart

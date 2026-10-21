@@ -2118,10 +2118,12 @@ struct TestMain {
         testSprintEntryValidation()
         testCatchUpAnalytics()
         testFinishForecast()
+        testPeriodPaceForecast()
         await MainActor.run {
             testDailyTimesheetClipboard()
             testLiveCatchUpViewModel()
             testFinishForecastViewModel()
+            testPeriodPaceViewModel()
             testEyeBreakReminders()
             testSprintEngine()
             testTickerCleanup()
