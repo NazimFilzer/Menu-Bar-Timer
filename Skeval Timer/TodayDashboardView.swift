@@ -20,7 +20,7 @@ struct TodayDashboardView: View {
                 metrics
                 dailyGoal
                 if vm.isViewingToday {
-                    CatchUpCardView(summary: vm.catchUpSummary(for: .week),
+                    CatchUpCardView(summary: vm.catchUpSummary(for: .day),
                                     dailyGoalLabel: vm.goal.goalLabel, theme: theme)
                     FinishForecastCardView(vm: vm, theme: theme)
                 }

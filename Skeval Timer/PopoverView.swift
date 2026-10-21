@@ -478,7 +478,7 @@ private struct DailyGoalProgressView: View {
                     Text("This week").foregroundStyle(theme.textSecondary)
                 }
                 .font(.system(size: 10, weight: .medium, design: .rounded))
-                .help("Expected by today: \(catchUp.expectedLabel). Clocked this week: \(catchUp.clockedLabel). Includes the active sprint.")
+                .help("Expected through today: \(catchUp.expectedLabel). Clocked this week: \(catchUp.clockedLabel). Remaining is the total to meet this week's pace, not today's finish-time estimate. Includes the active sprint.")
             }
 
             if vm.goal.hasHourlyRate {

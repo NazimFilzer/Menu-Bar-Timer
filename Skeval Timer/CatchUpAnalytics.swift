@@ -1,13 +1,20 @@
 import Foundation
 
 enum CatchUpPeriod: String {
-    case week, month
+    case day, week, month
 
-    var label: String { self == .week ? "This week" : "This month" }
+    var label: String {
+        switch self {
+        case .day: "Today"
+        case .week: "This week"
+        case .month: "This month"
+        }
+    }
 
     func dates(containing date: Date, calendar: Calendar) -> [Date] {
-        if self == .month { return AnalyticsMetrics.monthDates(containing: date, calendar: calendar) }
         let today = calendar.startOfDay(for: date)
+        if self == .day { return [today] }
+        if self == .month { return AnalyticsMetrics.monthDates(containing: date, calendar: calendar) }
         let daysFromMonday = (calendar.component(.weekday, from: today) + 5) % 7
         let monday = calendar.date(byAdding: .day, value: -daysFromMonday, to: today) ?? today
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
@@ -27,14 +34,19 @@ struct CatchUpSummary: Equatable {
     var clockedLabel: String { Self.durationLabel(clockedSeconds) }
 
     var headline: String {
-        if isBehind { return "\(Self.durationLabel(remainingSeconds)) left to catch up today" }
-        if aheadSeconds > 0 { return "\(Self.durationLabel(aheadSeconds)) ahead" }
+        let periodDescription = period == .day ? "today" : period == .week ? "this week" : "this month"
+        if isBehind { return "\(Self.durationLabel(remainingSeconds)) left \(periodDescription)" }
+        if aheadSeconds > 0 { return "\(Self.durationLabel(aheadSeconds)) ahead \(periodDescription)" }
         if workingDaysElapsed == 0 { return "No work target yet" }
-        return "On track"
+        return switch period {
+        case .day: "Today's target is reached"
+        case .week: "This week's target is reached"
+        case .month: "This month's target is reached"
+        }
     }
 
     var compactLabel: String {
-        if isBehind { return "\(Self.durationLabel(remainingSeconds)) to catch up" }
+        if isBehind { return "\(Self.durationLabel(remainingSeconds)) left \(period == .day ? "today" : period == .week ? "this week" : "this month")" }
         return headline
     }
 
@@ -45,7 +57,8 @@ struct CatchUpSummary: Equatable {
     }
 }
 
-/// Targets include today's full daily goal. Work on days off still counts toward catching up.
+/// Day targets use today's daily goal; week and month targets accumulate through today.
+/// Work on days off still counts toward period catch-up.
 enum CatchUpAnalytics {
     static func calculate(
         logs: [String: [Sprint]], period: CatchUpPeriod, referenceDate: Date = Date(),

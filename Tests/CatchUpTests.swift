@@ -23,11 +23,16 @@ func testCatchUpAnalytics() {
     }
 
     let dayTwo = summary(tuesday)
+    let todaySummary = summary(tuesday, period: .day)
+    assertEqual(todaySummary.expectedSeconds, 8 * 3600, "Today uses one scheduled daily goal")
+    assertEqual(todaySummary.clockedSeconds, 2 * 3600, "Today's catch-up only counts today's completed work")
+    assertEqual(todaySummary.remainingSeconds, 6 * 3600, "Today's catch-up is the daily goal shortfall")
+    assertEqual(todaySummary.headline, "6h left today")
     assertEqual(dayTwo.workingDaysElapsed, 2)
     assertEqual(dayTwo.expectedSeconds, 16 * 3600)
     assertEqual(dayTwo.clockedSeconds, 6 * 3600, "Breaks don't count toward catching up")
     assertEqual(dayTwo.remainingSeconds, 10 * 3600)
-    assertEqual(dayTwo.headline, "10h left to catch up today")
+    assertEqual(dayTwo.headline, "10h left this week", "Weekly shortfall is labeled as a period total, not today's finish requirement")
     assertEqual(summary(monday).clockedSeconds, 4 * 3600, "Future days cannot reduce today's shortfall")
     assertEqual(summary(friday).expectedSeconds, 40 * 3600)
     assertEqual(summary(saturday).expectedSeconds, 40 * 3600, "Weekends do not add expected hours")
@@ -45,11 +50,13 @@ func testCatchUpAnalytics() {
 
     let caughtUp = summary(tuesday, liveSprint: open, liveElapsed: 10 * 3600)
     assertEqual(caughtUp.remainingSeconds, 0)
-    assertEqual(caughtUp.headline, "On track")
+    assertEqual(caughtUp.headline, "This week's target is reached")
     let ahead = summary(tuesday, liveSprint: open, liveElapsed: 12 * 3600)
     assertEqual(ahead.remainingSeconds, 0)
     assertEqual(ahead.aheadSeconds, 2 * 3600)
-    assertEqual(ahead.headline, "2h ahead")
+    assertEqual(ahead.headline, "2h ahead this week", "Surplus is labeled as ahead of the weekly target")
+    assertEqual(summary(tuesday, period: .month, liveSprint: open, liveElapsed: 80 * 3600).headline,
+                 "14h ahead this month", "Monthly surplus is labeled as ahead of its period target")
 
     settings.daysOff.insert(mondayKey)
     assertEqual(summary(tuesday).expectedSeconds, 8 * 3600, "A day off removes that day's expected hours")
@@ -65,6 +72,14 @@ func testCatchUpAnalytics() {
     assertEqual(summary(auditDate(2026, 11, 2, calendar: calendar)).clockedSeconds, 0, "New week resets the catch-up period")
     assertEqual(summary(tuesday, period: .month).workingDaysElapsed, 9)
     assertEqual(summary(tuesday, period: .month).expectedSeconds, 72 * 3600)
+    let monthlySummary = summary(tuesday, period: .month)
+    assertEqual(monthlySummary.headline, "66h left this month", "Monthly shortfall is labeled by its period")
+    let screenshotMonthlySummary = CatchUpAnalytics.calculate(
+        logs: [:], period: .month, referenceDate: auditDate(2026, 10, 21, calendar: calendar),
+        settings: settings, calendar: calendar
+    )
+    assertEqual(screenshotMonthlySummary.expectedSeconds, 120 * 3600,
+                "October 21 with 15 scheduled weekdays expects 120 hours")
     settings.dailyGoalHours = 7.5
     assertEqual(summary(tuesday).expectedSeconds, 15 * 3600, "Fractional daily goals are supported")
 
