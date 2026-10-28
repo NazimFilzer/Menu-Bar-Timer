@@ -352,9 +352,10 @@ private struct ThemeCard: View {
                     }) {
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(appTheme.theme.accentColor)
-                                .frame(width: 10, height: 10)
-                                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                                .fill(LinearGradient(colors: [appTheme.theme.bgDark, appTheme.theme.accentColor],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 16, height: 16)
+                                .overlay(Circle().stroke(appTheme.theme.cardBorder, lineWidth: 1))
 
                             Text(appTheme.displayName)
                                 .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .rounded))

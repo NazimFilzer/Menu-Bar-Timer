@@ -4,6 +4,7 @@ struct TodayDashboardView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
     let openSettings: () -> Void
+    @State private var showingCalendar = false
 
     private var dateSelection: Binding<Date> {
         Binding(get: { vm.selectedDate }, set: { vm.selectDate($0) })
@@ -56,9 +57,25 @@ struct TodayDashboardView: View {
             Button { moveDay(-1) } label: { Image(systemName: "chevron.left") }
                 .accessibilityLabel("Previous day")
                 .help("Previous day")
-            DatePicker("Review day", selection: dateSelection, in: ...Date(), displayedComponents: .date)
-                .labelsHidden()
-                .accessibilityLabel("Day to review")
+            Button { showingCalendar.toggle() } label: {
+                Label(vm.selectedDate.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(theme.textPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Day to review")
+            .popover(isPresented: $showingCalendar) {
+                DatePicker("Review day", selection: dateSelection, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                    .tint(theme.accentColor)
+                    .padding()
+                    .environment(\.colorScheme, .light)
+            }
             Button { moveDay(1) } label: { Image(systemName: "chevron.right") }
                 .disabled(vm.isViewingToday)
                 .accessibilityLabel("Next day")

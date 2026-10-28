@@ -46,7 +46,7 @@ struct DashboardView: View {
             VStack(spacing: 0) {
                 DashboardToolbar(vm: vm, destination: destination, theme: theme)
                 Divider()
-                DashboardResolutionView(vm: vm)
+                DashboardResolutionView(vm: vm, theme: theme)
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -167,6 +167,7 @@ private struct DashboardToolbar: View {
 
 private struct DashboardResolutionView: View {
     @Bindable var vm: TimerViewModel
+    let theme: PopoverTheme
 
     var body: some View {
         if let error = vm.persistenceError {
@@ -179,7 +180,7 @@ private struct DashboardResolutionView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Finish or resume your recovered sprint").font(.headline)
                 HStack {
-                    DatePicker("End date", selection: $vm.recoveryEndDate, displayedComponents: .date)
+                    RecoveryDatePicker(selection: $vm.recoveryEndDate, theme: theme)
                     TextField("End time, HH:mm:ss", text: $vm.recoveryEndText)
                         .textFieldStyle(.roundedBorder).frame(width: 190)
                         .accessibilityLabel("Recovered sprint end time")

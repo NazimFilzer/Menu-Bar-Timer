@@ -228,7 +228,7 @@ private struct RecoveryBannerView: View {
                 }
             }
 
-            DatePicker("End date", selection: $vm.recoveryEndDate, displayedComponents: .date)
+            RecoveryDatePicker(selection: $vm.recoveryEndDate, theme: theme)
                 .font(.caption)
 
             HStack(spacing: 8) {
@@ -1178,9 +1178,15 @@ private struct ManualSprintSheetView: View {
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
 
             TextField("Optional project or client tag", text: $vm.manualTagText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Manual sprint tag")
+                .textFieldStyle(.plain)
                 .font(.system(size: 12))
+                .foregroundColor(theme.textPrimary)
+                .padding(8)
+                .background(theme.cardBg)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
+                .environment(\.colorScheme, .light)
+                .accessibilityLabel("Manual sprint tag")
 
             if let netDuration = vm.manualComputedNetDuration {
                 HStack {

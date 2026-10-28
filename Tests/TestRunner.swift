@@ -248,21 +248,30 @@ func testTickerCleanup() {
 func testAppThemes() {
     print("Running AppTheme tests...")
 
-    assertEqual(AppTheme.allCases.count, 8)
+    assertEqual(AppTheme.allCases.count, 12)
     assertEqual(AppTheme.citrus.displayName, "Citrus")
-    assertEqual(AppTheme.sepia.displayName, "Sepia")
-    assertEqual(AppTheme.nord.displayName, "Nord")
+    assertEqual(AppTheme.sand.displayName, "Sand")
+    assertEqual(AppTheme.sky.displayName, "Sky")
     assertEqual(AppTheme.cloud.displayName, "Cloud")
     assertEqual(AppTheme.matcha.displayName, "Matcha")
-    assertEqual(AppTheme.forest.displayName, "Forest")
+    assertEqual(AppTheme.mint.displayName, "Mint")
     assertEqual(AppTheme.rose.displayName, "Rose")
-    assertEqual(AppTheme.lavender.displayName, "Lavender")
+    assertEqual(AppTheme.slate.displayName, "Slate")
+    assertEqual(AppTheme.confetti.displayName, "Confetti")
+    assertEqual(AppTheme.lagoon.displayName, "Lagoon")
+    assertEqual(AppTheme.orchid.displayName, "Orchid")
+    assertEqual(AppTheme.terracotta.displayName, "Terracotta")
 
-    // Verify Sepia theme attributes
-    let sepia = PopoverTheme.sepia
-    assertEqual(sepia.name, "Sepia")
-    assertEqual(sepia.isLight, false)
-    assertEqual(sepia.neonTeal, sepia.accentColor)
+    // Saved dark-theme identifiers now resolve to light palettes.
+    assertEqual(AppTheme(rawValue: "sepia"), .sand)
+    assertEqual(AppTheme(rawValue: "nord"), .sky)
+    assertEqual(AppTheme(rawValue: "forest"), .mint)
+    assertEqual(AppTheme(rawValue: "lavender"), .slate)
+    assertEqual(AppTheme(rawValue: "sorbet"), .confetti)
+    assertEqual(AppTheme(rawValue: "peach"), .terracotta)
+    for appTheme in AppTheme.allCases {
+        assertTrue(appTheme.theme.isLight)
+    }
 
     // Verify Matcha Light theme attributes
     let matcha = PopoverTheme.matcha
