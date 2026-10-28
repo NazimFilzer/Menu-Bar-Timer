@@ -62,14 +62,12 @@ struct AnalyticsDashboardView: View {
                 // GitHub-Style Annual Contribution Heatmap (52 Weeks)
                 annualHeatmapCard(matrix: matrix)
 
-                // Sprints in Selected Period Table
-                SprintLogTableView(
+                PeriodTimesheetView(
                     vm: vm,
-                    sprints: summary.sprints,
-                    distinctTags: summary.distinctTags,
+                    days: summary.days,
+                    periodTitle: summary.dateRangeLabel,
                     defaultDate: summary.endDate,
-                    theme: theme,
-                    title: "SPRINTS IN SELECTED PERIOD (\(summary.sprints.count))"
+                    theme: theme
                 )
             }
             .padding(20)

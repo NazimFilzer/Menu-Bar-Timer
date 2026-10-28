@@ -61,6 +61,7 @@ struct PeriodSummary: Equatable {
     let totalSprintsCount: Int
     let sprints: [Sprint]
     let trendPoints: [TrendDataPoint]
+    let days: [DailyBarData]
 
     var distinctTags: [String] {
         Array(Set(sprints.compactMap { $0.tag?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
@@ -129,6 +130,10 @@ enum InsightsAnalytics {
         let activeDaysCount = selectedLogs.values.filter { DayLog(sprints: $0).accumulatedTotal > 0 }.count
 
         let totalDays = max(1, (cal.dateComponents([.day], from: cleanStart, to: cleanEnd).day ?? 0) + 1)
+        let referenceDate = Date()
+        let days = (0..<totalDays).compactMap { cal.date(byAdding: .day, value: $0, to: cleanStart) }
+            .map { AnalyticsMetrics.day($0, logs: selectedLogs, referenceDate: referenceDate,
+                                       settings: settings, calendar: cal) }
         let dailyAvgSec = AnalyticsMetrics.average(totalSeconds: totalSec, days: activeDaysCount)
         let dailyAvgHours = (dailyAvgSec / 3600.0 * 10).rounded() / 10.0
 
@@ -167,7 +172,8 @@ enum InsightsAnalytics {
             totalDaysCount: totalDays,
             totalSprintsCount: matchingSprints.count,
             sprints: matchingSprints,
-            trendPoints: trendPoints
+            trendPoints: trendPoints,
+            days: days
         )
     }
 

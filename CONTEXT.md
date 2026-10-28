@@ -88,7 +88,7 @@ Break is `(last logout - first login) - total net work`, including pauses and ga
 between sprints, rounded to the nearest minute with 30 seconds rounding up.
 Stored durations retain their precision. Date and Hours Worked belong to the sheet.
 
-Week and Month show a daily timesheet in the sprint list's place. All calendar
+Week, Month, and Analytics show a daily timesheet in the sprint list's place. All calendar
 days in the selected period appear together without pagination. Each day
 can be copied individually. Copy All exports the whole selected period in ascending
 date order using the same four columns, with four empty cells for dates without

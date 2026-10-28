@@ -10,6 +10,7 @@ struct PeriodTimesheetView: View {
     @State private var selectedDay: DailyBarData?
     @State private var isAddingSprint = false
     @State private var copiedScope: String?
+    @State private var tableWidth: CGFloat = 0
 
     private var hasCompletedSprints: Bool { days.contains { !$0.completedSprints.isEmpty } }
 
@@ -21,7 +22,9 @@ struct PeriodTimesheetView: View {
                 .foregroundStyle(theme.textSecondary)
             ScrollView(.horizontal) {
                 table
+                    .frame(width: max(tableWidth, 780))
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
             Text("Copy All copies the whole period, earliest day first. Empty days paste as blank rows. Columns: Login, Logout, blank Lunch, Break in minutes.")
                 .font(.caption)
                 .foregroundStyle(theme.textSecondary)
@@ -37,6 +40,7 @@ struct PeriodTimesheetView: View {
         .onChange(of: days.first?.id) { _, _ in
             copiedScope = nil
         }
+        .onChange(of: days.last?.id) { _, _ in copiedScope = nil }
         .onChange(of: vm.logRevision) { _, _ in copiedScope = nil }
         .task(id: copiedScope) {
             guard copiedScope != nil else { return }
@@ -69,37 +73,50 @@ struct PeriodTimesheetView: View {
     }
 
     private var table: some View {
-        Grid(horizontalSpacing: 20, verticalSpacing: 12) {
-            GridRow {
-                Text("DATE")
-                Text("LOGIN")
-                Text("LOGOUT")
-                Text("BREAK (MIN)")
-                Text("SPRINTS")
-                Text("ACTIONS")
+        LazyVStack(spacing: 0) {
+            HStack(spacing: 16) {
+                Text("DATE").frame(minWidth: 170, maxWidth: .infinity, alignment: .leading)
+                Text("LOGIN").frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
+                Text("LOGOUT").frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
+                Text("BREAK (MIN)").frame(minWidth: 92, maxWidth: .infinity, alignment: .trailing)
+                Text("SPRINTS").frame(minWidth: 65, maxWidth: .infinity, alignment: .trailing)
+                Text("ACTIONS").frame(width: 140, alignment: .trailing)
             }
-            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(theme.textSecondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(theme.cardBorder.opacity(0.25))
 
-            ForEach(days) { day in
+            ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
                 dailyRow(day)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(index.isMultiple(of: 2) ? theme.cardBorder.opacity(0.08) : Color.clear)
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(theme.dividerColor.opacity(0.4)).frame(height: 0.5)
+                    }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(theme.cardBorder.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
     }
 
     private func dailyRow(_ day: DailyBarData) -> some View {
         let summary = DailyTimesheet(log: DayLog(sprints: day.completedSprints))
-        return GridRow {
-            Text(day.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
-                .frame(maxWidth: .infinity, alignment: .leading)
+        return HStack(spacing: 16) {
+            Text(day.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().year())
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .frame(minWidth: 170, maxWidth: .infinity, alignment: .leading)
             Text(summary.map { TimeFormatter.format(time: $0.login) } ?? "—")
+                .frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
             Text(summary.map { TimeFormatter.format(time: $0.logout) } ?? "—")
+                .frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
             Text(summary.map { TimeFormatter.format(breakMinutes: $0.breakDuration) } ?? "—")
+                .frame(minWidth: 92, maxWidth: .infinity, alignment: .trailing)
             Text("\(day.completedSprints.count)")
+                .foregroundStyle(theme.textSecondary)
+                .frame(minWidth: 65, maxWidth: .infinity, alignment: .trailing)
             HStack(spacing: 10) {
                 Button {
                     copy([day], scope: day.id)
@@ -112,8 +129,9 @@ struct PeriodTimesheetView: View {
                 Button("Details") { selectedDay = day }
                     .help("View, add, edit, or delete this day's sprints.")
             }
+            .frame(width: 140, alignment: .trailing)
         }
-        .font(.system(size: 11, design: .monospaced))
+        .font(.system(size: 12, design: .monospaced))
         .monospacedDigit()
     }
 
