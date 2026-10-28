@@ -637,6 +637,31 @@ class TimerViewModel {
         EarningsCalculator.calculate(durationInSeconds: manualComputedNetDuration ?? 0, hourlyRate: goal.hourlyRate)
     }
 
+    func confirmOverlaps(for entry: SprintEntry, excluding id: UUID? = nil) -> Bool {
+        let now = Date()
+        let conflicts = overlappingSprints(entry: entry, logs: store.allLogs(), excluding: id, now: now)
+        guard !conflicts.isEmpty else { return true }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        let details = conflicts.map { sprint in
+            let end = sprint.endTime.map { formatter.string(from: $0) } ?? "ongoing (through \(formatter.string(from: now)))"
+            return "• \(formatter.string(from: sprint.startTime)) - \(end)"
+        }.joined(separator: "\n")
+        let alert = NSAlert()
+        alert.messageText = "Overlapping Sprints"
+        alert.informativeText = "This Sprint overlaps with:\n\n\(details)\n\nSave it anyway?"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Save Anyway")
+        return alert.runModal() == .alertSecondButtonReturn
+    }
+
+    func confirmManualSprintOverlaps() -> Bool {
+        guard let entry = try? manualEntry() else { return false }
+        return confirmOverlaps(for: entry)
+    }
+
     @discardableResult
     func saveManualSprint() -> Bool {
         do {

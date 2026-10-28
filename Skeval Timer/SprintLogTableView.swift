@@ -813,6 +813,7 @@ struct AddSprintModalView: View {
     }
 
     private func saveSprint() {
+        guard let entry = validatedEntry, vm.confirmOverlaps(for: entry) else { return }
         do {
             _ = try vm.addManualSprint(date: draft.selectedDate, startTime: draft.startTime, endTime: draft.endTime,
                                       pausedDuration: draft.pausedDuration, tag: draft.tagText, endDayOffset: draft.endDayOffset)
@@ -926,6 +927,7 @@ struct EditSprintModalView: View {
     }
 
     private func saveChanges() {
+        guard let entry = validatedEntry, vm.confirmOverlaps(for: entry, excluding: sprint.id) else { return }
         do {
             _ = try vm.updateSprint(originalSprint: sprint, newDate: draft.selectedDate,
                                    newStartTime: draft.startTime, newEndTime: draft.endTime,

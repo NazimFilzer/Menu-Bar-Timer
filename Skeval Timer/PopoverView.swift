@@ -1226,6 +1226,7 @@ private struct ManualSprintSheetView: View {
                 .focusable(false)
 
                 Button("Log Sprint") {
+                    guard vm.confirmManualSprintOverlaps() else { return }
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         _ = vm.saveManualSprint()
                     }

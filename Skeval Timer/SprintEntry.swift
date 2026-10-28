@@ -62,6 +62,16 @@ struct SprintEntry {
     }
 }
 
+/// Finds occupied wall-clock intervals across every Day Log. Pause totals do not
+/// describe when a pause happened, so they cannot remove time from an interval.
+func overlappingSprints(entry: SprintEntry, logs: [String: [Sprint]], excluding id: UUID? = nil,
+                        now: Date = Date()) -> [Sprint] {
+    logs.values.flatMap { $0 }.filter { sprint in
+        let end = sprint.endTime ?? now
+        return sprint.id != id && end > sprint.startTime && entry.start < end && sprint.startTime < entry.end
+    }.sorted { $0.startTime < $1.startTime }
+}
+
 /// Editable values retain exact pause seconds until the user changes the pause.
 struct SprintDraft {
     var selectedDate: Date

@@ -2117,6 +2117,7 @@ struct TestMain {
         testTagFilterMatching()
         testAppVersion()
         testSprintEntryValidation()
+        testSprintOverlaps()
         testCatchUpAnalytics()
         testFinishForecast()
         testPeriodPaceForecast()
