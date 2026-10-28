@@ -2103,6 +2103,7 @@ struct TestMain {
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
         testDailyTimesheetExport()
+        testPeriodTimesheetExport()
         testSprintTaggingAndBackwardCompatibility()
         testGoalSettingsExpansion()
         testEarningsCalculator()

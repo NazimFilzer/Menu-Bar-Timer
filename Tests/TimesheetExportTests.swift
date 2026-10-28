@@ -53,6 +53,63 @@ func testDailyTimesheetExport() {
     assertEqual(DayLog(sprints: [pauseTwo, pauseOne]).clipboardText, "09:00:00\t11:00:00\t\t1")
 }
 
+func testPeriodTimesheetExport() {
+    let settings = auditSettings()
+    let monday = auditDate(2026, 10, 26)
+    let thursday = auditDate(2026, 10, 29)
+    let sunday = auditDate(2026, 11, 1, hour: 23)
+    let first = Sprint(startTime: monday, endTime: monday.addingTimeInterval(3600), pausedDuration: 600)
+    let second = Sprint(startTime: monday.addingTimeInterval(7200), endTime: monday.addingTimeInterval(10800), pausedDuration: 300)
+    let later = Sprint(startTime: thursday, endTime: thursday.addingTimeInterval(7200))
+    let overnight = Sprint(startTime: sunday, endTime: sunday.addingTimeInterval(7200), pausedDuration: 900)
+    let open = Sprint(startTime: auditDate(2026, 10, 28))
+    let outside = Sprint(startTime: auditDate(2026, 11, 2), endTime: auditDate(2026, 11, 2, hour: 10))
+    let storage = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: storage)
+    for sprint in [later, second, overnight, open, first, outside] { store.save(sprint: sprint) }
+    let originalLogs = storage.loadAll()
+    let week = WeeklyAnalytics.calculate(store: store, referenceDate: monday, settings: settings)
+    // Reversed input still exports oldest first.
+    let exported = DailyTimesheet.clipboardText(days: Array(week.days.reversed()))
+    let rows = exported.components(separatedBy: "\n")
+    assertEqual(rows.count, 7)
+    assertEqual(rows[0], "09:00:00\t12:00:00\t\t75")
+    assertEqual(rows[1], "\t\t\t", "An empty date keeps its spreadsheet row")
+    assertEqual(rows[2], "\t\t\t", "An open sprint does not contribute to the timesheet")
+    assertEqual(rows[3], "09:00:00\t11:00:00\t\t0")
+    assertEqual(rows[6], DayLog(sprints: [overnight]).clipboardText, "Cross-midnight work stays on Sunday")
+    assertTrue(rows.allSatisfy { $0.components(separatedBy: "\t").count == 4 })
+    assertEqual(DailyTimesheet.clipboardText(days: []), "")
+
+    let october = MonthlyAnalytics.calculate(store: store, referenceDate: monday, settings: settings)
+    let monthRows = DailyTimesheet.clipboardText(days: october.days).components(separatedBy: "\n")
+    assertEqual(monthRows.count, 31)
+    assertEqual(monthRows[25], rows[0])
+    assertEqual(monthRows[28], rows[3])
+    assertEqual(monthRows[30], "\t\t\t", "Trailing empty dates remain blank")
+    let previousMonth = MonthlyAnalytics.calculate(store: store, monthOffset: -1, referenceDate: monday, settings: settings)
+    assertEqual(DailyTimesheet.clipboardText(days: previousMonth.days), "", "A wholly empty period has nothing to copy")
+    assertEqual(storage.loadAll(), originalLogs, "Generating summaries never changes stored sprints")
+    let reloaded = DayLogStore(storage: storage)
+    assertEqual(DailyTimesheet.clipboardText(days: WeeklyAnalytics.calculate(store: reloaded, referenceDate: monday, settings: settings).days), exported)
+
+    // A local calendar day can be 23 or 25 hours. Use elapsed time for break math.
+    var dstCalendar = Calendar(identifier: .gregorian)
+    dstCalendar.timeZone = TimeZone(identifier: "America/New_York")!
+    for (month, day, elapsedHours) in [(3, 8, 23), (11, 1, 25)] {
+        let start = dstCalendar.startOfDay(for: auditDate(2026, month, day, calendar: dstCalendar))
+        let end = dstCalendar.date(byAdding: .day, value: 1, to: start)!
+        let sprint = Sprint(startTime: start, endTime: end, pausedDuration: 1800)
+        let key = TimeFormatter.format(dateKey: start, calendar: dstCalendar)
+        let summary = MonthlyAnalytics.calculate(logs: [key: [sprint]], referenceDate: start,
+                                                 settings: settings, calendar: dstCalendar)
+        let lines = DailyTimesheet.clipboardText(days: summary.days).components(separatedBy: "\n")
+        assertEqual(end.timeIntervalSince(start), Double(elapsedHours) * 3600)
+        assertEqual(lines[day - 1], DayLog(sprints: [sprint]).clipboardText)
+        assertEqual(lines[day - 1].components(separatedBy: "\t").last, "30")
+    }
+}
+
 @MainActor
 func testDailyTimesheetClipboard() {
     let store = DayLogStore(storage: InMemoryDayLogAdapter())
@@ -78,4 +135,18 @@ func testDailyTimesheetClipboard() {
     vm.selectDate(emptyDay)
     vm.copyAllDisplayedSprints()
     assertEqual(NSPasteboard.general.string(forType: .string), "10:00:00\t11:00:00\t\t10", "Empty days leave the clipboard intact")
+
+    let week = WeeklyAnalytics.calculate(store: store, referenceDate: yesterday, settings: vm.goal)
+    assertTrue(vm.copyTimesheet(days: week.days))
+    let copiedWeek = NSPasteboard.general.string(forType: .string)
+    assertEqual(copiedWeek, DailyTimesheet.clipboardText(days: week.days))
+    let month = MonthlyAnalytics.calculate(store: store, referenceDate: today, settings: vm.goal)
+    assertTrue(vm.copyTimesheet(days: month.days))
+    assertEqual(NSPasteboard.general.string(forType: .string), DailyTimesheet.clipboardText(days: month.days))
+    let copiedMonth = NSPasteboard.general.string(forType: .string)
+    assertFalse(vm.copyTimesheet(days: []))
+    assertEqual(NSPasteboard.general.string(forType: .string), copiedMonth, "An empty period leaves the clipboard intact")
+    let day = month.days.first { $0.id == TimeFormatter.format(dateKey: today) }!
+    assertTrue(vm.copyTimesheet(days: [day]))
+    assertEqual(NSPasteboard.general.string(forType: .string), "10:00:00\t11:00:00\t\t10")
 }

@@ -66,10 +66,11 @@ struct WeeklyDashboardView: View {
                 weekOffset: $weekOffset
             )
 
-            // Interactive Sprint Log CRUD Table
-            SprintLogTableView(
+            PeriodTimesheetView(
                 vm: vm,
-                summary: summary,
+                days: summary.days,
+                periodTitle: summary.weekRangeLabel,
+                defaultDate: summary.isCurrentWeek ? Date() : summary.weekStartDate,
                 theme: theme
             )
         }

@@ -563,6 +563,17 @@ class TimerViewModel {
         copyAllDisplayedSprints()
     }
 
+    @discardableResult
+    func copyTimesheet(days: [DailyBarData]) -> Bool {
+        let text = DailyTimesheet.clipboardText(days: days)
+        guard !text.isEmpty else { return false }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        lastCopiedId = nil
+        isAllCopied = false
+        return true
+    }
+
     func delete(sprint: Sprint) {
         store.delete(sprint: sprint)
         refreshLogs()

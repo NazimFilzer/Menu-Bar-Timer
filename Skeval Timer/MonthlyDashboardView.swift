@@ -69,12 +69,12 @@ struct MonthlyDashboardView: View {
             // Tag Breakdown Distribution Card
             tagBreakdownCardView(summary: summary)
 
-            // Monthly Sprints Log Table
-            SprintLogTableView(
+            PeriodTimesheetView(
                 vm: vm,
-                monthlySummary: summary,
-                theme: theme,
-                title: "MONTHLY SPRINT LOGS"
+                days: summary.days,
+                periodTitle: summary.monthTitle,
+                defaultDate: summary.isCurrentMonth ? Date() : summary.monthStartDate,
+                theme: theme
             )
         }
     }

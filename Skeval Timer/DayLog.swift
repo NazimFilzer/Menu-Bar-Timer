@@ -27,18 +27,6 @@ struct DayLog {
     }
 
     var clipboardText: String {
-        let completed = completedSprints
-        guard let login = completed.first?.startTime,
-              let logout = completed.compactMap(\.endTime).max() else { return "" }
-        let worked = completed.compactMap(\.duration).reduce(0, +)
-        // Everything between the first login and last logout that wasn't work,
-        // including pauses within sprints and gaps between sprints.
-        let breakDuration = max(0, logout.timeIntervalSince(login) - worked)
-        return [
-            TimeFormatter.format(time: login),
-            TimeFormatter.format(time: logout),
-            "",
-            TimeFormatter.format(breakMinutes: breakDuration)
-        ].joined(separator: "\t")
+        DailyTimesheet(log: self)?.clipboardText ?? ""
     }
 }
