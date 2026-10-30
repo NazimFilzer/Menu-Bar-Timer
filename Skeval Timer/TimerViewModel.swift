@@ -355,10 +355,22 @@ class TimerViewModel {
         TimeFormatter.format(shortDuration: displayedAccumulatedTotal)
     }
 
+    var displayedTotalHoursMinutesLabel: String {
+        TimeFormatter.format(hoursAndMinutes: displayedAccumulatedTotal)
+    }
+
     var displayedProgressFraction: Double {
         let g = goal.dailyGoalSeconds
         guard g > 0 else { return 0 }
         return min(displayedAccumulatedTotal / g, 1.0)
+    }
+
+    var displayedProgressPercent: Int {
+        Int(round(displayedProgressFraction * 100))
+    }
+
+    var displayedProgressPercentLabel: String {
+        "\(displayedProgressPercent)% achieved"
     }
 
     var displayedProgressLabel: String {

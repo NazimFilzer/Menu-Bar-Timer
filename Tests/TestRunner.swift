@@ -59,6 +59,14 @@ func testTimeFormatter() {
     assertEqual(TimeFormatter.format(shortDuration: 1800), "30m")
     assertEqual(TimeFormatter.format(shortDuration: 3660), "1h 1m")
 
+    // Hours and minutes formatting (no seconds)
+    assertEqual(TimeFormatter.format(hoursAndMinutes: 0), "0m")
+    assertEqual(TimeFormatter.format(hoursAndMinutes: 45), "0m")
+    assertEqual(TimeFormatter.format(hoursAndMinutes: 1800), "30m")
+    assertEqual(TimeFormatter.format(hoursAndMinutes: 3600), "1h 0m")
+    assertEqual(TimeFormatter.format(hoursAndMinutes: 3660), "1h 1m")
+    assertEqual(TimeFormatter.format(hoursAndMinutes: 13980), "3h 53m")
+
     // Clock formatting
     assertEqual(TimeFormatter.format(clock: 0), "00:00:00")
     assertEqual(TimeFormatter.format(clock: 3665), "01:01:05")
@@ -1603,6 +1611,9 @@ func testEarningsTracking() {
     assertEqual(vm.totalTodayElapsed, 9000)
     assertEqual(vm.todayEarnings, 3750.0, "2.5 hours with live ticking must equal 3750")
     assertEqual(vm.todayEarningsLabel, "₹3,750")
+    assertEqual(vm.displayedTotalHoursMinutesLabel, "2h 30m", "Displayed hours and minutes should factor in live running sprint")
+    assertEqual(vm.displayedProgressPercent, 31, "2.5 hours / 8 hours = 31.25% -> 31%")
+    assertEqual(vm.displayedProgressPercentLabel, "31% achieved")
 
     // Overtime test: simulate 10 hours logged (36000s) on 8h goal
     vm.currentElapsed = 28800 // 8h live + 2h completed = 10h total

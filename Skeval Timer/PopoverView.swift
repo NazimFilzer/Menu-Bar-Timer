@@ -384,17 +384,23 @@ private struct ClockSectionView: View {
                     }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            } else if vm.todayLog.accumulatedTotal > 0 {
+            }
+
+            if vm.displayedAccumulatedTotal > 0 || vm.isRunning {
                 HStack(spacing: 5) {
                     Image(systemName: "sum")
                         .font(.system(size: 10, weight: .bold))
-                    Text("Today's Total: \(vm.todayLog.accumulatedLabel)")
+                    Text("\(vm.isViewingToday ? "Today's Total" : "\(vm.selectedDayShortTitle)'s Total"): \(vm.displayedTotalHoursMinutesLabel)")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
-
+                    Text("·")
+                        .foregroundColor(theme.textSecondary.opacity(0.6))
+                    Text(vm.displayedProgressPercentLabel)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(vm.displayedProgressFraction >= 1.0 ? theme.neonTeal : theme.textSecondary)
                 }
                 .foregroundColor(theme.textSecondary)
                 .padding(.top, 2)
-            } else {
+            } else if !vm.isPaused {
                 Text("Ready to start your next sprint")
                     .font(.system(size: 11, weight: .regular, design: .rounded))
                     .foregroundColor(theme.textSecondary)
@@ -479,20 +485,6 @@ private struct DailyGoalProgressView: View {
                 }
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .help("Expected through today: \(catchUp.expectedLabel). Clocked this week: \(catchUp.clockedLabel). Remaining is the total to meet this week's pace, not today's finish-time estimate. Includes the active sprint.")
-            }
-
-            if vm.goal.hasHourlyRate {
-                HStack {
-                    Text("Logged: \(vm.displayedTotalShortLabel) / \(vm.goal.goalLabel)")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(theme.textSecondary)
-                    Spacer()
-                    let pct = Int(round(vm.displayedProgressFraction * 100))
-                    Text("\(pct)% achieved")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundColor(vm.displayedProgressFraction >= 1.0 ? earningsColor : theme.textSecondary)
-                }
-                .padding(.top, 1)
             }
         }
         .padding(.horizontal, 16)

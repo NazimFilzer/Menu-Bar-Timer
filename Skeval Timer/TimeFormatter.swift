@@ -87,6 +87,14 @@ enum TimeFormatter {
         return totalSeconds > 0 ? "\(totalSeconds)s" : "0m"
     }
 
+    static func format(hoursAndMinutes duration: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(duration))
+        let h = totalSeconds / 3600
+        let m = (totalSeconds % 3600) / 60
+        if h > 0 { return "\(h)h \(m)m" }
+        return "\(m)m"
+    }
+
     static func format(clock: TimeInterval) -> String {
         let totalSeconds = max(0, Int(clock))
         let h = totalSeconds / 3600
