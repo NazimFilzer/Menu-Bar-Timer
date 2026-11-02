@@ -1552,9 +1552,9 @@ func testGlobalHotkeys() {
 
 func testAppVersion() {
     print("Running AppVersion tests...")
-    assertEqual(AppVersion.current, "v2.0", "App version should be tracked as v1.2")
-    assertEqual(AppVersion.marketingVersion, "2.0", "Marketing version should be 1.2")
-    assertEqual(AppVersion.buildNumber, "4", "Build number should be 3")
+    assertEqual(AppVersion.current, "v2.1", "App version should be tracked as v2.1")
+    assertEqual(AppVersion.marketingVersion, "2.1", "Marketing version should be 2.1")
+    assertEqual(AppVersion.buildNumber, "5", "Build number should be 5")
 }
 
 @MainActor
@@ -2142,6 +2142,7 @@ struct TestMain {
         testFinishForecast()
         testPeriodPaceForecast()
         await MainActor.run {
+            testDeleteDaySprints()
             testDailyTimesheetClipboard()
             testLiveCatchUpViewModel()
             testFinishForecastViewModel()

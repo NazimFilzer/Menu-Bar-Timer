@@ -8,6 +8,8 @@ struct PeriodTimesheetView: View {
     let theme: PopoverTheme
 
     @State private var selectedDay: DailyBarData?
+    @State private var dayToDelete: DailyBarData?
+    @State private var isDeleteAlertPresented = false
     @State private var isAddingSprint = false
     @State private var copiedScope: String?
     @State private var tableWidth: CGFloat = 0
@@ -22,7 +24,7 @@ struct PeriodTimesheetView: View {
                 .foregroundStyle(theme.textSecondary)
             ScrollView(.horizontal) {
                 table
-                    .frame(width: max(tableWidth, 780))
+                    .frame(width: max(tableWidth, 820))
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
             Text("Copy All copies the whole period, earliest day first. Empty days paste as blank rows. Columns: Login, Logout, blank Lunch, Break in minutes.")
@@ -55,6 +57,15 @@ struct PeriodTimesheetView: View {
         .sheet(item: $selectedDay) { day in
             sprintDetails(for: days.first { $0.id == day.id } ?? day)
         }
+        .alert("Delete sprints for this day?", isPresented: $isDeleteAlertPresented, presenting: dayToDelete) { day in
+            Button("Delete Sprints", role: .destructive) {
+                vm.deleteCompletedSprints(for: day.date)
+                dayToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { dayToDelete = nil }
+        } message: { day in
+            Text("Delete all completed sprints for \(day.date.formatted(date: .long, time: .omitted))? This cannot be undone. An open sprint will remain.")
+        }
     }
 
     private var header: some View {
@@ -80,7 +91,7 @@ struct PeriodTimesheetView: View {
                 Text("LOGOUT").frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
                 Text("BREAK (MIN)").frame(minWidth: 92, maxWidth: .infinity, alignment: .trailing)
                 Text("SPRINTS").frame(minWidth: 65, maxWidth: .infinity, alignment: .trailing)
-                Text("ACTIONS").frame(width: 140, alignment: .trailing)
+                Text("ACTIONS").frame(width: 180, alignment: .trailing)
             }
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(theme.textSecondary)
@@ -128,8 +139,17 @@ struct PeriodTimesheetView: View {
                 .help("Copy this day's Login, Logout, blank Lunch, and Break in minutes.")
                 Button("Details") { selectedDay = day }
                     .help("View, add, edit, or delete this day's sprints.")
+                Button(role: .destructive) {
+                    dayToDelete = day
+                    isDeleteAlertPresented = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .disabled(day.completedSprints.isEmpty)
+                .accessibilityLabel("Delete completed sprints for \(day.date.formatted(date: .abbreviated, time: .omitted))")
+                .help("Delete all completed sprints for this day.")
             }
-            .frame(width: 140, alignment: .trailing)
+            .frame(width: 180, alignment: .trailing)
         }
         .font(.system(size: 12, design: .monospaced))
         .monospacedDigit()

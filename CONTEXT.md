@@ -110,7 +110,7 @@ and synchronizing with engine ticks.
 
 ## Version tracking
 
-- v2.0 is the current version on the v2 branch. It combines main's live daily earnings, recent-day history, manual entry, pause hotkey, exact timer math, and day rollover with v2's tags, dashboard editing, sleep resolution, weekly and monthly analytics, and CSV reports.
+- v2.1 is the current version on the v2 branch. It combines main's live daily earnings, recent-day history, manual entry, pause hotkey, exact timer math, and day rollover with v2's tags, dashboard editing, sleep resolution, weekly and monthly analytics, and CSV reports.
 - Main remains at v1.2. Work on v2 does not modify main.
 
 ## Daily totals and reports

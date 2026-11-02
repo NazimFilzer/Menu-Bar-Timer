@@ -6,9 +6,9 @@ import UserNotifications
 // MARK: - Version Tracking
 
 enum AppVersion {
-    static let current = "v2.0"
-    static let marketingVersion = "2.0"
-    static let buildNumber = "4"
+    static let current = "v2.1"
+    static let marketingVersion = "2.1"
+    static let buildNumber = "5"
 }
 
 @Observable
@@ -589,6 +589,12 @@ class TimerViewModel {
     func delete(sprint: Sprint) {
         store.delete(sprint: sprint)
         refreshLogs()
+    }
+
+    func deleteCompletedSprints(for date: Date) {
+        if store.deleteCompletedSprints(for: date) {
+            refreshLogs()
+        }
     }
 
     // MARK: - Manual Sprint Entry

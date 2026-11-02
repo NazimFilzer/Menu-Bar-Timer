@@ -76,6 +76,18 @@ final class DayLogStore: @unchecked Sendable {
         delete(sprintId: sprint.id, preferredDate: sprint.startTime)
     }
 
+    @discardableResult
+    func deleteCompletedSprints(for date: Date) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let key = TimeFormatter.format(dateKey: date)
+        guard let bucket = logs[key], bucket.contains(where: { !$0.isOpen }) else { return false }
+        let openSprints = bucket.filter(\.isOpen)
+        logs[key] = openSprints.isEmpty ? nil : openSprints
+        storage.saveAll(logs)
+        return true
+    }
+
     func delete(sprintId: UUID, preferredDate: Date? = nil) {
         lock.lock()
         defer { lock.unlock() }
