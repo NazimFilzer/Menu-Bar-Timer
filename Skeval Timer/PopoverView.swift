@@ -1078,65 +1078,13 @@ private struct ManualSprintSheetView: View {
                 .focusable(false)
             }
 
+            DualClockTimePickerView(
+                startTime: $vm.manualStartDate,
+                endTime: $vm.manualEndDate,
+                theme: theme
+            )
+
             VStack(spacing: 7) {
-                HStack {
-                    Text("START")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-                        .frame(width: 44, alignment: .leading)
-
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        Button("-15m") { vm.stepManualTime(isStart: true, minutes: -15) }
-                            .buttonStyle(StepperChipButtonStyle(theme: theme))
-
-                        TextField("HH:mm:ss", text: $vm.manualStartText)
-                            .accessibilityLabel("Manual sprint start time")
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
-                            .foregroundColor(theme.textPrimary)
-                            .multilineTextAlignment(.center)
-                            .frame(width: 76)
-                            .padding(.vertical, 3.5)
-                            .background(theme.cardBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
-
-                        Button("+15m") { vm.stepManualTime(isStart: true, minutes: 15) }
-                            .buttonStyle(StepperChipButtonStyle(theme: theme))
-                    }
-                }
-
-                HStack {
-                    Text("END")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(theme.textSecondary)
-                        .frame(width: 44, alignment: .leading)
-
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        Button("-15m") { vm.stepManualTime(isStart: false, minutes: -15) }
-                            .buttonStyle(StepperChipButtonStyle(theme: theme))
-
-                        TextField("HH:mm:ss", text: $vm.manualEndText)
-                            .accessibilityLabel("Manual sprint end time")
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
-                            .foregroundColor(theme.textPrimary)
-                            .multilineTextAlignment(.center)
-                            .frame(width: 76)
-                            .padding(.vertical, 3.5)
-                            .background(theme.cardBg)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(theme.cardBorder, lineWidth: 1))
-
-                        Button("+15m") { vm.stepManualTime(isStart: false, minutes: 15) }
-                            .buttonStyle(StepperChipButtonStyle(theme: theme))
-                    }
-                }
-
                 HStack {
                     Text("BREAK")
                         .font(.system(size: 9, weight: .bold, design: .rounded))

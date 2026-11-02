@@ -583,26 +583,16 @@ struct SprintFormFieldsView: View {
                 Spacer()
             }
 
-            HStack {
-                Text("Start Time:")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Time Range:")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
-                    .frame(width: 90, alignment: .leading)
 
-                DatePicker("Start time", selection: $startTime, displayedComponents: [.hourAndMinute])
-                    .labelsHidden()
-                Spacer()
-            }
-
-            HStack {
-                Text("End Time:")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
-                    .frame(width: 90, alignment: .leading)
-
-                DatePicker("End time", selection: $endTime, displayedComponents: [.hourAndMinute])
-                    .labelsHidden()
-                Spacer()
+                DualClockTimePickerView(
+                    startTime: $startTime,
+                    endTime: $endTime,
+                    theme: theme
+                )
             }
 
             HStack {

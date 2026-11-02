@@ -622,6 +622,26 @@ class TimerViewModel {
         manualEntryError = nil
     }
 
+    var manualStartDate: Date {
+        get {
+            TimeFormatter.parseTime(manualStartText, on: selectedDate) ?? selectedDate
+        }
+        set {
+            manualStartText = TimeFormatter.format(time: newValue)
+            manualEntryError = nil
+        }
+    }
+
+    var manualEndDate: Date {
+        get {
+            TimeFormatter.parseTime(manualEndText, on: selectedDate) ?? selectedDate
+        }
+        set {
+            manualEndText = TimeFormatter.format(time: newValue)
+            manualEntryError = nil
+        }
+    }
+
     func stepManualTime(isStart: Bool, minutes: Int) {
         let reference = selectedDate
         let currentText = isStart ? manualStartText : manualEndText

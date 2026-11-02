@@ -119,7 +119,7 @@ func testDayLogStoreWithInMemoryStorage() {
     let inMemory = InMemoryDayLogAdapter()
     let store = DayLogStore(storage: inMemory)
 
-    let now = Date()
+    let now = Calendar.current.startOfDay(for: Date()).addingTimeInterval(36000)
     let s1 = Sprint(startTime: now, endTime: now.addingTimeInterval(1800), pausedDuration: 0)
     let s2 = Sprint(startTime: now.addingTimeInterval(2000), endTime: now.addingTimeInterval(3800), pausedDuration: 300)
     let sOpen = Sprint(startTime: now.addingTimeInterval(4000))
@@ -1594,7 +1594,7 @@ func testEarningsTracking() {
     let vm = TimerViewModel(engine: engine, store: store)
 
     // Save a completed sprint of 2 hours (7200 seconds)
-    let t0 = Date().addingTimeInterval(-7200)
+    let t0 = Calendar.current.startOfDay(for: Date()).addingTimeInterval(60)
     let completedSprint = Sprint(startTime: t0, endTime: t0.addingTimeInterval(7200), pausedDuration: 0)
     store.save(sprint: completedSprint)
     vm.todayLog = store.todayLog()
