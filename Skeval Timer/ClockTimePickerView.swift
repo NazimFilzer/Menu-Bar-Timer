@@ -57,6 +57,38 @@ struct ClockTimeHelper {
         let period = isPM(from: date, calendar: calendar) ? "PM" : "AM"
         return String(format: "%d:%02d %@", h, m, period)
     }
+
+    static func parseTime(_ input: String, on date: Date, calendar: Calendar = .current) -> Date? {
+        var value = input.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let isPM = value.hasSuffix("PM")
+        let isAM = value.hasSuffix("AM")
+        let hasPeriod = isAM || isPM
+
+        if hasPeriod {
+            value = String(value.dropLast(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let enteredHour = Int(parts[0]),
+              let enteredMinute = Int(parts[1]),
+              (0...59).contains(enteredMinute) else { return nil }
+
+        let hour: Int
+        if hasPeriod {
+            guard (1...12).contains(enteredHour) else { return nil }
+            hour = (enteredHour % 12) + (isPM ? 12 : 0)
+        } else {
+            guard (0...23).contains(enteredHour) else { return nil }
+            hour = enteredHour
+        }
+
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = hour
+        components.minute = enteredMinute
+        components.second = 0
+        return calendar.date(from: components)
+    }
 }
 
 // MARK: - Interactive Analog Clock Dial
@@ -234,14 +266,8 @@ struct SingleClockPickerView: View {
     let theme: PopoverTheme
 
     @State private var mode: ClockPickerMode = .hour
-
-    private var hour12: Int {
-        ClockTimeHelper.hour12(from: date)
-    }
-
-    private var minute: Int {
-        ClockTimeHelper.minute(from: date)
-    }
+    @State private var timeText = ""
+    @FocusState private var isTimeFieldFocused: Bool
 
     private var isPM: Bool {
         ClockTimeHelper.isPM(from: date)
@@ -249,53 +275,46 @@ struct SingleClockPickerView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // Digital Display & AM / PM Controls
+            // Editable Time Display & AM / PM Controls
             HStack(spacing: 6) {
-                // Hour Display Button
-                Button(action: {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                        mode = .hour
-                    }
-                }) {
-                    Text(String(format: "%02d", hour12))
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
-                        .foregroundColor(mode == .hour ? theme.neonTeal : theme.textPrimary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(mode == .hour ? theme.neonTeal.opacity(0.15) : theme.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(mode == .hour ? theme.neonTeal : theme.cardBorder, lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-                .focusable(false)
-
-                Text(":")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                Text("Time")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
 
-                // Minute Display Button
-                Button(action: {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
-                        mode = .minute
+                TextField("9:30 AM", text: $timeText)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(theme.textPrimary)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .frame(width: 100)
+                    .background(theme.cardBg)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(
+                        parsedTimeText == nil && !timeText.isEmpty ? .red : (isTimeFieldFocused ? theme.neonTeal : theme.cardBorder),
+                        lineWidth: 1
+                    ))
+                    .focused($isTimeFieldFocused)
+                    .accessibilityLabel("Time")
+                    .onSubmit(commitTimeText)
+                    .onChange(of: timeText) { _, _ in
+                        if let parsedTime = parsedTimeText {
+                            date = parsedTime
+                        }
                     }
-                }) {
-                    Text(String(format: "%02d", minute))
-                        .font(.system(size: 15, weight: .bold, design: .monospaced))
-                        .foregroundColor(mode == .minute ? theme.neonTeal : theme.textPrimary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(mode == .minute ? theme.neonTeal.opacity(0.15) : theme.cardBg)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(mode == .minute ? theme.neonTeal : theme.cardBorder, lineWidth: 1)
-                        )
+                    .help("Enter a time such as 9:30 AM or 14:30")
+
+                Button(action: commitTimeText) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(parsedTimeText == nil ? theme.textSecondary : theme.neonTeal)
+                        .frame(width: 24, height: 24)
+                        .background(theme.cardBg)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
-                .focusable(false)
+                .disabled(parsedTimeText == nil)
+                .help("Apply time")
 
                 Spacer()
 
@@ -369,6 +388,20 @@ struct SingleClockPickerView: View {
         .background(theme.cardBg.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder.opacity(0.6), lineWidth: 1))
+        .onAppear {
+            timeText = ClockTimeHelper.format12Hour(date: date)
+        }
+        .onChange(of: date) { _, newDate in
+            let draftDate = ClockTimeHelper.parseTime(timeText, on: newDate)
+            if !isTimeFieldFocused || draftDate != newDate {
+                timeText = ClockTimeHelper.format12Hour(date: newDate)
+            }
+        }
+        .onChange(of: isTimeFieldFocused) { _, isFocused in
+            if !isFocused {
+                timeText = ClockTimeHelper.format12Hour(date: date)
+            }
+        }
     }
 
     private func stepButton(_ label: String, minutes: Int) -> some View {
@@ -386,6 +419,17 @@ struct SingleClockPickerView: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+    }
+
+    private var parsedTimeText: Date? {
+        ClockTimeHelper.parseTime(timeText, on: date)
+    }
+
+    private func commitTimeText() {
+        guard let parsedTime = parsedTimeText else { return }
+        date = parsedTime
+        timeText = ClockTimeHelper.format12Hour(date: parsedTime)
+        isTimeFieldFocused = false
     }
 }
 
