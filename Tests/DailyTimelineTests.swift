@@ -76,6 +76,96 @@ func testDailyTimeline() {
     assertEqual(timeline([first], now: 30).gaps.last?.end, date(24))
     assertEqual(TimelineHours(startHour: 23, endHour: 6), TimelineHours())
     assertEqual(TimelineHours(startHour: -1, endHour: 24), TimelineHours())
+    testDailyTimelineVisualColumns()
+}
+
+func testDailyTimelineVisualColumns() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+    let day = auditDate(2026, 11, 4, hour: 0, calendar: calendar)
+    func date(_ hour: Int, _ minute: Int) -> Date {
+        day.addingTimeInterval(Double(hour * 60 + minute) * 60)
+    }
+    let sprints = [
+        Sprint(startTime: date(8, 4), endTime: date(9, 51), pausedDuration: 25 * 60),
+        Sprint(startTime: date(9, 59), endTime: date(10, 8)),
+        Sprint(startTime: date(10, 12), endTime: date(11, 1)),
+        Sprint(startTime: date(11, 4), endTime: date(11, 11)),
+        Sprint(startTime: date(11, 15), endTime: date(11, 49)),
+        Sprint(startTime: date(13, 0), endTime: date(14, 0))
+    ]
+    let timeline = DailyTimeline.calculate(sprints: sprints, date: day, now: date(16, 0), calendar: calendar)
+    let arranged = DailyTimelineLayout.arrange(timeline.segments)
+    assertEqual(arranged.map(\.columnCount), [1, 2, 2, 2, 2, 1],
+                "Short blocks share the existing width when their screen heights collide")
+    assertEqual(arranged.map(\.column), [0, 0, 1, 0, 1, 0])
+    assertEqual(arranged.map(\.interval), timeline.segments.map(\.interval), "Layout retains exact clock positions")
+    assertEqual(arranged.map(\.netWork), timeline.segments.map(\.netWork), "Layout does not change net work")
+    assertEqual(arranged.map(\.paused), timeline.segments.map(\.paused), "Layout does not change paused totals")
+    assertEqual(DailyTimelineLayout.arrange(arranged).map(\.column), arranged.map(\.column),
+                "Column placement is stable when recalculated")
+    assertTimelineBlocksDoNotOverlap(arranged)
+
+    let dense = (0..<5).map { minute in
+        Sprint(startTime: date(10, minute), endTime: date(10, minute).addingTimeInterval(30))
+    }
+    let denseTimeline = DailyTimeline.calculate(sprints: dense, date: day, now: date(16, 0), calendar: calendar)
+    let denseLayout = DailyTimelineLayout.arrange(denseTimeline.segments)
+    assertEqual(denseLayout.map(\.columnCount), Array(repeating: 5, count: 5))
+    assertTimelineBlocksDoNotOverlap(denseLayout)
+
+    let chain = [Sprint(startTime: date(10, 0), endTime: date(10, 1)),
+                 Sprint(startTime: date(10, 10), endTime: date(10, 11)),
+                 Sprint(startTime: date(10, 21), endTime: date(10, 22))]
+    let chainTimeline = DailyTimeline.calculate(sprints: chain, date: day, now: date(16, 0), calendar: calendar)
+    let chainLayout = DailyTimelineLayout.arrange(chainTimeline.segments)
+    assertEqual(chainLayout.map(\.column), [0, 1, 0], "Reuse a column once its earlier block clears")
+    assertEqual(chainLayout.map(\.columnCount), [2, 2, 2])
+    assertTimelineBlocksDoNotOverlap(chainLayout)
+
+    let liveSprint = Sprint(startTime: date(11, 15))
+    for status in [TimelineSprintStatus.active, .paused, .sleep, .recovery] {
+        let live = TimelineLiveSprint(sprint: liveSprint, status: status, netWork: 60, paused: 0,
+                                      unresolvedStart: nil)
+        let current = DailyTimeline.calculate(sprints: Array(sprints.prefix(4)), live: live, date: day,
+                                             now: date(11, 16), calendar: calendar)
+        let currentLayout = DailyTimelineLayout.arrange(current.segments)
+        assertEqual(currentLayout.suffix(2).map(\.columnCount), [2, 2],
+                    "A short current sprint must clear the previous completed block")
+        assertTimelineBlocksDoNotOverlap(currentLayout)
+    }
+
+    // An imported overlapping sprint can sit behind the active sprint's external label.
+    let live = TimelineLiveSprint(sprint: Sprint(startTime: date(10, 0)), status: .active,
+                                  netWork: 60, paused: 0, unresolvedStart: nil)
+    let imported = Sprint(startTime: date(10, 10), endTime: date(10, 30))
+    let withLabel = DailyTimeline.calculate(sprints: [imported], live: live, date: day,
+                                           now: date(10, 1), calendar: calendar)
+    let labelLayout = DailyTimelineLayout.arrange(withLabel.segments)
+    assertEqual(labelLayout.map(\.columnCount), [2, 2], "External active labels reserve space too")
+    assertTimelineBlocksDoNotOverlap(labelLayout)
+
+    let touching = [Sprint(startTime: date(10, 0), endTime: date(11, 0)),
+                    Sprint(startTime: date(11, 0), endTime: date(12, 0))]
+    let touchingTimeline = DailyTimeline.calculate(sprints: touching, date: day, now: date(16, 0), calendar: calendar)
+    assertEqual(DailyTimelineLayout.arrange(touchingTimeline.segments).map(\.columnCount), [1, 1],
+                "Full-size blocks that touch in time keep full width")
+
+    let overlapping = [touching[0], Sprint(startTime: date(11, 0).addingTimeInterval(-30), endTime: date(12, 0))]
+    let overlappingTimeline = DailyTimeline.calculate(sprints: overlapping, date: day,
+                                                     now: date(16, 0), calendar: calendar)
+    assertEqual(DailyTimelineLayout.arrange(overlappingTimeline.segments).map(\.columnCount), [2, 2],
+                "Actual overlapping times use columns even when the block gap could hide the overlap")
+}
+
+private func assertTimelineBlocksDoNotOverlap(_ segments: [TimelineSegment]) {
+    for (index, first) in segments.enumerated() {
+        for second in segments.dropFirst(index + 1) where first.column == second.column {
+            let separation = DailyTimelineLayout.height(second.interval.start.timeIntervalSince(first.interval.start))
+            assertTrue(separation >= DailyTimelineLayout.occupiedHeight(for: first),
+                       "Blocks in the same column must have room for their labels")
+        }
+    }
 }
 
 func testDailyTimelineDST() {
@@ -92,6 +182,9 @@ func testDailyTimelineDST() {
         assertEqual(result.hourMarks.count, expectedHours + 1)
         assertEqual(result.segments[0].netWork, Double(expectedHours * 3600))
         assertEqual(result.gaps.count, 0)
+        let arranged = DailyTimelineLayout.arrange(result.segments)
+        assertEqual(arranged[0].interval, result.segments[0].interval, "Layout retains DST clock spans")
+        assertEqual(arranged[0].columnCount, 1)
         let six = DailyTimeline.calculate(sprints: [], date: start, now: end, calendar: calendar)
         assertEqual(calendar.component(.hour, from: six.visible.start), 6)
     }

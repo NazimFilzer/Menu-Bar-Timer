@@ -10,7 +10,7 @@ struct DailyTimelineView: View {
     @State private var focusRequest = 0
     @State private var visibleTimelineRect = CGRect.zero
     @State private var scrollPosition: ScrollPosition
-    private static let hourHeight: CGFloat = 64
+    private static let hourHeight = DailyTimelineLayout.pointsPerHour
 
     init(vm: TimerViewModel, theme: PopoverTheme, temporaryHours: Binding<TimelineHours?>) {
         self.vm = vm
@@ -104,11 +104,10 @@ struct DailyTimelineView: View {
                 untrackedBand(gap, width: max(1, trackWidth - 10), top: y(gap.start, in: timeline) + 8)
                     .offset(x: labelWidth, y: y(gap.start, in: timeline) + 8)
             }
-            ForEach(timeline.segments) { segment in
+            ForEach(DailyTimelineLayout.arrange(timeline.segments)) { segment in
                 let blockWidth = trackWidth / CGFloat(segment.columnCount)
                 TimelineSprintBlock(segment: segment, theme: theme,
-                                    width: max(1, blockWidth - 10),
-                                    height: max(2, height(segment.interval.duration) - 5)) {
+                                    width: max(1, blockWidth - 10)) {
                     selectedSprint = segment.sprint
                 }
                     .offset(x: labelWidth + CGFloat(segment.column) * blockWidth,

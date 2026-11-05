@@ -35,7 +35,12 @@ Untracked gaps use a faint band without a border across the timeline width. Long
 their duration at the center of the visible part, with a time range when space
 permits. The label stays visible as the timeline scrolls.
 
-Sprints that overlap appear in separate columns. A sprint across midnight appears
+Sprints that overlap appear in separate columns. Blocks also use separate columns
+when their minimum height or external active label would overlap on screen.
+Columns share the existing timeline width. A group returns to full width once
+its blocks and labels have enough space. Each block keeps its exact start position,
+and layout does not change recorded times, work totals, or untracked gaps.
+A sprint across midnight appears
 on both calendar days. Continuation labels state its start day, which still owns
 all work in daily totals, earnings, and reports. The timeline does not add new
 work or move recorded work between day logs.
@@ -76,3 +81,7 @@ The implementation spec is `.scratch/daily-timeline/spec.md`.
 expansion, day clipping, continuation attribution, overlap columns, DST boundaries,
 settings persistence, and view model state. Tests use disposable settings and
 in-memory logs. The existing runtime health check also hosts the Today dashboard.
+Screen layout tests cover short adjacent sprints, dense groups, column reuse,
+current sprint states, and external active labels.
+Run `./scripts/run-preview.sh --timeline` to open a native preview of the reported
+short-sprint pairs. The preview uses in-memory logs and separate preferences.

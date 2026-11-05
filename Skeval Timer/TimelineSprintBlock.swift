@@ -5,8 +5,9 @@ struct TimelineSprintBlock: View {
     let segment: TimelineSegment
     let theme: PopoverTheme
     let width: CGFloat
-    let height: CGFloat
     let select: () -> Void
+
+    private var height: CGFloat { DailyTimelineLayout.spanHeight(for: segment) }
 
     private var title: String { segment.displayName }
     private var duration: String {
@@ -29,10 +30,10 @@ struct TimelineSprintBlock: View {
         }
     }
 
-    private var usesExternalLabel: Bool { segment.status == .active && height < 26 }
+    private var usesExternalLabel: Bool { DailyTimelineLayout.usesExternalLabel(for: segment) }
     private var usesRightPausedLabel: Bool { segment.paused > 0 && height < 68 }
     private var blockHeight: CGFloat {
-        segment.status == .active ? height : max(18, height)
+        DailyTimelineLayout.blockHeight(for: segment)
     }
 
     var body: some View {
@@ -64,8 +65,7 @@ struct TimelineSprintBlock: View {
                     headline
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .frame(width: width, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: width, height: DailyTimelineLayout.externalLabelHeight, alignment: .leading)
                         .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 5))
                         .overlay(RoundedRectangle(cornerRadius: 5)
                             .stroke(accent.opacity(0.2), lineWidth: 0.5))
@@ -73,7 +73,7 @@ struct TimelineSprintBlock: View {
                 .buttonStyle(.plain)
                 // The clock span ends five points below the block. Leave room
                 // for the Now line before placing the full-height label.
-                .offset(y: height + 14)
+                .offset(y: height + DailyTimelineLayout.externalLabelGap)
             }
         }
         .help("\(title) · \(segment.status.rawValue)\n\(timeRange)\n\(duration) work. Select for details.")

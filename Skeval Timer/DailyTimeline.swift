@@ -135,7 +135,8 @@ struct DailyTimeline {
         return gaps
     }
 
-    private static func assignColumns(_ input: [TimelineSegment]) -> [TimelineSegment] {
+    static func assignColumns(_ input: [TimelineSegment],
+                              occupiedUntil: (TimelineSegment) -> Date = { $0.interval.end }) -> [TimelineSegment] {
         var result = input
         var group: [Int] = []
         var groupEnd = Date.distantPast
@@ -144,13 +145,13 @@ struct DailyTimeline {
                 finishGroup(group, in: &result)
                 group = []
             }
-            let occupied = Set(group.filter { result[$0].interval.end > result[index].interval.start }
+            let occupied = Set(group.filter { occupiedUntil(result[$0]) > result[index].interval.start }
                 .map { result[$0].column })
             var column = 0
             while occupied.contains(column) { column += 1 }
             result[index].column = column
             group.append(index)
-            groupEnd = max(groupEnd, result[index].interval.end)
+            groupEnd = max(groupEnd, occupiedUntil(result[index]))
         }
         finishGroup(group, in: &result)
         return result
