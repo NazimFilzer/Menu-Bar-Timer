@@ -578,8 +578,7 @@ struct SprintFormFieldsView: View {
                     .foregroundColor(theme.textSecondary)
                     .frame(width: 90, alignment: .leading)
 
-                DatePicker("Sprint date", selection: $selectedDate, displayedComponents: [.date])
-                    .labelsHidden()
+                CalendarDatePicker(title: "Sprint date", selection: $selectedDate, theme: theme)
                 Spacer()
             }
 

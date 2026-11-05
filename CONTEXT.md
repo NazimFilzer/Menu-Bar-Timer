@@ -6,6 +6,14 @@ Has: `id`, `startTime`, `endTime?` (nil if open). Duration is computed (`endTime
 A sprint always belongs to the calendar day of its `startTime`, even if it crosses midnight.
 _Avoid_: Work Log, Session, Task
 
+## Daily timeline
+A view of recorded sprints and the current sprint on a vertical clock scale.
+Equal time takes equal space. The visible time range is configurable.
+
+## Untracked time
+Time between sprints with no recorded sprint. It does not establish whether the user was idle.
+_Avoid_: Idle time, inactivity
+
 ## Day Log
 All sprints for one calendar day, keyed by the date of each sprint's `startTime` (`yyyy-MM-dd`).
 Persisted in a JSON file in Application Support. Loaded on launch; filtered to today.

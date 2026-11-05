@@ -154,7 +154,8 @@ private struct WorkScheduleView: View {
                 }
             }
             HStack {
-                DatePicker("Day off", selection: $dayOff, displayedComponents: .date)
+                Text("Day off")
+                CalendarDatePicker(title: "Day off", selection: $dayOff, theme: theme)
                 Spacer()
                 Button("Add day off") {
                     settings.daysOff.insert(TimeFormatter.format(dateKey: dayOff))

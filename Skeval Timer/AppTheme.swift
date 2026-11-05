@@ -342,31 +342,12 @@ final class ThemeManager {
 struct RecoveryDatePicker: View {
     @Binding var selection: Date
     let theme: PopoverTheme
-    @State private var showingCalendar = false
 
     var body: some View {
         HStack(spacing: 8) {
             Text("End date")
                 .foregroundStyle(theme.textSecondary)
-            Button { showingCalendar.toggle() } label: {
-                Label(selection.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
-                    .foregroundStyle(theme.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Recovery end date")
-            .accessibilityValue(selection.formatted(date: .abbreviated, time: .omitted))
-            .popover(isPresented: $showingCalendar) {
-                DatePicker("Recovery end date", selection: $selection, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .labelsHidden()
-                    .tint(theme.accentColor)
-                    .padding()
-                    .environment(\.colorScheme, .light)
-            }
+            CalendarDatePicker(title: "Recovery end date", selection: $selection, theme: theme)
         }
     }
 }

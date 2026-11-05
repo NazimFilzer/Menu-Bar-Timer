@@ -4,7 +4,8 @@ struct TodayDashboardView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
     let openSettings: () -> Void
-    @State private var showingCalendar = false
+    @AppStorage("skevalTodayShowingTimeline") private var showingTimeline = true
+    @State private var temporaryTimelineHours: TimelineHours?
 
     private var dateSelection: Binding<Date> {
         Binding(get: { vm.selectedDate }, set: { vm.selectDate($0) })
@@ -43,12 +44,25 @@ struct TodayDashboardView: View {
                     .disabled(vm.displayedCompletedSprints.isEmpty)
                     .help("Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
                 }
-                SprintLogTableView(vm: vm, sprints: vm.displayedCompletedSprintsDescending.map(\.sprint),
-                                   distinctTags: tags, defaultDate: vm.selectedDate,
-                                   theme: theme, title: "SPRINT HISTORY")
+                Picker("Sprint view", selection: $showingTimeline) {
+                    Text("Timeline").tag(true)
+                    Text("List").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 240)
+                if showingTimeline {
+                    DailyTimelineView(vm: vm, theme: theme, temporaryHours: $temporaryTimelineHours)
+                } else {
+                    SprintLogTableView(vm: vm, sprints: vm.displayedCompletedSprintsDescending.map(\.sprint),
+                                       distinctTags: tags, defaultDate: vm.selectedDate,
+                                       theme: theme, title: "SPRINT HISTORY")
+                }
             }
             .padding(20)
             .foregroundStyle(theme.textPrimary)
+        }
+        .onChange(of: Calendar.current.startOfDay(for: vm.selectedDate)) {
+            temporaryTimelineHours = nil
         }
     }
 
@@ -57,25 +71,9 @@ struct TodayDashboardView: View {
             Button { moveDay(-1) } label: { Image(systemName: "chevron.left") }
                 .accessibilityLabel("Previous day")
                 .help("Previous day")
-            Button { showingCalendar.toggle() } label: {
-                Label(vm.selectedDate.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(theme.textPrimary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Day to review")
-            .popover(isPresented: $showingCalendar) {
-                DatePicker("Review day", selection: dateSelection, in: ...Date(), displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .labelsHidden()
-                    .tint(theme.accentColor)
-                    .padding()
-                    .environment(\.colorScheme, .light)
-            }
+            CalendarDatePicker(title: "Day to review", selection: dateSelection, theme: theme,
+                               allowedRange: Date.distantPast...Date())
+                .font(.subheadline.weight(.medium))
             Button { moveDay(1) } label: { Image(systemName: "chevron.right") }
                 .disabled(vm.isViewingToday)
                 .accessibilityLabel("Next day")

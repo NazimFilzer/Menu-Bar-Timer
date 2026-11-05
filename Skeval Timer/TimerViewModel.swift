@@ -219,6 +219,30 @@ class TimerViewModel {
         )
     }
 
+    func dailyTimeline(hours: TimelineHours? = nil, now: Date = Date(),
+                       calendar: Calendar = .current) -> DailyTimeline {
+        _ = logRevision
+        // Read both tick values so the view updates from the engine's existing timer.
+        _ = currentPauseElapsed
+        let live = timelineLiveSprint()
+        return DailyTimeline.calculate(sprints: store.allLogs().values.flatMap { $0 }, live: live,
+                                       date: selectedDate, hours: hours ?? goal.timelineHours,
+                                       now: now, calendar: calendar)
+    }
+
+    private func timelineLiveSprint() -> TimelineLiveSprint? {
+        guard let sprint = currentSprint else { return nil }
+        if recoveryMode {
+            return TimelineLiveSprint(sprint: sprint, status: .recovery, netWork: nil,
+                                      paused: sprint.pausedDuration, unresolvedStart: sprint.startTime)
+        }
+        let unresolved = pendingSleepInterval?.sleepStartedAt ?? engine.sleepStartedAt
+        let status: TimelineSprintStatus = unresolved != nil ? .sleep : (isPaused ? .paused : .active)
+        let paused = unresolved == nil ? totalCurrentSprintPaused : sprint.pausedDuration
+        return TimelineLiveSprint(sprint: sprint, status: status, netWork: currentElapsed,
+                                  paused: paused, unresolvedStart: unresolved)
+    }
+
     func finishForecast(now: Date = Date(), calendar: Calendar = .current) -> FinishForecast {
         _ = logRevision
         return FinishForecast.calculate(

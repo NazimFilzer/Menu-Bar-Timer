@@ -136,18 +136,14 @@ struct AnalyticsDashboardView: View {
                         Text("From:")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(theme.textSecondary)
-                        DatePicker("Report start date", selection: $customStartDate, displayedComponents: [.date])
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
+                        CalendarDatePicker(title: "Report start date", selection: $customStartDate, theme: theme)
                     }
 
                     HStack(spacing: 6) {
                         Text("To:")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(theme.textSecondary)
-                        DatePicker("Report end date", selection: $customEndDate, displayedComponents: [.date])
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
+                        CalendarDatePicker(title: "Report end date", selection: $customEndDate, theme: theme)
                     }
 
                     Spacer()

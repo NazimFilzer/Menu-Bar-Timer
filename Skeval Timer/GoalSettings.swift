@@ -7,6 +7,13 @@ class GoalSettings {
 
     private let userDefaults: UserDefaults
 
+    var timelineHours = TimelineHours() {
+        didSet {
+            userDefaults.set(timelineHours.startHour, forKey: "skevalTimelineStartHour")
+            userDefaults.set(timelineHours.endHour, forKey: "skevalTimelineEndHour")
+        }
+    }
+
     // Calendar weekday numbers: Sunday = 1, Monday = 2, … Saturday = 7.
     var workingWeekdays: Set<Int> = [2, 3, 4, 5, 6] {
         didSet {
@@ -56,6 +63,10 @@ class GoalSettings {
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
+        timelineHours = TimelineHours(
+            startHour: userDefaults.object(forKey: "skevalTimelineStartHour") as? Int ?? 6,
+            endHour: userDefaults.object(forKey: "skevalTimelineEndHour") as? Int ?? 24
+        )
         let storedWeekdays = Set(userDefaults.array(forKey: "skevalWorkingWeekdays") as? [Int] ?? [])
         workingWeekdays = !storedWeekdays.isEmpty && storedWeekdays.isSubset(of: Set(1...7))
             ? storedWeekdays : [2, 3, 4, 5, 6]
