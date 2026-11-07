@@ -6,9 +6,9 @@ import UserNotifications
 // MARK: - Version Tracking
 
 enum AppVersion {
-    static let current = "v2.1"
-    static let marketingVersion = "2.1"
-    static let buildNumber = "5"
+    static let current = "v2.2"
+    static let marketingVersion = "2.2"
+    static let buildNumber = "6"
 }
 
 @Observable

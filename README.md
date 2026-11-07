@@ -1,6 +1,6 @@
 # Skeval Timer
 
-Current version: `v2.1`
+Current version: `v2.2`
 
 A native macOS menu bar timer with a desktop dashboard for work time, goals, and hourly earnings.
 

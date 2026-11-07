@@ -1573,9 +1573,9 @@ func testGlobalHotkeys() {
 
 func testAppVersion() {
     print("Running AppVersion tests...")
-    assertEqual(AppVersion.current, "v2.1", "App version should be tracked as v2.1")
-    assertEqual(AppVersion.marketingVersion, "2.1", "Marketing version should be 2.1")
-    assertEqual(AppVersion.buildNumber, "5", "Build number should be 5")
+    assertEqual(AppVersion.current, "v2.2", "App version should be tracked as v2.2")
+    assertEqual(AppVersion.marketingVersion, "2.2", "Marketing version should be 2.2")
+    assertEqual(AppVersion.buildNumber, "6", "Build number should be 6")
 }
 
 @MainActor
