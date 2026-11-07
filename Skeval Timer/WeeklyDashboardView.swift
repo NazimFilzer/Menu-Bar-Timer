@@ -37,12 +37,15 @@ struct WeeklyDashboardView: View {
             }
 
             // Interactive 7-Day Bar Chart
-            WeeklyChartView(
-                summary: summary,
+            ActivityChartView(
+                style: .week,
+                days: summary.days,
+                isCurrent: summary.isCurrentWeek,
+                rangeLabel: summary.weekRangeLabel,
                 dailyGoalHours: vm.goal.dailyGoalHours,
                 dailyGoalLabel: vm.goal.goalLabel,
                 theme: theme,
-                weekOffset: $weekOffset
+                offset: $weekOffset
             )
 
             if summary.weekStartDate <= Date() {

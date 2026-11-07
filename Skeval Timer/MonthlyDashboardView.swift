@@ -36,12 +36,15 @@ struct MonthlyDashboardView: View {
             }
 
             // 28–31 Day Interactive Bar Chart
-            MonthlyChartView(
-                summary: summary,
+            ActivityChartView(
+                style: .month,
+                days: summary.days,
+                isCurrent: summary.isCurrentMonth,
+                rangeLabel: summary.monthTitle,
                 dailyGoalHours: vm.goal.dailyGoalHours,
                 dailyGoalLabel: vm.goal.goalLabel,
                 theme: theme,
-                monthOffset: $monthOffset
+                offset: $monthOffset
             )
 
             GoalConsistencyCardView(

@@ -1,11 +1,29 @@
 import SwiftUI
 
-struct WeeklyChartView: View {
-    let summary: WeeklySummary
+/// Bar chart of daily work for the Week (7 bars) and Month (28–31 narrow bars) pages.
+struct ActivityChartView: View {
+    struct Style {
+        let title: String
+        let icon: String
+        let currentLabel: String
+        let plotHeight: CGFloat
+        /// Narrow bars for a whole month: smaller corners and labels, hidden when too tight.
+        let compact: Bool
+
+        static let week = Style(title: "WEEKLY ACTIVITY", icon: "chart.bar.fill",
+                                currentLabel: "Current Week", plotHeight: 220, compact: false)
+        static let month = Style(title: "MONTHLY ACTIVITY", icon: "calendar",
+                                 currentLabel: "Current Month", plotHeight: 230, compact: true)
+    }
+
+    let style: Style
+    let days: [DailyBarData]
+    let isCurrent: Bool
+    let rangeLabel: String
     let dailyGoalHours: Double
     let dailyGoalLabel: String
     let theme: PopoverTheme
-    @Binding var weekOffset: Int
+    @Binding var offset: Int
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredDay: DailyBarData? = nil
     @State private var selectedDay: DailyBarData? = nil
@@ -15,21 +33,21 @@ struct WeeklyChartView: View {
     }
 
     private var maxChartHours: Double {
-        let maxLogged = summary.days.map(\.totalHours).max() ?? 0.0
+        let maxLogged = days.map(\.totalHours).max() ?? 0.0
         let baseline = max(maxLogged, dailyGoalHours, 8.0)
         return baseline * 1.2
     }
 
+    private var barCorner: CGFloat { style.compact ? 4 : 6 }
+
     var body: some View {
         VStack(spacing: 16) {
-            // Navigation & Header Bar
             chartHeaderView
 
-            // Main Bar Chart Surface
             ZStack(alignment: .top) {
                 chartPlotArea
 
-                // Inspection Tooltip overlay when hovering or clicking
+                // Inspection tooltip when hovering or clicking a bar
                 if let inspecting = activeInspectionDay {
                     inspectionTooltip(for: inspecting)
                         .transition(.asymmetric(
@@ -38,7 +56,7 @@ struct WeeklyChartView: View {
                         ))
                 }
             }
-            .frame(height: 220)
+            .frame(height: style.plotHeight)
         }
         .padding(18)
         .background(theme.cardBg)
@@ -49,22 +67,21 @@ struct WeeklyChartView: View {
         )
     }
 
-    // MARK: - Header & Week Navigation
+    // MARK: - Header & Navigation
 
     private var chartHeaderView: some View {
         HStack(alignment: .center) {
-            // Title & Icon
             HStack(spacing: 7) {
-                Image(systemName: "chart.bar.fill")
+                Image(systemName: style.icon)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(theme.neonTeal)
 
-                Text("WEEKLY ACTIVITY")
+                Text(style.title)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(theme.textPrimary)
                     .kerning(0.8)
 
-                if summary.isCurrentWeek {
+                if isCurrent {
                     Text("CURRENT")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .padding(.horizontal, 6)
@@ -77,17 +94,10 @@ struct WeeklyChartView: View {
 
             Spacer()
 
-            // Navigation Controls
             HStack(spacing: 6) {
-                if weekOffset != 0 {
-                    Button(action: {
-                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
-                            weekOffset = 0
-                            hoveredDay = nil
-                            selectedDay = nil
-                        }
-                    }) {
-                        Text("Current Week")
+                if offset != 0 {
+                    Button(action: { move(to: 0) }) {
+                        Text(style.currentLabel)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -98,14 +108,7 @@ struct WeeklyChartView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Previous Week Arrow
-                Button(action: {
-                    withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
-                        weekOffset -= 1
-                        hoveredDay = nil
-                        selectedDay = nil
-                    }
-                }) {
+                Button(action: { move(to: offset - 1) }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .bold))
                         .padding(6)
@@ -116,8 +119,7 @@ struct WeeklyChartView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Week Range Label
-                Text(summary.weekRangeLabel)
+                Text(rangeLabel)
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(theme.textPrimary)
                     .padding(.horizontal, 8)
@@ -125,27 +127,26 @@ struct WeeklyChartView: View {
                     .background(theme.cardBg.opacity(0.5))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                // Next Week Arrow
-                Button(action: {
-                    if weekOffset < 0 {
-                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
-                            weekOffset += 1
-                            hoveredDay = nil
-                            selectedDay = nil
-                        }
-                    }
-                }) {
+                Button(action: { if offset < 0 { move(to: offset + 1) } }) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
                         .padding(6)
                         .background(theme.cardBg.opacity(0.8))
-                        .foregroundColor(weekOffset < 0 ? theme.textPrimary : theme.textSecondary.opacity(0.4))
+                        .foregroundColor(offset < 0 ? theme.textPrimary : theme.textSecondary.opacity(0.4))
                         .clipShape(Circle())
                         .overlay(Circle().stroke(theme.cardBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .disabled(weekOffset >= 0)
+                .disabled(offset >= 0)
             }
+        }
+    }
+
+    private func move(to newOffset: Int) {
+        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8)) {
+            offset = newOffset
+            hoveredDay = nil
+            selectedDay = nil
         }
     }
 
@@ -155,20 +156,17 @@ struct WeeklyChartView: View {
         GeometryReader { proxy in
             let availableWidth = proxy.size.width
             let availableHeight = proxy.size.height - 35 // Reserve 35pt for X-axis labels
-            let columnWidth = max((availableWidth - (6 * 12)) / 7.0, 36)
+            let count = max(days.count, 1)
+            let spacing: CGFloat = style.compact ? (count > 30 ? 4 : 5) : 12
+            let rawColumnWidth = (availableWidth - CGFloat(count - 1) * spacing) / CGFloat(count)
+            let columnWidth = max(rawColumnWidth, style.compact ? 12 : 36)
 
             ZStack(alignment: .bottomLeading) {
-                // Background Grid & Daily Goal Reference Line
                 goalReferenceLineView(chartHeight: availableHeight, chartWidth: availableWidth)
 
-                // 7 Day Bars
-                HStack(alignment: .bottom, spacing: 12) {
-                    ForEach(summary.days) { day in
-                        barColumn(
-                            day: day,
-                            columnWidth: columnWidth,
-                            chartHeight: availableHeight
-                        )
+                HStack(alignment: .bottom, spacing: spacing) {
+                    ForEach(days) { day in
+                        barColumn(day: day, columnWidth: columnWidth, chartHeight: availableHeight)
                     }
                 }
                 .frame(width: availableWidth, height: proxy.size.height, alignment: .bottom)
@@ -183,7 +181,6 @@ struct WeeklyChartView: View {
         let yOffset = chartHeight * CGFloat(1.0 - goalFraction)
 
         return ZStack(alignment: .topLeading) {
-            // Dashed Line
             Path { path in
                 path.move(to: CGPoint(x: 0, y: yOffset))
                 path.addLine(to: CGPoint(x: chartWidth, y: yOffset))
@@ -193,7 +190,6 @@ struct WeeklyChartView: View {
                 style: StrokeStyle(lineWidth: 1, dash: [4, 4])
             )
 
-            // Goal Label Pill on Right
             HStack(spacing: 4) {
                 Image(systemName: "flag.fill")
                     .font(.system(size: 8))
@@ -206,7 +202,7 @@ struct WeeklyChartView: View {
             .background(theme.cardBg.opacity(0.9))
             .clipShape(Capsule())
             .overlay(Capsule().stroke(theme.neonTeal.opacity(0.3), lineWidth: 0.8))
-            .offset(x: chartWidth - 115, y: max(yOffset - 18, 0))
+            .offset(x: max(chartWidth - 115, 0), y: max(yOffset - 18, 0))
         }
         .frame(height: chartHeight)
     }
@@ -215,35 +211,28 @@ struct WeeklyChartView: View {
 
     private func barColumn(day: DailyBarData, columnWidth: CGFloat, chartHeight: CGFloat) -> some View {
         let heightFraction = maxChartHours > 0 ? min(day.totalHours / maxChartHours, 1.0) : 0
-        let barHeight = max(chartHeight * CGFloat(heightFraction), day.totalSeconds > 0 ? 6.0 : 0.0)
+        let minimumBar: CGFloat = style.compact ? 5 : 6
+        let barHeight = max(chartHeight * CGFloat(heightFraction), day.totalSeconds > 0 ? minimumBar : 0.0)
         let isMetGoal = day.totalHours >= dailyGoalHours && dailyGoalHours > 0
         let isHovered = hoveredDay?.id == day.id || selectedDay?.id == day.id
 
         return Button {
             selectedDay = selectedDay?.id == day.id ? nil : day
         } label: {
-            VStack(spacing: 6) {
-                // Hours Label on top of bar
-                Text(day.totalSeconds > 0 ? day.formattedDuration : "—")
-                    .font(.system(size: 9, weight: day.isToday ? .bold : .medium, design: .monospaced))
-                    .foregroundColor(day.isToday ? theme.neonTeal : (day.totalSeconds > 0 ? theme.textPrimary : theme.textSecondary.opacity(0.5)))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+            VStack(spacing: style.compact ? 5 : 6) {
+                hoursLabel(day: day, columnWidth: columnWidth)
 
-                // Bar Track & Fill
                 ZStack(alignment: .bottom) {
-                    // Background track
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: barCorner)
                         .fill(theme.cardBg.opacity(0.5))
                         .frame(width: columnWidth, height: chartHeight)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(theme.cardBorder.opacity(isHovered ? 0.8 : 0.25), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: barCorner)
+                                .stroke(theme.cardBorder.opacity(isHovered ? 0.8 : (style.compact ? 0.2 : 0.25)), lineWidth: 1)
                         )
 
-                    // Filled Bar
                     if barHeight > 0 {
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: barCorner)
                             .fill(
                                 LinearGradient(
                                     colors: barGradientColors(isToday: day.isToday, isMetGoal: isMetGoal, isHovered: isHovered),
@@ -254,7 +243,7 @@ struct WeeklyChartView: View {
                             .frame(width: columnWidth, height: barHeight)
                             .shadow(
                                 color: day.isToday ? theme.neonTeal.opacity(0.4) : (isMetGoal ? Color.teal.opacity(0.3) : Color.clear),
-                                radius: isHovered ? 6 : 3,
+                                radius: style.compact ? (isHovered ? 5 : 2) : (isHovered ? 6 : 3),
                                 x: 0,
                                 y: 0
                             )
@@ -268,25 +257,7 @@ struct WeeklyChartView: View {
                     }
                 }
 
-
-                // X-Axis Day & Date Label
-                VStack(spacing: 2) {
-                    Text(day.dayOfWeekLabel)
-                        .font(.system(size: 10, weight: day.isToday ? .heavy : .semibold, design: .rounded))
-                        .foregroundColor(day.isToday ? theme.neonTeal : theme.textPrimary)
-
-                    Text(day.dayNumberLabel)
-                        .font(.system(size: 9, weight: .regular, design: .monospaced))
-                        .foregroundColor(day.isToday ? theme.neonTeal : theme.textSecondary)
-                }
-                .padding(.vertical, 3)
-                .padding(.horizontal, 6)
-                .background(day.isToday ? theme.neonTeal.opacity(0.18) : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(day.isToday ? theme.neonTeal.opacity(0.5) : Color.clear, lineWidth: 1)
-                )
+                dayLabel(day: day, columnWidth: columnWidth)
             }
             .frame(width: columnWidth)
         }
@@ -294,6 +265,57 @@ struct WeeklyChartView: View {
         .accessibilityLabel(TimeFormatter.format(headerDate: day.date))
         .accessibilityValue("\(day.formattedDuration), \(day.formattedEarnings)")
         .accessibilityAddTraits(selectedDay?.id == day.id ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private func hoursLabel(day: DailyBarData, columnWidth: CGFloat) -> some View {
+        let color = day.isToday ? theme.neonTeal : (day.totalSeconds > 0 ? theme.textPrimary : theme.textSecondary.opacity(0.5))
+        if !style.compact {
+            Text(day.totalSeconds > 0 ? day.formattedDuration : "—")
+                .font(.system(size: 9, weight: day.isToday ? .bold : .medium, design: .monospaced))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else if columnWidth >= 22 {
+            Text(day.totalSeconds > 0 ? day.formattedDuration : "")
+                .font(.system(size: 8, weight: day.isToday ? .bold : .medium, design: .monospaced))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        } else {
+            Spacer().frame(height: 10)
+        }
+    }
+
+    private func dayLabel(day: DailyBarData, columnWidth: CGFloat) -> some View {
+        let corner: CGFloat = style.compact ? 4 : 5
+        return VStack(spacing: style.compact ? 1 : 2) {
+            if style.compact {
+                Text(day.dayNumberLabel)
+                    .font(.system(size: 9, weight: day.isToday ? .heavy : .semibold, design: .monospaced))
+                    .foregroundColor(day.isToday ? theme.neonTeal : theme.textPrimary)
+                if columnWidth >= 20 {
+                    Text(String(day.dayOfWeekLabel.prefix(1)))
+                        .font(.system(size: 8, weight: .regular, design: .rounded))
+                        .foregroundColor(day.isToday ? theme.neonTeal : theme.textSecondary)
+                }
+            } else {
+                Text(day.dayOfWeekLabel)
+                    .font(.system(size: 10, weight: day.isToday ? .heavy : .semibold, design: .rounded))
+                    .foregroundColor(day.isToday ? theme.neonTeal : theme.textPrimary)
+                Text(day.dayNumberLabel)
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .foregroundColor(day.isToday ? theme.neonTeal : theme.textSecondary)
+            }
+        }
+        .padding(.vertical, style.compact ? 2 : 3)
+        .padding(.horizontal, style.compact ? 2 : 6)
+        .background(day.isToday ? theme.neonTeal.opacity(0.18) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: corner))
+        .overlay(
+            RoundedRectangle(cornerRadius: corner)
+                .stroke(day.isToday ? theme.neonTeal.opacity(0.5) : Color.clear, lineWidth: 1)
+        )
     }
 
     private func barGradientColors(isToday: Bool, isMetGoal: Bool, isHovered: Bool) -> [Color] {
@@ -329,7 +351,8 @@ struct WeeklyChartView: View {
                     }
                 }
 
-                Text("\(day.sprintCount) sprint\(day.sprintCount == 1 ? "" : "s") logged")
+                let sprints = "\(day.sprintCount) sprint\(day.sprintCount == 1 ? "" : "s")"
+                Text(style.compact ? "\(day.dayOfWeekLabel) • \(sprints)" : "\(sprints) logged")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundColor(theme.textSecondary)
             }
