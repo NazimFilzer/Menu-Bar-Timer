@@ -53,8 +53,10 @@ struct WeeklyDashboardView: View {
             weeklyTargetProgressCardView(summary: summary)
 
             if summary.isCurrentWeek {
-                CatchUpCardView(summary: vm.catchUpSummary(for: .week),
-                                dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                Live {
+                    CatchUpCardView(summary: vm.catchUpSummary(for: .week),
+                                    dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                }
                 PeriodPaceCardView(vm: vm, period: .week, theme: theme)
             }
 
@@ -68,14 +70,16 @@ struct WeeklyDashboardView: View {
             )
 
             if summary.weekStartDate <= Date() {
-                WeekComparisonCardView(
-                    comparison: WeekComparison.calculate(
-                        logs: vm.store.allLogs(), weekStart: summary.weekStartDate,
-                        compareClockTime: compareClockTime,
-                        liveSprint: vm.isRunning ? vm.currentSprint : nil,
-                        liveElapsed: vm.currentElapsed),
-                    theme: theme, compareClockTime: $compareClockTime
-                )
+                Live {
+                    WeekComparisonCardView(
+                        comparison: WeekComparison.calculate(
+                            logs: vm.store.allLogs(), weekStart: summary.weekStartDate,
+                            compareClockTime: compareClockTime,
+                            liveSprint: vm.isRunning ? vm.currentSprint : nil,
+                            liveElapsed: vm.currentElapsed),
+                        theme: theme, compareClockTime: $compareClockTime
+                    )
+                }
             }
 
             PeriodTimesheetView(
@@ -105,20 +109,22 @@ struct WeeklyDashboardView: View {
             Spacer()
 
             // Quick live sprint status pill
-            if vm.isRunning {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(theme.statusColor(for: vm.state))
-                        .frame(width: 8, height: 8)
-                    Text("Sprint in Progress: \(vm.currentElapsedLabel)")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(theme.neonTeal)
+            Live {
+                if vm.isRunning {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(theme.statusColor(for: vm.state))
+                            .frame(width: 8, height: 8)
+                        Text("Sprint in Progress: \(vm.currentElapsedLabel)")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(theme.neonTeal)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(theme.neonTeal.opacity(0.12))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(theme.neonTeal.opacity(0.4), lineWidth: 1))
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(theme.neonTeal.opacity(0.12))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(theme.neonTeal.opacity(0.4), lineWidth: 1))
             }
         }
         .padding(.horizontal, 18)
@@ -146,22 +152,26 @@ struct WeeklyDashboardView: View {
     private func metricsRowView(summary: WeeklySummary) -> some View {
         HStack(spacing: 16) {
             // 1. Today's Hours
-            MetricCardView(
-                title: "TODAY'S HOURS",
-                value: vm.totalTodayShortLabel,
-                subtitle: "Daily Target: \(vm.goal.goalLabel)",
-                icon: "clock.fill",
-                theme: theme
-            )
+            Live {
+                MetricCardView(
+                    title: "TODAY'S HOURS",
+                    value: vm.totalTodayShortLabel,
+                    subtitle: "Daily Target: \(vm.goal.goalLabel)",
+                    icon: "clock.fill",
+                    theme: theme
+                )
+            }
 
             // 2. Today's Earnings
-            MetricCardView(
-                title: "TODAY'S EARNINGS",
-                value: vm.todayEarningsLabel,
-                subtitle: "\(vm.todayLog.completedSprints.count) sprint\(vm.todayLog.completedSprints.count == 1 ? "" : "s") logged",
-                icon: "banknote.fill",
-                theme: theme
-            )
+            Live {
+                MetricCardView(
+                    title: "TODAY'S EARNINGS",
+                    value: vm.todayEarningsLabel,
+                    subtitle: "\(vm.todayLog.completedSprints.count) sprint\(vm.todayLog.completedSprints.count == 1 ? "" : "s") logged",
+                    icon: "banknote.fill",
+                    theme: theme
+                )
+            }
 
             // 3. Current Week's Daily Average
             MetricCardView(

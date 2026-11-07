@@ -405,7 +405,8 @@ final class SprintEngine {
     private func startTicker() {
         stopTicker()
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            // Scheduled on the main run loop, so the block already runs on the main actor.
+            MainActor.assumeIsolated {
                 guard let self else { return }
                 guard case .active(let sprint, _) = self.state else { return }
                 let elapsed = max(0, Date().timeIntervalSince(sprint.startTime) - self.totalPausedDuration)
@@ -413,13 +414,20 @@ final class SprintEngine {
                 self.onTick?(elapsed)
             }
         }
+        allowCoalescing(ticker)
+    }
+
+    /// Lets macOS batch this wake-up with others. Elapsed time is read from the clock,
+    /// so a late fire never changes recorded work.
+    private func allowCoalescing(_ timer: Timer?) {
+        timer?.tolerance = 0.1
     }
 
     private func startPauseTicker(startedAt: Date) {
         stopTicker()
         pauseStartedAt = startedAt
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 guard let self else { return }
                 guard case .paused = self.state, let start = self.pauseStartedAt else { return }
                 let pauseElapsed = max(0, Date().timeIntervalSince(start))
@@ -427,6 +435,7 @@ final class SprintEngine {
                 self.onPauseTick?(pauseElapsed)
             }
         }
+        allowCoalescing(ticker)
     }
 
     private func stopTicker() {

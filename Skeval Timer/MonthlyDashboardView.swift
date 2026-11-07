@@ -52,8 +52,10 @@ struct MonthlyDashboardView: View {
             monthlyGoalProgressCardView(summary: summary)
 
             if summary.isCurrentMonth {
-                CatchUpCardView(summary: vm.catchUpSummary(for: .month),
-                                dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                Live {
+                    CatchUpCardView(summary: vm.catchUpSummary(for: .month),
+                                    dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                }
                 PeriodPaceCardView(vm: vm, period: .month, theme: theme)
             }
 
