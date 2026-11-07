@@ -4,6 +4,7 @@ struct WeeklyDashboardView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
     @State private var weekOffset: Int = 0
+    @State private var compareClockTime = true
 
     private var weeklySummary: WeeklySummary {
         _ = vm.logRevision
@@ -65,6 +66,17 @@ struct WeeklyDashboardView: View {
                 theme: theme,
                 weekOffset: $weekOffset
             )
+
+            if summary.weekStartDate <= Date() {
+                WeekComparisonCardView(
+                    comparison: WeekComparison.calculate(
+                        logs: vm.store.allLogs(), weekStart: summary.weekStartDate,
+                        compareClockTime: compareClockTime,
+                        liveSprint: vm.isRunning ? vm.currentSprint : nil,
+                        liveElapsed: vm.currentElapsed),
+                    theme: theme, compareClockTime: $compareClockTime
+                )
+            }
 
             PeriodTimesheetView(
                 vm: vm,

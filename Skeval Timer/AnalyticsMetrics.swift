@@ -13,6 +13,10 @@ enum AnalyticsMetrics {
         if let cached = formatters[key] {
             formatter = cached
         } else {
+            // Bound memory use when formats or time zones change.
+            if formatters.count >= 32 {
+                formatters.removeAll(keepingCapacity: true)
+            }
             formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.calendar = calendar

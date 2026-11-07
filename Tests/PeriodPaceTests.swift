@@ -26,6 +26,11 @@ func testPeriodPaceForecast() {
     assertEqual(idle.secondsPerWorkingDay, 12 * 3600)
     assertEqual(idle.extraSecondsPerWorkingDay, 4 * 3600)
     assertTrue(idle.includesToday)
+    assertTrue(idle.exceedsCapacity, "96 hours exceeds eight remaining 8-hour goals")
+    assertEqual(idle.remainingCalendarSeconds, 64 * 3600)
+    settings.monthlyGoalHours = 128
+    assertFalse(monthly().exceedsCapacity, "Exactly the remaining goal capacity is achievable")
+    settings.monthlyGoalHours = 160
     let active = monthly(.active(sprint: open, elapsed: 2 * 3600))
     assertEqual(active.clockedSeconds, 66 * 3600)
     assertEqual(active.secondsPerWorkingDay, 11.75 * 3600)

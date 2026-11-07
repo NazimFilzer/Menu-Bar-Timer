@@ -1948,6 +1948,9 @@ func testTimeAndPauseMathVerification() {
     assertEqual(clampedSprint.duration, 0.0, "Duration must clamp to 0 when pause exceeds gross duration")
     assertEqual(clampedSprint.effectiveEnd, t0, "EffectiveEnd must clamp to startTime when pause exceeds duration")
 
+    assertEqual(clampedSprint.clipboardText, "\(clampedSprint.startLabel)\t\(clampedSprint.startLabel)",
+                "Zero net work exports equal start and end times")
+
     // 3. Recovery validation: break duration exceeding sprint time must throw
     let openSprintWithPauses = Sprint(startTime: t0, pausedDuration: 600)
     store.save(sprint: openSprintWithPauses)
@@ -2122,11 +2125,16 @@ struct TestMain {
         defer { cleanUpAuditSettings() }
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
+        testStoreReadsDuringSave()
         testDailyTimesheetExport()
         testPeriodTimesheetExport()
         testSprintTaggingAndBackwardCompatibility()
         testGoalSettingsExpansion()
         testEarningsCalculator()
+        testGoalConsistencyIncludesWeekendWork()
+        testSprintPatternsUseNetCompletedWork()
+        testWeekComparisonBoundaries()
+        testWorkInsightsCalendarTransitions()
         testWeeklyAnalytics()
         testMonthlyAnalytics()
         testTagBreakdownAndAttribution()

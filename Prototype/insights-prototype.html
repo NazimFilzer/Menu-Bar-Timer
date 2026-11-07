@@ -1,0 +1,1184 @@
+<!--
+  PROTOTYPE — throwaway. Not the app.
+
+  Question: where should these three insights live, and how much should each say?
+    1. Same part of each week   (Week page)
+    2. Goal consistency         (Analytics)
+    3. Sprint patterns          (Analytics)
+
+  Three original options and the selected mix, switchable via ?variant=A|B|C|D.
+  D combines Week B, goal consistency C, and sprint patterns A.
+  Mock data only. No persistence. Keep as a prototype reference.
+
+  Run:  open "Prototype/insights-prototype.html"
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — insights</title>
+<style>
+  :root {
+    --page: #f4eeda;
+    --bg: #fffdf6;
+    --card: #ffffff;
+    --border: #e8e0ba;
+    --border-soft: #f0ead0;
+    --accent: #e0b34d;
+    --accent-ink: #9a7620;
+    --accent-soft: #fbf1d6;
+    --text: #38301c;
+    --text-2: #80754f;
+    --text-3: #a89d78;
+    --good: #2f9e6b;
+    --good-soft: #e6f4ec;
+    --bad: #cf5b4e;
+    --bad-soft: #fbeae7;
+    --radius: 12px;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text);
+    font: 13px/1.5 -apple-system, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .num, .big, td.n, th.n { font-variant-numeric: tabular-nums; }
+
+  /* ---------- prototype banner ---------- */
+  .proto-strip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 14px;
+    background: #2b2618; color: #f4eeda;
+    font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .proto-strip b { color: #f0c766; font-weight: 600; }
+  .proto-strip span { opacity: .72; text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+
+  /* ---------- app shell ---------- */
+  .app {
+    display: grid; grid-template-columns: 196px 1fr;
+    height: calc(100vh - 27px);
+    background: var(--bg);
+  }
+  .sidebar {
+    border-right: 1px solid var(--border-soft);
+    padding: 16px 12px;
+    display: flex; flex-direction: column; gap: 2px;
+    background: #fffdf6;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    padding: 2px 8px 18px;
+    font-weight: 600; letter-spacing: -.01em;
+  }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 9px; border-radius: 8px;
+    color: var(--text-2); font-size: 12.5px;
+  }
+  .nav-item .ico { width: 14px; text-align: center; opacity: .8; }
+  .nav-item.active { background: var(--accent-soft); color: var(--text); font-weight: 500; }
+  .nav-item .proto-dot {
+    margin-left: auto; font-size: 9px; letter-spacing: .06em;
+    color: var(--accent-ink); background: #fff; border: 1px solid var(--border);
+    border-radius: 20px; padding: 1px 5px;
+  }
+  .sidebar-foot { margin-top: auto; padding: 10px 9px; color: var(--text-3); font-size: 11px; }
+
+  .main { overflow: auto; }
+  .topbar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 26px;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .topbar h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .topbar .range { color: var(--text-2); font-size: 12px; }
+  .topbar .chip {
+    margin-left: auto; font-size: 11px; color: var(--text-2);
+    border: 1px solid var(--border); border-radius: 20px; padding: 3px 9px;
+    background: #fff;
+  }
+  .canvas { padding: 22px 26px 120px; max-width: 1180px; }
+
+  .proto-note {
+    display: flex; gap: 8px; align-items: baseline;
+    margin: 0 0 18px; padding: 8px 12px;
+    border-left: 2px solid var(--accent);
+    background: #fffdf2;
+    color: var(--text-2); font-size: 12px;
+  }
+  .proto-note b { color: var(--text); font-weight: 600; }
+
+  /* ---------- blocks ---------- */
+  .block { margin-bottom: 22px; }
+  .placement {
+    font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--text-3); margin: 0 2px 7px;
+  }
+  .placement b { color: var(--accent-ink); font-weight: 600; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: 0 1px 0 rgba(80, 66, 20, .03);
+  }
+  .card-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+  .card-head h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+  .card-head .sub { margin: 2px 0 0; color: var(--text-2); font-size: 11.5px; }
+  .card-head .spacer { margin-left: auto; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid2 > .block { display: flex; flex-direction: column; }
+  .grid2 > .block > .card { flex: 1; }
+  @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .seg {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 7px;
+    overflow: hidden; background: #fff; flex: none;
+  }
+  .seg button {
+    border: 0; background: transparent; color: var(--text-2);
+    font: inherit; font-size: 11.5px; padding: 4px 9px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: var(--accent-soft); color: var(--text); font-weight: 500; }
+
+  .tabs {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; background: #fff; flex: none;
+  }
+  .tabs button {
+    border: 0; background: transparent; color: var(--text-2);
+    font: inherit; font-size: 12px; padding: 5px 12px; cursor: pointer;
+  }
+  .tabs button + button { border-left: 1px solid var(--border); }
+  .tabs button.on { background: var(--accent-soft); color: var(--text); font-weight: 500; }
+
+  .narrative-card { padding: 22px 24px; }
+  .narrative-card .lede, .narrative-card .aside { max-width: 720px; }
+
+  .foot {
+    margin: 12px 0 0; padding-top: 10px;
+    border-top: 1px dashed var(--border-soft);
+    color: var(--text-3); font-size: 11px; line-height: 1.45;
+  }
+
+  /* ---------- delta ---------- */
+  .delta-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .delta { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+  .delta.good { color: var(--good); }
+  .delta.bad { color: var(--bad); }
+  .delta-note { color: var(--text-2); font-size: 12px; }
+
+  /* ---------- paired bars ---------- */
+  .pairs { display: flex; align-items: flex-end; gap: 6px; height: 168px; }
+  .pair { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; height: 100%; }
+  .pair .bars { display: flex; align-items: flex-end; gap: 4px; height: 122px; }
+  .bar { width: 16px; border-radius: 3px 3px 1px 1px; min-height: 2px; }
+  .bar.cur { background: var(--accent); }
+  .bar.prev { background: #ddd5b4; }
+  .pair-label { font-size: 10.5px; color: var(--text-2); }
+  .pair-val { font-size: 9.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .pair-tag { font-size: 9px; color: var(--accent-ink); letter-spacing: .04em; text-transform: uppercase; }
+  .pair.future { opacity: .38; }
+  .pair.future .bar { background: var(--border-soft); }
+  .legend { display: flex; gap: 14px; color: var(--text-2); font-size: 11px; margin-top: 4px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
+
+  /* ---------- stats ---------- */
+  .stat-row { display: flex; gap: 26px; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; }
+  .stat .v { font-size: 24px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+  .stat .k { color: var(--text-2); font-size: 11px; margin-top: 2px; }
+  .stat.small .v { font-size: 15px; font-weight: 500; }
+
+  /* ---------- week strip (goal consistency) ---------- */
+  .weeks { display: flex; align-items: flex-end; gap: 4px; height: 98px; margin-top: 4px; }
+  .wk { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+  .wk .count { font-size: 9.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .wk .track { width: 100%; display: flex; flex-direction: column-reverse; gap: 1px; }
+  .wk .slot { height: 10px; border-radius: 2px; }
+  .wk .slot.met { background: var(--good); }
+  .wk .slot.miss { background: #efc9c1; }
+  .wk .lbl { font-size: 9px; color: var(--text-3); white-space: nowrap; }
+
+  /* ---------- distribution ---------- */
+  .dist { display: grid; grid-template-columns: 52px 1fr 34px; gap: 6px 10px; align-items: center; }
+  .dist .lbl { font-size: 11px; color: var(--text-2); text-align: right; }
+  .dist .track { height: 9px; background: var(--border-soft); border-radius: 5px; overflow: hidden; }
+  .dist .fill { height: 100%; background: var(--accent); border-radius: 5px; }
+  .dist .cnt { font-size: 11px; color: var(--text-2); text-align: right; }
+
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .pill {
+    font-size: 11px; color: var(--text-2);
+    background: #fffdf4; border: 1px solid var(--border-soft);
+    border-radius: 20px; padding: 3px 9px;
+  }
+  .pill b { color: var(--text); font-weight: 600; }
+
+  /* ---------- variant B: narrative ---------- */
+  .review { max-width: 720px; }
+  .review section { padding: 26px 0; border-bottom: 1px solid var(--border-soft); }
+  .review section:last-child { border-bottom: 0; }
+  .eyebrow { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
+  .lede { font-size: 20px; line-height: 1.45; letter-spacing: -.015em; margin: 0 0 6px; }
+  .lede b { font-weight: 600; white-space: nowrap; }
+  .lede .up { color: var(--good); }
+  .lede .down { color: var(--bad); }
+  .aside { color: var(--text-2); font-size: 12px; margin: 0 0 16px; }
+  .aside button {
+    border: 0; background: none; padding: 0; font: inherit; font-size: 12px;
+    color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+  }
+  details { margin-top: 14px; }
+  details summary {
+    font-size: 11.5px; color: var(--text-2); cursor: pointer;
+    list-style: none; display: inline-flex; gap: 5px; align-items: center;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "▸"; font-size: 9px; color: var(--text-3); }
+  details[open] summary::before { content: "▾"; }
+  details table { margin-top: 10px; }
+
+  .day-strip { display: flex; flex-direction: column; gap: 7px; }
+  .ds-row { display: grid; grid-template-columns: 34px 1fr 112px; gap: 10px; align-items: center; }
+  .ds-row .d { font-size: 11px; color: var(--text-2); }
+  .ds-bars { display: flex; flex-direction: column; gap: 2px; }
+  .ds-bar { height: 6px; border-radius: 3px; }
+  .ds-bar.cur { background: var(--accent); }
+  .ds-bar.prev { background: #ddd5b4; }
+  .ds-row .v { font-size: 10.5px; color: var(--text-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .filmstrip { display: flex; gap: 3px; margin: 2px 0 8px; }
+  .film {
+    flex: 1; height: 34px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-variant-numeric: tabular-nums;
+  }
+  .film.hi { background: var(--good-soft); color: #1f6f4b; }
+  .film.mid { background: var(--accent-soft); color: var(--accent-ink); }
+  .film.lo { background: var(--bad-soft); color: #9c4038; }
+
+  .stack { display: flex; height: 26px; border-radius: 6px; overflow: hidden; gap: 2px; }
+  .stack div { display: flex; align-items: center; justify-content: center; font-size: 9.5px; color: #4a3d14; }
+  .stack-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 10.5px; color: var(--text-2); }
+  .stack-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+
+  /* ---------- variant C: matrix ---------- */
+  .strip {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--card); overflow: hidden; margin-bottom: 20px;
+  }
+  .strip-cell { padding: 12px 14px; border-right: 1px solid var(--border-soft); }
+  .strip-cell:last-child { border-right: 0; }
+  .strip-cell .k { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+  .strip-cell .v { font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin-top: 3px; }
+  .strip-cell .v small { font-size: 11px; font-weight: 400; color: var(--text-2); margin-left: 3px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    text-align: right; font-weight: 500; font-size: 10px; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--text-3);
+    padding: 0 8px 6px; border-bottom: 1px solid var(--border);
+  }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 5px 8px; border-bottom: 1px solid var(--border-soft); text-align: right; }
+  tr:last-child td { border-bottom: 0; }
+  tr.now td { background: #fffdf2; font-weight: 500; }
+  td.dim, th.dim { color: var(--text-3); }
+  td.pos { color: var(--good); }
+  td.neg { color: var(--bad); }
+  .tbl-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px; }
+  .tbl-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .tbl-head h3 { margin: 0; font-size: 12px; font-weight: 600; }
+  .tbl-head .hint { color: var(--text-3); font-size: 11px; }
+
+  .goal-grid { display: grid; grid-template-columns: 46px repeat(7, 1fr) 62px 52px; gap: 4px; align-items: center; }
+  .goal-grid .hd { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); text-align: center; }
+  .goal-grid .hd.l { text-align: left; }
+  .goal-grid .wl { font-size: 10px; color: var(--text-3); }
+  .cell {
+    height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-variant-numeric: tabular-nums;
+  }
+  .cell.met { background: var(--good); color: #fff; }
+  .cell.miss { background: var(--bad-soft); color: #9c4038; }
+  .cell.off { background: transparent; color: var(--text-3); border: 1px dashed var(--border); }
+  .cell.future { background: #faf7ea; }
+  .cell.today { background: #fff; border: 1.5px solid var(--accent); color: var(--accent-ink); }
+  .cell.none { background: #faf7ea; color: var(--text-3); }
+  .goal-grid .pct { font-size: 11px; text-align: right; color: var(--text-2); }
+  .goal-grid .frac { font-size: 10.5px; text-align: right; color: var(--text-3); }
+
+  /* ---------- switcher ---------- */
+  .switcher {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 4px;
+    background: #241f13; color: #f7f1dd;
+    border-radius: 999px; padding: 5px 6px;
+    box-shadow: 0 8px 26px rgba(40, 32, 8, .28), 0 1px 0 rgba(255,255,255,.08) inset;
+    z-index: 50; font-size: 12px;
+  }
+  .switcher button {
+    border: 0; background: transparent; color: #f7f1dd;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 14px; cursor: pointer; line-height: 1;
+  }
+  .switcher button:hover { background: rgba(255,255,255,.12); }
+  .switcher .label { padding: 0 6px; min-width: 190px; text-align: center; }
+  .switcher .label b { color: #f0c766; font-weight: 600; }
+  .switcher .label span { opacity: .75; }
+</style>
+</head>
+<body>
+
+<div class="proto-strip">
+  <b>Prototype</b>
+  <span>throwaway · mock data · question: where do these three insights live, and how much should each say?</span>
+</div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="canvas" id="canvas"></div>
+  </main>
+</div>
+
+<div class="switcher">
+  <button id="prev" title="Previous variant (←)">‹</button>
+  <div class="label" id="label"></div>
+  <button id="next" title="Next variant (→)">›</button>
+</div>
+
+<script>
+/* ============================================================
+   Scenario
+   ============================================================ */
+const CFG = {
+  today: new Date(2026, 10, 5),   // Thu 5 Nov 2026
+  nowMin: 16 * 60 + 15,           // 16:15, late afternoon
+  dailyGoalMin: 8 * 60,
+  weeklyGoalMin: 40 * 60,
+  workingWeekdays: [1, 2, 3, 4, 5],
+  daysOff: new Set(['2026-09-18', '2026-10-12']),
+};
+const NOW_LABEL = '16:15';
+const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const TODAY_NAME = DOW[(CFG.today.getDay() + 6) % 7];
+const TAGS = ['Development', 'Development', 'Development', 'Design', 'Meetings', 'Admin'];
+
+/* ============================================================
+   Dates
+   ============================================================ */
+const DAY = 86400000;
+const keyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const mondayOf = d => addDays(d, -((d.getDay() + 6) % 7));
+const sameDay = (a, b) => keyOf(a) === keyOf(b);
+const shortDate = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const longDate = d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+/* ============================================================
+   Mock sprints — shaped like the real Sprint model:
+   net work (minutes), paused minutes, pause count, tag.
+   ============================================================ */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261105);
+
+const TODAY_SPRINTS = [
+  { start: 9 * 60 + 5,   net: 50, paused: 0,  pauseCount: 0, tag: 'Development' },
+  { start: 10 * 60 + 10, net: 48, paused: 7,  pauseCount: 1, tag: 'Development' },
+  { start: 11 * 60 + 20, net: 42, paused: 0,  pauseCount: 0, tag: 'Design' },
+  { start: 12 * 60 + 15, net: 55, paused: 12, pauseCount: 2, tag: 'Meetings' },
+  { start: 13 * 60 + 45, net: 35, paused: 5,  pauseCount: 1, tag: 'Development' },
+  { start: 14 * 60 + 40, net: 52, paused: 9,  pauseCount: 1, tag: 'Development' },
+  { start: 15 * 60 + 30, net: 38, paused: 0,  pauseCount: 0, tag: 'Admin' },
+];
+
+// Two hand-set weeks so the demo tells one clear story:
+// this week is slightly ahead at the same point, but behind on whole days.
+const STORY = {
+  '2026-11-02': 8 * 60 + 25,
+  '2026-11-03': 7 * 60 + 5,
+  '2026-11-04': 8 * 60 + 40,
+  '2026-10-26': 8 * 60 + 5,
+  '2026-10-27': 7 * 60 + 25,
+  '2026-10-28': 8 * 60 + 15,
+  '2026-10-29': 8 * 60 + 10,
+};
+
+const DATA = {};
+const RANGE_START = addDays(mondayOf(CFG.today), -12 * 7);
+
+(function generate() {
+  let weekIndex = 0;
+  for (let d = RANGE_START; d <= CFG.today; d = addDays(d, 1)) {
+    weekIndex = Math.floor((d - RANGE_START) / (7 * DAY));
+    DATA[keyOf(d)] = daySprints(d, weekIndex);
+  }
+})();
+
+function daySprints(d, weekIndex) {
+  if (sameDay(d, CFG.today)) return TODAY_SPRINTS.slice();
+  const key = keyOf(d);
+  const dow = d.getDay();
+  const scheduled = CFG.workingWeekdays.includes(dow) && !CFG.daysOff.has(key);
+
+  if (!scheduled) {
+    if (rand() < 0.16) {
+      return [{ start: 10 * 60 + Math.round(rand() * 180), net: 35 + Math.round(rand() * 50), paused: 0, pauseCount: 0, tag: 'Admin' }];
+    }
+    return [];
+  }
+
+  // A believable mix: about half the scheduled days clear the 8h goal.
+  const roll = rand();
+  let target;
+  if (roll < 0.55) target = (8.0 + rand() * 1.2) * 60;        // goal met
+  else if (roll < 0.88) target = (6.0 + rand() * 1.9) * 60;   // short of goal
+  else if (roll < 0.96) target = (3.0 + rand() * 2.5) * 60;   // half day
+  else target = (0.5 + rand() * 1.5) * 60;                    // barely started
+
+  if (STORY[key] != null) {
+    target = STORY[key];
+  } else {
+    // recent weeks run slightly lighter — gives the comparison something to say
+    target *= 1 - weekIndex * 0.008;
+  }
+
+  const sprints = [];
+  let clock = 8 * 60 + 40 + Math.round(rand() * 30);
+  let remaining = target;
+  let guard = 0;
+
+  while (remaining > 9 && guard++ < 20 && clock < 21 * 60) {
+    const r = rand();
+    let net;
+    if (r < 0.12) net = 6 + rand() * 9;          // quick check
+    else if (r < 0.55) net = 25 + rand() * 35;
+    else if (r < 0.90) net = 45 + rand() * 25;
+    else net = 70 + rand() * 35;
+
+    net = Math.round(Math.min(net, remaining));
+    if (net < 6) break;
+
+    const pauseCount = rand() < 0.40 ? 0 : 1 + Math.floor(rand() * 3);
+    const paused = pauseCount ? Math.round(Math.min(net * 0.3, 3 + rand() * 14)) : 0;
+    sprints.push({ start: clock, net, paused, pauseCount, tag: TAGS[Math.floor(rand() * TAGS.length)] });
+    clock += net + paused + 5 + Math.round(rand() * 16);
+    remaining -= net;
+  }
+  return sprints;
+}
+
+/* ============================================================
+   Compute
+   ============================================================ */
+const sprintsOn = d => DATA[keyOf(d)] || [];
+const netOf = d => sprintsOn(d).reduce((a, s) => a + s.net, 0);
+const isScheduled = d => CFG.workingWeekdays.includes(d.getDay()) && !CFG.daysOff.has(keyOf(d));
+
+// Net work recorded before a clock time. Prorates a sprint that straddles the cut.
+function netBefore(d, capMin) {
+  if (capMin == null) return netOf(d);
+  let total = 0;
+  for (const s of sprintsOn(d)) {
+    const gross = s.net + s.paused;
+    const end = s.start + gross;
+    if (s.start >= capMin) continue;
+    if (end <= capMin) { total += s.net; continue; }
+    total += s.net * ((capMin - s.start) / gross);
+  }
+  return total;
+}
+
+// ---- 1. same part of each week ----
+function buildComparison(mode) {
+  const ws = mondayOf(CFG.today);
+  const idx = (CFG.today.getDay() + 6) % 7;   // Thu -> 3
+  const rows = [];
+
+  for (let i = 0; i < 7; i++) {
+    const cur = addDays(ws, i);
+    const prev = addDays(ws, i - 7);
+    const future = cur > CFG.today;
+    const isToday = i === idx;
+
+    // "Cut" mode: last week's matching weekday stops at the same clock time.
+    const prevCap = (mode === 'cut' && i === idx) ? CFG.nowMin : null;
+    const curCap = (mode === 'cut' && i === idx) ? CFG.nowMin : null;
+
+    rows.push({
+      label: DOW[i],
+      date: cur,
+      cur: future ? 0 : netBefore(cur, curCap),
+      prev: netBefore(prev, prevCap),
+      isToday,
+      future,
+      scheduled: isScheduled(cur),
+    });
+  }
+
+  const span = rows.slice(0, idx + 1);
+  const curTotal = span.reduce((a, r) => a + r.cur, 0);
+  const prevTotal = span.reduce((a, r) => a + r.prev, 0);
+  const max = Math.max(...rows.map(r => Math.max(r.cur, r.prev)), 60);
+
+  return { rows, idx, curTotal, prevTotal, delta: curTotal - prevTotal, max, mode };
+}
+
+// ---- 2. goal consistency ----
+function buildConsistency() {
+  const ws = mondayOf(CFG.today);
+  const weeks = [];
+  const all = [];
+
+  for (let w = 12; w >= 0; w--) {
+    const start = addDays(ws, -w * 7);
+    let met = 0, sched = 0, lowMisses = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(start, i);
+      if (d >= CFG.today) continue;          // today is still in progress
+      if (!isScheduled(d)) continue;
+      sched++;
+      const net = netOf(d);
+      const hit = net >= CFG.dailyGoalMin;
+      if (hit) met++; else if (net < 120) lowMisses++;
+      all.push({ date: d, net, hit });
+    }
+    if (sched > 0) weeks.push({ start, met, sched, pct: met / sched, lowMisses });
+  }
+
+  const met = weeks.reduce((a, w) => a + w.met, 0);
+  const sched = weeks.reduce((a, w) => a + w.sched, 0);
+  const lowMisses = weeks.reduce((a, w) => a + w.lowMisses, 0);
+
+  // current streak: walk back from yesterday over scheduled days
+  let streak = 0;
+  for (let d = addDays(CFG.today, -1); d >= RANGE_START; d = addDays(d, -1)) {
+    if (!isScheduled(d)) continue;
+    if (netOf(d) >= CFG.dailyGoalMin) streak++; else break;
+  }
+
+  // best streak
+  let best = 0, run = 0;
+  for (const day of all) {
+    if (day.hit) { run++; best = Math.max(best, run); } else run = 0;
+  }
+
+  return { weeks, met, sched, pct: sched ? met / sched : 0, lowMisses, streak, best, all };
+}
+
+// ---- 3. sprint patterns ----
+function buildSprints() {
+  const all = [];
+  for (const list of Object.values(DATA)) for (const s of list) all.push(s);
+  const nets = all.map(s => s.net).sort((a, b) => a - b);
+  const sum = nets.reduce((a, b) => a + b, 0);
+  const median = nets.length ? (nets.length % 2 ? nets[(nets.length - 1) / 2] : (nets[nets.length / 2 - 1] + nets[nets.length / 2]) / 2) : 0;
+  const mean = nets.length ? sum / nets.length : 0;
+
+  const bucketDefs = [
+    { label: '<15m',   test: n => n < 15 },
+    { label: '15–30m', test: n => n >= 15 && n < 30 },
+    { label: '30–45m', test: n => n >= 30 && n < 45 },
+    { label: '45–60m', test: n => n >= 45 && n < 60 },
+    { label: '1–1.5h', test: n => n >= 60 && n < 90 },
+    { label: '1.5h+',  test: n => n >= 90 },
+  ];
+  const buckets = bucketDefs.map(b => {
+    const items = all.filter(s => b.test(s.net));
+    return { label: b.label, count: items.length, share: all.length ? items.length / all.length : 0, total: items.reduce((a, s) => a + s.net, 0) };
+  });
+
+  const withPause = all.filter(s => s.pauseCount > 0);
+  const pausedTotal = all.reduce((a, s) => a + s.paused, 0);
+  const longest = all.reduce((a, s) => Math.max(a, s.net), 0);
+
+  return {
+    count: all.length, median, mean, buckets,
+    pauseShare: all.length ? withPause.length / all.length : 0,
+    avgPaused: all.length ? pausedTotal / all.length : 0,
+    avgPauseCount: all.length ? all.reduce((a, s) => a + s.pauseCount, 0) / all.length : 0,
+    longest, totalNet: sum,
+  };
+}
+
+/* ============================================================
+   Format
+   ============================================================ */
+const hm = min => {
+  const m = Math.round(min);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h}h ${String(r).padStart(2, '0')}m` : `${h}h`;
+};
+const signed = min => (min < 0 ? '−' : '+') + hm(Math.abs(min));
+const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
+const hours1 = min => (min / 60).toFixed(1);
+const missText = n => (n === 1
+  ? 'One miss had under 2h recorded.'
+  : `${n} misses had under 2h recorded.`);
+
+/* ============================================================
+   Shell
+   ============================================================ */
+const VARIANTS = {
+  A: { name: 'Cards in place', page: 'Week', note: 'Each insight drops into the page it belongs to, in the shape the app already uses. Numbers first, detail underneath.' },
+  B: { name: 'One review flow', page: 'Insights', note: 'All three become one readable review. A sentence answers the question; the table is one click away.' },
+  C: { name: 'Dense matrix', page: 'Analytics', note: 'Density over prose. Aligned rows and a goal grid, so you can scan weeks and spot the odd day.' },
+  D: { name: 'Final mix', page: 'Week', note: 'B’s narrative for the week comparison, C’s goal grid for consistency, A’s card for sprint patterns.' },
+};
+
+function renderSidebar(variant) {
+  const items = [
+    { label: 'Today', ico: '◷' },
+    { label: 'Week', ico: '▦' },
+    { label: 'Month', ico: '▤' },
+    { label: 'Analytics', ico: '◔' },
+    { label: 'Settings', ico: '⚙' },
+  ];
+  const active = activePage(variant);
+  const extra = variant === 'B' ? `<div class="nav-item ${active === 'Insights' ? 'active' : ''}"><span class="ico">✳</span>Insights<span class="proto-dot">proto</span></div>` : '';
+  document.getElementById('sidebar').innerHTML = `
+    <div class="brand"><span class="dot"></span>Skeval</div>
+    ${items.map(i => `<div class="nav-item ${i.label === active ? 'active' : ''}"><span class="ico">${i.ico}</span>${i.label}</div>`).join('')}
+    ${extra}
+    <div class="sidebar-foot">Mock data · 13 weeks<br>Goal 8h/day · Mon–Fri</div>`;
+}
+
+function renderTopbar(variant) {
+  const page = activePage(variant);
+  const tabs = variant === 'D' ? `<div class="tabs">
+      <button class="${state.page === 'week' ? 'on' : ''}" data-page="week">Week</button>
+      <button class="${state.page === 'analytics' ? 'on' : ''}" data-page="analytics">Analytics</button>
+    </div>` : '';
+  document.getElementById('topbar').innerHTML = `
+    <h1>${page}</h1>
+    ${tabs}
+    <span class="range">${longDate(CFG.today)} · ${NOW_LABEL}</span>
+    <span class="chip">Prototype data</span>`;
+}
+
+/* ============================================================
+   Shared card pieces
+   ============================================================ */
+function sprintCardHTML(s) {
+  const dist = s.buckets.map(b => `
+    <div class="lbl">${b.label}</div>
+    <div class="track"><div class="fill" style="width:${Math.max(1, b.share * 100)}%"></div></div>
+    <div class="cnt">${b.count}</div>`).join('');
+
+  return `<div class="card">
+    <div class="card-head">
+      <div>
+        <h3>Sprint patterns</h3>
+        <p class="sub">${s.count} completed sprints · last 13 weeks</p>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="v">${hm(s.median)}</div><div class="k">median net sprint</div></div>
+      <div class="stat small"><div class="v">${hm(s.mean)}</div><div class="k">mean</div></div>
+      <div class="stat small"><div class="v">${hm(s.longest)}</div><div class="k">longest</div></div>
+    </div>
+    <div class="dist">${dist}</div>
+    <div class="pill-row">
+      <span class="pill"><b>${pct(s.pauseShare)}</b> had a pause</span>
+      <span class="pill">avg <b>${hm(s.avgPaused)}</b> paused</span>
+      <span class="pill"><b>${s.avgPauseCount.toFixed(1)}</b> pauses per sprint</span>
+    </div>
+    <p class="foot">A long sprint is not proof of uninterrupted work. Paused time is stored per sprint, not per hour.</p>
+  </div>`;
+}
+
+function goalGridHTML(g) {
+  const cells = [];
+  g.weeks.forEach(w => {
+    const weekCells = DOW.map((_, i) => {
+      const d = addDays(w.start, i);
+      if (sameDay(d, CFG.today)) return `<div class="cell today">·</div>`;
+      if (d > CFG.today) return `<div class="cell future"></div>`;
+      if (!isScheduled(d)) return `<div class="cell off">—</div>`;
+      const net = netOf(d);
+      if (net === 0) return `<div class="cell none" title="${keyOf(d)} · no work">0</div>`;
+      return net >= CFG.dailyGoalMin
+        ? `<div class="cell met" title="${keyOf(d)} · ${hm(net)}">✓</div>`
+        : `<div class="cell miss" title="${keyOf(d)} · ${hm(net)}">${hours1(net)}</div>`;
+    }).join('');
+    cells.push(`<div class="wl">${shortDate(w.start)}</div>${weekCells}
+      <div class="frac">${w.met}/${w.sched}</div>
+      <div class="pct">${pct(w.pct)}</div>`);
+  });
+
+  return `<div class="tbl-wrap">
+    <div class="tbl-head">
+      <h3>Daily goal, 13 weeks</h3>
+      <span class="hint">✓ met · numbers = recorded hours below 8h · 0 = nothing recorded · — day off</span>
+    </div>
+    <div class="goal-grid">
+      <div></div>
+      ${DOW.map(d => `<div class="hd">${d}</div>`).join('')}
+      <div class="hd">Met</div><div class="hd">Rate</div>
+      ${cells.join('')}
+    </div>
+    <p class="foot">Today is in progress and does not count in the rate. Future days and days off do not count. This sample applies an 8h goal to all past days.</p>
+  </div>`;
+}
+
+/* ============================================================
+   Variant A — cards in place
+   ============================================================ */
+function renderA() {
+  const c = buildComparison(state.mode);
+  const g = buildConsistency();
+  const s = buildSprints();
+  const ahead = c.delta >= 0;
+
+  const pairs = c.rows.map(r => `
+    <div class="pair ${r.future ? 'future' : ''}">
+      <div class="bars">
+        <div class="bar prev" style="height:${Math.max(2, Math.round(r.prev / c.max * 122))}px" title="Last week ${hm(r.prev)}"></div>
+        <div class="bar cur" style="height:${Math.max(2, Math.round(r.cur / c.max * 122))}px" title="This week ${hm(r.cur)}"></div>
+      </div>
+      <div class="pair-label">${r.label}${r.isToday ? ' ·' : ''}</div>
+      <div class="pair-val">${r.future ? '' : hours1(r.cur) + 'h'}</div>
+    </div>`).join('');
+
+  const weekBars = g.weeks.map((w, i) => {
+    const lbl = i % 3 === 0 || i === g.weeks.length - 1 ? shortDate(w.start) : '';
+    const slots = [
+      ...Array.from({ length: w.met }, () => '<div class="slot met"></div>'),
+      ...Array.from({ length: w.sched - w.met }, () => '<div class="slot miss"></div>'),
+    ].join('');
+    return `<div class="wk" title="Week of ${shortDate(w.start)}: ${w.met} of ${w.sched} scheduled days met the goal">
+      <div class="count">${w.met}/${w.sched}</div>
+      <div class="track">${slots}</div>
+      <div class="lbl">${lbl}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="proto-note"><b>A — Cards in place.</b> ${VARIANTS.A.note}</div>
+
+  <div class="block">
+    <div class="placement">Week page · <b>below the weekly goal bar</b></div>
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Same point last week</h3>
+          <p class="sub">Mon ${shortDate(addDays(mondayOf(CFG.today), 0))} – Thu ${shortDate(CFG.today)} vs Mon ${shortDate(addDays(mondayOf(CFG.today), -7))} – Thu ${shortDate(addDays(CFG.today, -7))}</p>
+        </div>
+        <div class="spacer"></div>
+        <div class="seg">
+          <button class="${state.mode === 'days' ? 'on' : ''}" data-mode="days">Full days</button>
+          <button class="${state.mode === 'cut' ? 'on' : ''}" data-mode="cut">Cut at ${NOW_LABEL}</button>
+        </div>
+      </div>
+
+      <div class="delta-row">
+        <div class="delta ${ahead ? 'good' : 'bad'}">${signed(c.delta)}</div>
+        <div class="delta-note">${ahead ? 'ahead of' : 'behind'} last week · ${hm(c.curTotal)} this week vs ${hm(c.prevTotal)} last week</div>
+      </div>
+
+      <div class="pairs">${pairs}</div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>This week</span><span><i style="background:#ddd5b4"></i>Last week</span></div>
+
+      <p class="foot">${state.mode === 'cut'
+        ? `Last week’s ${TODAY_NAME} is cut at ${NOW_LABEL} so it matches today so far. Earlier days are full in both weeks.`
+        : `Today is only partly done, so this week is compared against a full last week. Switch to “Cut at ${NOW_LABEL}” for a fairer read.`}</p>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="block">
+      <div class="placement">Analytics · <b>new card, above the trend chart</b></div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Goal consistency</h3>
+            <p class="sub">Last 13 weeks · scheduled days only</p>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="v">${pct(g.pct)}</div><div class="k">${g.met} of ${g.sched} scheduled days</div></div>
+          <div class="stat small"><div class="v">${g.streak}</div><div class="k">current streak</div></div>
+          <div class="stat small"><div class="v">${g.best}</div><div class="k">best streak</div></div>
+        </div>
+        <div class="weeks">${weekBars}</div>
+        <div class="legend"><span><i style="background:var(--good)"></i>day met the goal</span><span><i style="background:#efc9c1"></i>day missed</span></div>
+        <p class="foot">Days off and non-working weekdays are excluded. Today is excluded until it ends. ${missText(g.lowMisses)}</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="placement">Analytics · <b>new card, below goal consistency</b></div>
+      ${sprintCardHTML(s)}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   Variant B — one review flow
+   ============================================================ */
+function renderB() {
+  const c = buildComparison(state.mode);
+  const g = buildConsistency();
+  const s = buildSprints();
+  const ahead = c.delta >= 0;
+  const maxDay = Math.max(...c.rows.map(r => Math.max(r.cur, r.prev)), 60);
+
+  const dayStrip = c.rows.filter(r => !r.future).map(r => `
+    <div class="ds-row">
+      <div class="d">${r.label}${r.isToday ? ' ·' : ''}</div>
+      <div class="ds-bars">
+        <div class="ds-bar cur" style="width:${Math.max(1, r.cur / maxDay * 100)}%"></div>
+        <div class="ds-bar prev" style="width:${Math.max(1, r.prev / maxDay * 100)}%"></div>
+      </div>
+      <div class="v">${hm(r.cur)} / ${hm(r.prev)}</div>
+    </div>`).join('');
+
+  const film = g.weeks.map(w => {
+    const cls = w.pct >= 0.8 ? 'hi' : w.pct < 0.5 ? 'lo' : 'mid';
+    return `<div class="film ${cls}" title="Week of ${shortDate(w.start)}: ${w.met}/${w.sched}">${w.met}/${w.sched}</div>`;
+  }).join('');
+
+  const stackColors = ['#e0b34d', '#d8a63a', '#c99a34', '#b98c2e', '#a67d28', '#8f6a22'];
+  const stack = s.buckets.map((b, i) => b.share > 0
+    ? `<div style="flex:${b.share};background:${stackColors[i]}">${b.share >= 0.12 ? pct(b.share) : ''}</div>`
+    : '').join('');
+  const stackLegend = s.buckets.map((b, i) => `<span><i style="background:${stackColors[i]}"></i>${b.label} · ${b.count}</span>`).join('');
+
+  const cmpRows = c.rows.slice(0, c.idx + 1).map(r => `
+    <tr><td>${r.label} ${shortDate(r.date)}</td><td class="n">${hm(r.cur)}</td><td class="n">${hm(r.prev)}</td>
+    <td class="n ${r.cur - r.prev >= 0 ? 'pos' : 'neg'}">${signed(r.cur - r.prev)}</td></tr>`).join('');
+
+  const goalRows = g.weeks.map(w => `
+    <tr><td>Week of ${shortDate(w.start)}</td><td class="n">${w.met}</td><td class="n">${w.sched}</td><td class="n">${pct(w.pct)}</td></tr>`).join('');
+
+  const sprintRows = s.buckets.map(b => `
+    <tr><td>${b.label}</td><td class="n">${b.count}</td><td class="n">${pct(b.share)}</td><td class="n">${hm(b.total)}</td></tr>`).join('');
+
+  return `
+  <div class="proto-note"><b>B — One review flow.</b> ${VARIANTS.B.note}</div>
+
+  <div class="review">
+    <section>
+      <div class="eyebrow">Week · same point last week</div>
+      <p class="lede">You’ve worked <b>${hm(c.curTotal)}</b> since Monday. At the same point last week you had <b>${hm(c.prevTotal)}</b> — you’re <b class="${ahead ? 'up' : 'down'}">${hm(Math.abs(c.delta))} ${ahead ? 'ahead' : 'behind'}</b>.</p>
+      <p class="aside">Thursday is still open. ${state.mode === 'cut'
+        ? `Last week’s ${TODAY_NAME} is cut at ${NOW_LABEL} so the two match.`
+        : `Last week’s ${TODAY_NAME} is counted in full, so part of that gap is just the day being unfinished.`}
+        <button data-mode="${state.mode === 'cut' ? 'days' : 'cut'}">${state.mode === 'cut' ? 'Compare whole days instead' : `Cut last week at ${NOW_LABEL}`}</button>
+      </p>
+      ${state.mode === 'cut' ? '<p class="foot">Estimate. Paused time is spread evenly within any sprint that crosses 16:15. Exact pause times are not available.</p>' : ''}
+      <div class="day-strip">${dayStrip}</div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>This week</span><span><i style="background:#ddd5b4"></i>Last week</span></div>
+      <details>
+        <summary>Show the numbers</summary>
+        <table>
+          <thead><tr><th>Day</th><th class="n">This week</th><th class="n">Last week</th><th class="n">Change</th></tr></thead>
+          <tbody>${cmpRows}</tbody>
+        </table>
+      </details>
+    </section>
+
+    <section>
+      <div class="eyebrow">Analytics · goal consistency</div>
+      <p class="lede">You hit your 8h goal on <b>${g.met} of ${g.sched}</b> scheduled days — <b>${pct(g.pct)}</b>. ${missText(g.lowMisses)}</p>
+      <p class="aside">Current streak ${g.streak} scheduled ${g.streak === 1 ? 'day' : 'days'} · best ${g.best}. Days off are not counted against you, and today isn’t judged until it ends.</p>
+      <div class="filmstrip">${film}</div>
+      <div class="legend"><span><i style="background:var(--good)"></i>80%+</span><span><i style="background:var(--accent)"></i>50–79%</span><span><i style="background:#e3b7ae"></i>under 50%</span></div>
+      <details>
+        <summary>Show the numbers</summary>
+        <table>
+          <thead><tr><th>Week</th><th class="n">Met</th><th class="n">Scheduled</th><th class="n">Rate</th></tr></thead>
+          <tbody>${goalRows}</tbody>
+        </table>
+      </details>
+    </section>
+
+    <section>
+      <div class="eyebrow">Analytics · sprint patterns</div>
+      <p class="lede">Your typical sprint is <b>${hm(s.median)}</b>. <b>${pct(s.pauseShare)}</b> of sprints include a pause, and the longest was <b>${hm(s.longest)}</b>.</p>
+      <p class="aside">${s.count} sprints over 13 weeks. Paused time averages ${hm(s.avgPaused)} per sprint.</p>
+      <div class="stack">${stack}</div>
+      <div class="stack-legend">${stackLegend}</div>
+      <details>
+        <summary>Show the numbers</summary>
+        <table>
+          <thead><tr><th>Length</th><th class="n">Sprints</th><th class="n">Share</th><th class="n">Total</th></tr></thead>
+          <tbody>${sprintRows}</tbody>
+        </table>
+      </details>
+    </section>
+  </div>`;
+}
+
+/* ============================================================
+   Variant C — dense matrix
+   ============================================================ */
+function renderC() {
+  const c = buildComparison(state.mode);
+  const g = buildConsistency();
+  const s = buildSprints();
+  const ahead = c.delta >= 0;
+  const ws = mondayOf(CFG.today);
+
+  // --- week x day matrix, last 6 weeks ---
+  const matrixRows = [];
+  let anyOff = false;
+  for (let w = 5; w >= 0; w--) {
+    const start = addDays(ws, -w * 7);
+    const isNow = w === 0;
+    const cells = DOW.map((_, i) => {
+      const d = addDays(start, i);
+      if (d > CFG.today) return `<td class="dim">·</td>`;
+      if (!isScheduled(d)) return `<td class="dim">—</td>`;
+      const net = netOf(d);
+      if (sameDay(d, CFG.today)) return `<td>${hours1(net)}</td>`;
+      return `<td class="${net >= CFG.dailyGoalMin ? 'pos' : ''}">${hours1(net)}</td>`;
+    }).join('');
+
+    const idx = isNow ? (CFG.today.getDay() + 6) % 7 : 6;
+    const spanTotal = Array.from({ length: idx + 1 }, (_, i) => {
+      const d = addDays(start, i);
+      return d > CFG.today ? 0 : netOf(d);
+    }).reduce((a, b) => a + b, 0);
+
+    const prevStart = addDays(start, -7);
+    const prevTotal = Array.from({ length: idx + 1 }, (_, i) => netOf(addDays(prevStart, i))).reduce((a, b) => a + b, 0);
+    const delta = spanTotal - prevTotal;
+
+    // A day off in either compared week makes the change less meaningful.
+    const hasOff = Array.from({ length: idx + 1 }, (_, i) => i)
+      .some(i => CFG.daysOff.has(keyOf(addDays(start, i))) || CFG.daysOff.has(keyOf(addDays(prevStart, i))));
+    if (hasOff) anyOff = true;
+
+    matrixRows.push(`<tr class="${isNow ? 'now' : ''}">
+      <td>${shortDate(start)}${isNow ? ' · now' : ''}${hasOff ? ' †' : ''}</td>
+      ${cells}
+      <td class="n">${hm(spanTotal)}</td>
+      <td class="n ${delta >= 0 ? 'pos' : 'neg'}">${signed(delta)}</td>
+    </tr>`);
+  }
+
+  // --- goal grid: 13 weeks x 7 days ---
+  const sprintRows = s.buckets.map(b => `
+    <tr>
+      <td>${b.label}</td>
+      <td class="n">${b.count}</td>
+      <td class="n">${pct(b.share)}</td>
+      <td class="n">${hm(b.total)}</td>
+      <td class="n dim">${b.count ? hm(b.total / b.count) : '—'}</td>
+    </tr>`).join('');
+
+  return `
+  <div class="proto-note"><b>C — Dense matrix.</b> ${VARIANTS.C.note}</div>
+
+  <div class="strip">
+    <div class="strip-cell"><div class="k">Mon–Thu</div><div class="v">${hm(c.curTotal)}<small>vs ${hm(c.prevTotal)}</small></div></div>
+    <div class="strip-cell"><div class="k">Change</div><div class="v" style="color:${ahead ? 'var(--good)' : 'var(--bad)'}">${signed(c.delta)}</div></div>
+    <div class="strip-cell"><div class="k">Goal rate</div><div class="v">${pct(g.pct)}<small>${g.met}/${g.sched}</small></div></div>
+    <div class="strip-cell"><div class="k">Median sprint</div><div class="v">${hm(s.median)}<small>mean ${hm(s.mean)}</small></div></div>
+    <div class="strip-cell"><div class="k">Paused sprints</div><div class="v">${pct(s.pauseShare)}<small>${hm(s.avgPaused)} each</small></div></div>
+    <div class="strip-cell"><div class="k">Longest</div><div class="v">${hm(s.longest)}<small>${s.count} sprints</small></div></div>
+  </div>
+
+  <div class="tbl-wrap">
+    <div class="tbl-head">
+      <h3>Hours by day, last 6 weeks</h3>
+      <span class="hint">green = daily goal met · — day off · · future</span>
+      <div class="spacer" style="margin-left:auto"></div>
+      <div class="seg">
+        <button class="${state.mode === 'days' ? 'on' : ''}" data-mode="days">Full days</button>
+        <button class="${state.mode === 'cut' ? 'on' : ''}" data-mode="cut">Cut at ${NOW_LABEL}</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Week</th>${DOW.map(d => `<th class="n">${d}</th>`).join('')}<th class="n">Mon–today</th><th class="n">Δ prior</th></tr></thead>
+      <tbody>${matrixRows.join('')}</tbody>
+    </table>
+    ${anyOff ? '<p class="foot">† A day off falls inside one of the compared weeks, so that change is not like-for-like.</p>' : ''}
+  </div>
+
+  ${goalGridHTML(g)}
+
+  <div class="tbl-wrap">
+    <div class="tbl-head">
+      <h3>Sprint length distribution</h3>
+      <span class="hint">${s.count} completed sprints · ${pct(s.pauseShare)} include a pause · ${s.avgPauseCount.toFixed(1)} pauses each</span>
+    </div>
+    <table>
+      <thead><tr><th>Length</th><th class="n">Sprints</th><th class="n">Share</th><th class="n">Total</th><th class="n">Average</th></tr></thead>
+      <tbody>${sprintRows}</tbody>
+    </table>
+  </div>`;
+}
+
+/* ============================================================
+   Variant D — the chosen mix
+   ============================================================ */
+function renderD() {
+  return state.page === 'week' ? renderDWeek() : renderDAnalytics();
+}
+
+function renderDWeek() {
+  const c = buildComparison(state.mode);
+  const ahead = c.delta >= 0;
+  const maxDay = Math.max(...c.rows.map(r => Math.max(r.cur, r.prev)), 60);
+
+  const dayStrip = c.rows.filter(r => !r.future).map(r => `
+    <div class="ds-row">
+      <div class="d">${r.label}${r.isToday ? ' ·' : ''}</div>
+      <div class="ds-bars">
+        <div class="ds-bar cur" style="width:${Math.max(1, r.cur / maxDay * 100)}%"></div>
+        <div class="ds-bar prev" style="width:${Math.max(1, r.prev / maxDay * 100)}%"></div>
+      </div>
+      <div class="v">${hm(r.cur)} / ${hm(r.prev)}</div>
+    </div>`).join('');
+
+  const cmpRows = c.rows.slice(0, c.idx + 1).map(r => `
+    <tr><td>${r.label} ${shortDate(r.date)}</td><td class="n">${hm(r.cur)}</td><td class="n">${hm(r.prev)}</td>
+    <td class="n ${r.cur - r.prev >= 0 ? 'pos' : 'neg'}">${signed(r.cur - r.prev)}</td></tr>`).join('');
+
+  return `
+  <div class="proto-note"><b>D — Final mix.</b> ${VARIANTS.D.note}</div>
+
+  <div class="block">
+    <div class="placement">Week page · <b>under the weekly goal bar</b></div>
+    <div class="card narrative-card">
+      <div class="eyebrow">Same point last week</div>
+      <p class="lede">You’ve worked <b>${hm(c.curTotal)}</b> since Monday. At the same point last week you had <b>${hm(c.prevTotal)}</b> — you’re <b class="${ahead ? 'up' : 'down'}">${hm(Math.abs(c.delta))} ${ahead ? 'ahead' : 'behind'}</b>.</p>
+      <p class="aside">${TODAY_NAME} is still open. ${state.mode === 'cut'
+        ? `Last week’s ${TODAY_NAME} is cut at ${NOW_LABEL} so the two match.`
+        : `Last week’s ${TODAY_NAME} is counted in full, so part of that gap is just the day being unfinished.`}
+        <button data-mode="${state.mode === 'cut' ? 'days' : 'cut'}">${state.mode === 'cut' ? 'Compare whole days instead' : `Cut last week at ${NOW_LABEL}`}</button>
+      </p>
+      ${state.mode === 'cut' ? '<p class="foot">Estimate. Paused time is spread evenly within any sprint that crosses 16:15. Exact pause times are not available.</p>' : ''}
+      <div class="day-strip">${dayStrip}</div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>This week</span><span><i style="background:#ddd5b4"></i>Last week</span></div>
+      <details>
+        <summary>Show the numbers</summary>
+        <table>
+          <thead><tr><th>Day</th><th class="n">This week</th><th class="n">Last week</th><th class="n">Change</th></tr></thead>
+          <tbody>${cmpRows}</tbody>
+        </table>
+      </details>
+    </div>
+  </div>`;
+}
+
+function renderDAnalytics() {
+  const g = buildConsistency();
+  const s = buildSprints();
+  return `
+  <div class="proto-note"><b>D — Final mix.</b> ${VARIANTS.D.note}</div>
+
+  <div class="block">
+    <div class="placement">Analytics · <b>goal consistency, above the trend chart</b></div>
+    ${goalGridHTML(g)}
+  </div>
+
+  <div class="block">
+    <div class="placement">Analytics · <b>sprint patterns, below goal consistency</b></div>
+    ${sprintCardHTML(s)}
+  </div>`;
+}
+
+/* ============================================================
+   Switcher
+   ============================================================ */
+const state = { variant: 'D', mode: 'cut', page: 'week' };
+const ORDER = ['A', 'B', 'C', 'D'];
+
+function activePage(v) {
+  if (v !== 'D') return VARIANTS[v].page;
+  return state.page === 'week' ? 'Week' : 'Analytics';
+}
+
+function setVariant(v, push = true) {
+  state.variant = v;
+  if (push) {
+    try { history.replaceState(null, '', `?variant=${v}&page=${state.page}`); } catch (e) { /* file:// */ }
+  }
+  renderSidebar(v);
+  renderTopbar(v);
+  document.getElementById('canvas').innerHTML =
+    v === 'A' ? renderA()
+    : v === 'B' ? renderB()
+    : v === 'C' ? renderC()
+    : renderD();
+  document.getElementById('label').innerHTML =
+    `<b>${v}</b> <span>— ${VARIANTS[v].name}</span>`;
+  document.querySelector('.main').scrollTop = 0;
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  setVariant(state.variant, false);
+}
+
+function setPage(page) {
+  state.page = page;
+  try { history.replaceState(null, '', `?variant=D&page=${page}`); } catch (e) { /* file:// */ }
+  setVariant('D', false);
+}
+
+document.getElementById('prev').onclick = () => {
+  const i = ORDER.indexOf(state.variant);
+  setVariant(ORDER[(i + ORDER.length - 1) % ORDER.length]);
+};
+document.getElementById('next').onclick = () => {
+  const i = ORDER.indexOf(state.variant);
+  setVariant(ORDER[(i + 1) % ORDER.length]);
+};
+
+document.addEventListener('keydown', e => {
+  const el = document.activeElement;
+  if (el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable)) return;
+  if (e.key === 'ArrowLeft') document.getElementById('prev').click();
+  if (e.key === 'ArrowRight') document.getElementById('next').click();
+});
+
+// mode and page toggles live inside the rendered markup
+document.getElementById('canvas').addEventListener('click', e => {
+  const btn = e.target.closest('[data-mode]');
+  if (btn) setMode(btn.dataset.mode);
+});
+
+document.getElementById('topbar').addEventListener('click', e => {
+  const btn = e.target.closest('[data-page]');
+  if (btn) setPage(btn.dataset.page);
+});
+
+const params = new URLSearchParams(location.search);
+const initial = params.get('variant');
+const initialPage = params.get('page');
+if (initialPage === 'analytics' || initialPage === 'week') state.page = initialPage;
+setVariant(ORDER.includes(initial) ? initial : 'D', false);
+</script>
+</body>
+</html>

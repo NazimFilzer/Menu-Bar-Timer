@@ -35,10 +35,14 @@ struct PeriodPaceForecast: Equatable {
             liveElapsed: state.currentElapsed, calendar: calendar
         ).clockedSeconds
         let target = targetSeconds(for: period, settings: settings, scheduledWorkingDays: scheduled.count)
-        // Calendar increments preserve 23/25-hour working days across DST.
+        // Capacity = how many goal-seconds can realistically be worked across remaining working days.
+        // Per day: min(dailyGoal, actual wall-clock seconds available), so a 23-hour DST day
+        // correctly flags exceedsCapacity when the goal exceeds the physical day length.
         let capacity = remainingDates.reduce(0.0) { total, date in
-            let end = calendar.date(byAdding: .day, value: 1, to: date) ?? date
-            return total + max(0, end.timeIntervalSince(max(date, now)))
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: date) ?? date
+            let availableStart = max(date, now)
+            let wallClockAvailable = max(0, dayEnd.timeIntervalSince(availableStart))
+            return total + min(settings.dailyGoalSeconds, wallClockAvailable)
         }
         return PeriodPaceForecast(
             period: period, targetSeconds: target,

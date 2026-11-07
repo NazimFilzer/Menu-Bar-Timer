@@ -28,6 +28,7 @@ final class StatusBarPresenter {
         let presentation = presentation(state: state, accumulatedTotal: accumulatedTotal,
                                         pauseElapsed: pauseElapsed, themeName: effectiveTheme.name)
         button.setAccessibilityLabel("Skeval Timer, \(state.statusTitle.lowercased()), \(presentation.text)")
+        // Only rebuild the CoreGraphics pill image when something actually changed.
         guard force || presentation != lastPresentation else { return }
         lastPresentation = presentation
         button.image = makePillImage(text: presentation.text, state: presentation.state, theme: effectiveTheme)

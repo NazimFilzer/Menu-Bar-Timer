@@ -6,6 +6,8 @@ final class DayLogStore: @unchecked Sendable {
     private let storage: DayLogStorage
     private var logs: [String: [Sprint]] = [:]
     private let lock = NSLock()
+    // Serialize mutations and saves while allowing reads during disk I/O.
+    private let mutationLock = NSLock()
 
     init(storage: DayLogStorage = DiskDayLogAdapter()) {
         self.storage = storage
@@ -47,8 +49,9 @@ final class DayLogStore: @unchecked Sendable {
     }
 
     func save(sprint: Sprint) {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
         lock.lock()
-        defer { lock.unlock() }
         let newKey = TimeFormatter.format(dateKey: sprint.startTime)
         for (key, bucket) in logs where key != newKey {
             if bucket.contains(where: { $0.id == sprint.id }) {
@@ -69,7 +72,9 @@ final class DayLogStore: @unchecked Sendable {
         }
         targetBucket.sort { $0.startTime < $1.startTime }
         logs[newKey] = targetBucket
-        storage.saveAll(logs)
+        let snapshot = logs
+        lock.unlock()
+        storage.saveAll(snapshot)
     }
 
     func delete(sprint: Sprint) {
@@ -78,23 +83,35 @@ final class DayLogStore: @unchecked Sendable {
 
     @discardableResult
     func deleteCompletedSprints(for date: Date) -> Bool {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
         lock.lock()
-        defer { lock.unlock() }
         let key = TimeFormatter.format(dateKey: date)
-        guard let bucket = logs[key], bucket.contains(where: { !$0.isOpen }) else { return false }
+        guard let bucket = logs[key], bucket.contains(where: { !$0.isOpen }) else {
+            lock.unlock()
+            return false
+        }
         let openSprints = bucket.filter(\.isOpen)
         logs[key] = openSprints.isEmpty ? nil : openSprints
-        storage.saveAll(logs)
+        let snapshot = logs
+        lock.unlock()
+        storage.saveAll(snapshot)
         return true
     }
 
     func delete(sprintId: UUID, preferredDate: Date? = nil) {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
         lock.lock()
-        defer { lock.unlock() }
-        guard let key = dayKey(containing: sprintId, preferredDate: preferredDate), var bucket = logs[key] else { return }
+        guard let key = dayKey(containing: sprintId, preferredDate: preferredDate), var bucket = logs[key] else {
+            lock.unlock()
+            return
+        }
         bucket.removeAll { $0.id == sprintId }
         logs[key] = bucket.isEmpty ? nil : bucket
-        storage.saveAll(logs)
+        let snapshot = logs
+        lock.unlock()
+        storage.saveAll(snapshot)
     }
 
     private func dayKey(containing sprintId: UUID, preferredDate: Date?) -> String? {

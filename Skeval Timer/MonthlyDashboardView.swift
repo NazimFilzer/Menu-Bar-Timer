@@ -66,6 +66,13 @@ struct MonthlyDashboardView: View {
                 monthOffset: $monthOffset
             )
 
+            GoalConsistencyCardView(
+                summary: GoalConsistency.calculate(
+                    logs: vm.store.allLogs(), startDate: summary.monthStartDate,
+                    endDate: summary.monthEndDate, settings: vm.goal),
+                dailyGoalLabel: vm.goal.goalLabel, theme: theme
+            )
+
             // Tag Breakdown Distribution Card
             tagBreakdownCardView(summary: summary)
 

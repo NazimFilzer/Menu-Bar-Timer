@@ -23,7 +23,7 @@ struct PeriodPaceCardView: View {
                     .font(.caption).foregroundStyle(.orange)
             }
             if forecast.exceedsCapacity {
-                Text("More work remains than the calendar time on your remaining scheduled days. Overnight or off-day work can still count; consider revising the plan.")
+                Text("More work remains than your daily goals or available time allow on the remaining scheduled days. Extra work or work on days off can still count. Consider changing the plan.")
                     .font(.caption).foregroundStyle(.orange)
             }
             Text(targetDescription(forecast))

@@ -243,7 +243,10 @@ enum InsightsAnalytics {
         cal.firstWeekday = 2 // Monday start
 
         guard let jan1 = cal.date(from: DateComponents(year: year, month: 1, day: 1)) else {
-            fatalError("Could not calculate Jan 1 for year \(year)")
+            return AnnualHeatmapMatrix(year: year, columns: [], monthHeaders: [],
+                                      totalActiveDays: 0, totalYearSeconds: 0,
+                                      totalYearHours: 0, formattedYearDuration: "",
+                                      totalYearEarnings: 0, formattedYearEarnings: "")
         }
 
         // Find the Monday of the week containing Jan 1

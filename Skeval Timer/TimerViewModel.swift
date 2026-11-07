@@ -701,7 +701,7 @@ class TimerViewModel {
 
     func confirmOverlaps(for entry: SprintEntry, excluding id: UUID? = nil) -> Bool {
         let now = Date()
-        let conflicts = overlappingSprints(entry: entry, logs: store.allLogs(), excluding: id, now: now)
+        let conflicts = SprintEntry.findOverlaps(with: entry, in: store.allLogs(), excluding: id, now: now)
         guard !conflicts.isEmpty else { return true }
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

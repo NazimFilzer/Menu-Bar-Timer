@@ -59,6 +59,8 @@ struct AnalyticsDashboardView: View {
                 // Long-Term Productivity Trend Curve Chart
                 trendLineChartCard(summary: summary)
 
+                SprintPatternsCardView(summary: SprintPatterns.calculate(sprints: summary.sprints), theme: theme)
+
                 // GitHub-Style Annual Contribution Heatmap (52 Weeks)
                 annualHeatmapCard(matrix: matrix)
 

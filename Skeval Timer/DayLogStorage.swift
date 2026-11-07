@@ -36,7 +36,6 @@ final class DiskDayLogAdapter: DayLogStorage, @unchecked Sendable {
 
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = .prettyPrinted
         self.encoder = e
 
         let d = JSONDecoder()
