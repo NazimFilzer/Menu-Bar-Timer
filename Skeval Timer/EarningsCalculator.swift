@@ -23,25 +23,6 @@ enum EarningsCalculator {
         return (raw * 100).rounded() / 100.0
     }
 
-    static func calculate(sprint: Sprint, hourlyRate: Double) -> Double {
-        guard let duration = sprint.duration else { return 0.0 }
-        return calculate(durationInSeconds: duration, hourlyRate: hourlyRate)
-    }
-
-    static func calculate(sprints: [Sprint], hourlyRate: Double) -> Double {
-        guard hourlyRate > 0 else { return 0.0 }
-        let totalDuration = sprints.compactMap { $0.duration }.reduce(0, +)
-        return calculate(durationInSeconds: totalDuration, hourlyRate: hourlyRate)
-    }
-
-    static func calculate(sprint: Sprint, settings: GoalSettings) -> Double {
-        calculate(sprint: sprint, hourlyRate: settings.hourlyRate)
-    }
-
-    static func calculate(sprints: [Sprint], settings: GoalSettings) -> Double {
-        calculate(sprints: sprints, hourlyRate: settings.hourlyRate)
-    }
-
     static func format(amount: Double, currencySymbol: String) -> String {
         let cleanAmount = amount.isFinite && (amount * 100).isFinite ? max(0, amount) : 0
         let rounded = (cleanAmount * 100).rounded() / 100.0
@@ -54,19 +35,5 @@ enum EarningsCalculator {
 
         let formattedNum = formatter.string(from: NSNumber(value: rounded)) ?? String(format: isInteger ? "%.0f" : "%.2f", rounded)
         return "\(currencySymbol)\(formattedNum)"
-    }
-
-    static func formattedEarnings(durationInSeconds: TimeInterval, hourlyRate: Double, currencySymbol: String) -> String {
-        let amount = calculate(durationInSeconds: durationInSeconds, hourlyRate: hourlyRate)
-        return format(amount: amount, currencySymbol: currencySymbol)
-    }
-
-    static func formattedEarnings(sprints: [Sprint], hourlyRate: Double, currencySymbol: String) -> String {
-        let amount = calculate(sprints: sprints, hourlyRate: hourlyRate)
-        return format(amount: amount, currencySymbol: currencySymbol)
-    }
-
-    static func formattedEarnings(sprints: [Sprint], settings: GoalSettings) -> String {
-        formattedEarnings(sprints: sprints, hourlyRate: settings.hourlyRate, currencySymbol: settings.currencySymbol)
     }
 }

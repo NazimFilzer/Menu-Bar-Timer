@@ -85,10 +85,6 @@ struct Sprint: Identifiable, Codable, Equatable {
         return max(0, end.timeIntervalSince(startTime))
     }
 
-    var grossDurationLabel: String {
-        TimeFormatter.format(duration: grossDuration)
-    }
-
     var startLabel: String { TimeFormatter.format(time: startTime) }
     var endLabel: String { endTime.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
     var pauseStartedLabel: String { pauseStartedAt.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
@@ -109,8 +105,22 @@ struct Sprint: Identifiable, Codable, Equatable {
         guard let effEnd = effectiveEnd else { return "\(startLabel)\t--:--:--" }
         return TimeFormatter.clipboardRow(start: startTime, effectiveEnd: effEnd)
     }
+}
 
-    static func fmt(_ date: Date) -> String {
-        TimeFormatter.format(time: date)
+extension Sprint {
+    /// The tag as grouped in reports: trimmed, and nil when empty.
+    var cleanTag: String? {
+        guard let tag = tag?.trimmingCharacters(in: .whitespacesAndNewlines), !tag.isEmpty else { return nil }
+        return tag
+    }
+}
+
+extension Array where Element == Sprint {
+    /// Tags in use, matched like the tag filter: case-insensitive, earliest spelling kept.
+    var distinctTags: [String] {
+        var seen = Set<String>()
+        return sorted { $0.startTime < $1.startTime }.compactMap(\.cleanTag)
+            .filter { seen.insert($0.lowercased()).inserted }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 }

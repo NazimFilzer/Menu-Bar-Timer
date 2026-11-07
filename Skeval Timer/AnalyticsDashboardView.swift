@@ -29,7 +29,7 @@ struct AnalyticsDashboardView: View {
         _ = vm.logRevision
         let range = activeDateRange
         return InsightsAnalytics.calculatePeriodSummary(
-            store: vm.store,
+            logs: vm.store.allLogs(),
             startDate: range.start,
             endDate: range.end,
             settings: vm.goal
@@ -39,7 +39,7 @@ struct AnalyticsDashboardView: View {
     private var annualHeatmap: AnnualHeatmapMatrix {
         _ = vm.logRevision
         return InsightsAnalytics.generateAnnualHeatmap(
-            store: vm.store,
+            logs: vm.store.allLogs(),
             year: selectedYear,
             settings: vm.goal
         )

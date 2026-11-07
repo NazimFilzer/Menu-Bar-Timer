@@ -131,3 +131,22 @@ func testWorkInsightsCalendarTransitions() {
         assertEqual(goal.countedDays, 6, "Six finished scheduled days; Sunday (today) is still in progress")
     }
 }
+
+func testTagsMatchIgnoringCase() {
+    let settings = auditSettings()
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+    let day1 = auditDate(2026, 10, 5, calendar: cal)
+    let day2 = auditDate(2026, 10, 6, calendar: cal)
+    let sprints = [Sprint(startTime: day1, endTime: day1.addingTimeInterval(3600), tag: "Dev"),
+                   Sprint(startTime: day2, endTime: day2.addingTimeInterval(7200), tag: " dev "),
+                   Sprint(startTime: day2.addingTimeInterval(9000), endTime: day2.addingTimeInterval(9000 + 1800), tag: "  ")]
+    var logs: [String: [Sprint]] = [:]
+    for sprint in sprints { logs[TimeFormatter.format(dateKey: sprint.startTime, calendar: cal), default: []].append(sprint) }
+    let month = MonthlyAnalytics.calculate(logs: logs, referenceDate: day2, settings: settings, calendar: cal)
+    assertEqual(month.tagBreakdowns.map(\.displayName), ["Dev", "Untagged"], "Dev and dev are one tag; blank is untagged")
+    assertEqual(month.tagBreakdowns.first?.totalSeconds, 3 * 3600, "Both spellings add up under the first spelling")
+    assertEqual(month.allDistinctTags, ["Dev"], "Tag chips match the filter's case-insensitive rule")
+    assertEqual(month.tagBreakdowns.first.map { tag in sprints.filter { TagFilter.tag(tag.displayName).matches(sprint: $0) }.count }, 2,
+                "Filter and breakdown count the same sprints")
+}

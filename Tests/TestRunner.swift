@@ -143,7 +143,7 @@ func testDayLogStoreWithInMemoryStorage() {
 
     // Accumulated total: 1800 + (1800 - 300) = 3300
     assertEqual(dayLog.accumulatedTotal, 3300)
-    assertEqual(dayLog.accumulatedLabel, "00:55:00")
+    assertEqual(TimeFormatter.format(clock: dayLog.accumulatedTotal), "00:55:00")
 
     // Daily pause total: 0 + 300 = 300
     assertEqual(dayLog.totalPausedDuration, 300)
@@ -553,17 +553,17 @@ func testEarningsCalculator() {
     // 5. Calculation for Sprint
     let t0 = Date()
     let completedSprint = Sprint(startTime: t0, endTime: t0.addingTimeInterval(7200), pausedDuration: 0)
-    assertEqual(EarningsCalculator.calculate(sprint: completedSprint, hourlyRate: 500), 1000.0, "Completed sprint earnings should match")
+    assertEqual(EarningsCalculator.calculate(durationInSeconds: completedSprint.duration ?? 0, hourlyRate: 500), 1000.0, "Completed sprint earnings should match")
 
     let sprintWithPause = Sprint(startTime: t0, endTime: t0.addingTimeInterval(7200), pausedDuration: 1800)
-    assertEqual(EarningsCalculator.calculate(sprint: sprintWithPause, hourlyRate: 500), 750.0, "Sprint with 30m pause should calculate net earnings")
+    assertEqual(EarningsCalculator.calculate(durationInSeconds: sprintWithPause.duration ?? 0, hourlyRate: 500), 750.0, "Sprint with 30m pause should calculate net earnings")
 
     let openSprint = Sprint(startTime: t0)
-    assertEqual(EarningsCalculator.calculate(sprint: openSprint, hourlyRate: 500), 0.0, "Open sprint without endTime should return 0")
+    assertEqual(EarningsCalculator.calculate(durationInSeconds: openSprint.duration ?? 0, hourlyRate: 500), 0.0, "Open sprint without endTime should return 0")
 
     // 6. Calculation for array of sprints
     let sprints = [completedSprint, sprintWithPause]
-    assertEqual(EarningsCalculator.calculate(sprints: sprints, hourlyRate: 500), 1750.0, "Array of sprints should sum net earnings")
+    assertEqual(EarningsCalculator.calculate(durationInSeconds: DayLog(sprints: sprints).accumulatedTotal, hourlyRate: 500), 1750.0, "Array of sprints should sum net earnings")
 
     // 7. Settings integration
     let suiteName = "test_earnings_\(UUID().uuidString)"
@@ -572,7 +572,7 @@ func testEarningsCalculator() {
     let settings = GoalSettings(userDefaults: defaults)
     settings.hourlyRate = 500.0
     settings.currencySymbol = "₹"
-    assertEqual(EarningsCalculator.calculate(sprints: sprints, settings: settings), 1750.0, "GoalSettings calculation should match")
+    assertEqual(EarningsCalculator.calculate(durationInSeconds: DayLog(sprints: sprints).accumulatedTotal, hourlyRate: settings.hourlyRate), 1750.0, "GoalSettings calculation should match")
 
     // 8. Formatting
     assertEqual(EarningsCalculator.format(amount: 1000, currencySymbol: "₹"), "₹1,000", "Whole thousands should format with grouping")
@@ -582,8 +582,8 @@ func testEarningsCalculator() {
     assertEqual(EarningsCalculator.format(amount: 150.25, currencySymbol: "€"), "€150.25", "Euros should format with decimals")
 
     // 9. Formatted helpers
-    assertEqual(EarningsCalculator.formattedEarnings(durationInSeconds: 7200, hourlyRate: 500, currencySymbol: "₹"), "₹1,000")
-    assertEqual(EarningsCalculator.formattedEarnings(sprints: sprints, settings: settings), "₹1,750")
+    assertEqual(EarningsCalculator.format(amount: EarningsCalculator.calculate(durationInSeconds: 7200, hourlyRate: 500),
+                                          currencySymbol: "₹"), "₹1,000")
 }
 
 @MainActor
@@ -999,7 +999,7 @@ func testWeeklyAnalytics() {
     store.save(sprint: sFri1)
 
     let storeSummary = WeeklyAnalytics.calculate(
-        store: store,
+        logs: store.allLogs(),
         weekOffset: 0,
         referenceDate: refDate,
         settings: settings,
@@ -1065,7 +1065,7 @@ func testSprintLogCRUDAndStoreConsistency() {
 
     // 3. Weekly Summary sprint accessors
     var summary = WeeklyAnalytics.calculate(
-        store: store,
+        logs: store.allLogs(),
         weekOffset: 0,
         referenceDate: refDate,
         settings: vm.goal,
@@ -1137,7 +1137,7 @@ func testSprintLogCRUDAndStoreConsistency() {
     assertEqual(wedLogAfterDel.sprints.count, 0, "Deleted sprint should no longer be in store")
 
     summary = WeeklyAnalytics.calculate(
-        store: store,
+        logs: store.allLogs(),
         weekOffset: 0,
         referenceDate: refDate,
         settings: vm.goal,
@@ -1582,13 +1582,6 @@ func testAppVersion() {
 func testEarningsTracking() {
     print("Running Today's Earnings & Hourly Rate tests...")
 
-    // 1. TimeFormatter rupee formatting
-    assertEqual(TimeFormatter.format(rupees: 0), "₹0", "Zero rupees should format as ₹0")
-    assertEqual(TimeFormatter.format(rupees: 1000), "₹1,000", "1000 should format with comma")
-    assertEqual(TimeFormatter.format(rupees: 3750.2), "₹3,750", "Decimal should round to nearest whole rupee")
-    assertEqual(TimeFormatter.format(rupees: 3750.8), "₹3,751", "Decimal .8 should round up")
-    assertEqual(TimeFormatter.format(rupees: 100000), "₹1,00,000", "Lakh formatting should use Indian grouping")
-
     // 2. GoalSettings rates & targets
     let goal = GoalSettings.shared
     let savedRate = goal.hourlyRate
@@ -1641,8 +1634,8 @@ func testEarningsTracking() {
     assertEqual(vm.totalTodayElapsed, 36000)
     assertEqual(vm.todayEarnings, 15000.0, "10 hours at 1500/hr must equal 15000")
     assertEqual(vm.todayEarningsLabel, "₹15,000")
-    assertEqual(vm.progressFraction, 1.0, "Progress fraction must cap at 1.0 on overtime")
-    assertTrue(vm.isDailyGoalReached, "Goal must be marked reached")
+    assertEqual(vm.displayedProgressFraction, 1.0, "Progress fraction must cap at 1.0 on overtime")
+    assertTrue(vm.isDisplayedGoalReached, "Goal must be marked reached")
 
     // Clean up sprint
     vm.clockOut()
@@ -2155,6 +2148,7 @@ struct TestMain {
         testDateKeysIgnoreSystemCalendar()
         testGoalConsistencyIncludesWeekendWork()
         testSprintPatternsUseNetCompletedWork()
+        testTagsMatchIgnoringCase()
         testWeekComparisonBoundaries()
         testWorkInsightsCalendarTransitions()
         testWeeklyAnalytics()

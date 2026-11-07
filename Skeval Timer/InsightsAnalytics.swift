@@ -63,9 +63,7 @@ struct PeriodSummary: Equatable {
     let trendPoints: [TrendDataPoint]
     let days: [DailyBarData]
 
-    var distinctTags: [String] {
-        Array(Set(sprints.compactMap { $0.tag?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
-    }
+    var distinctTags: [String] { sprints.distinctTags }
 }
 
 enum DateRangePreset: String, CaseIterable, Identifiable {
@@ -177,22 +175,6 @@ enum InsightsAnalytics {
         )
     }
 
-    static func calculatePeriodSummary(
-        store: DayLogStore,
-        startDate: Date,
-        endDate: Date,
-        settings: GoalSettings = .shared,
-        calendar: Calendar? = nil
-    ) -> PeriodSummary {
-        calculatePeriodSummary(
-            logs: store.allLogs(),
-            startDate: startDate,
-            endDate: endDate,
-            settings: settings,
-            calendar: calendar
-        )
-    }
-
     private static func includesDay(_ key: String, start: Date, end: Date, calendar: Calendar) -> Bool {
         guard let date = TimeFormatter.parseDateKey(key, calendar: calendar) else { return false }
         return (start...end).contains(calendar.startOfDay(for: date))
@@ -283,20 +265,6 @@ enum InsightsAnalytics {
             formattedYearDuration: formattedYearDur,
             totalYearEarnings: totalYearEarn,
             formattedYearEarnings: formattedYearEarn
-        )
-    }
-
-    static func generateAnnualHeatmap(
-        store: DayLogStore,
-        year: Int,
-        settings: GoalSettings = .shared,
-        calendar: Calendar? = nil
-    ) -> AnnualHeatmapMatrix {
-        generateAnnualHeatmap(
-            logs: store.allLogs(),
-            year: year,
-            settings: settings,
-            calendar: calendar
         )
     }
 

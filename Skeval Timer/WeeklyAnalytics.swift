@@ -45,9 +45,7 @@ struct WeeklySummary: Equatable {
         days.flatMap { $0.completedSprints }.sorted(by: { $0.startTime > $1.startTime })
     }
 
-    var allDistinctTags: [String] {
-        Array(Set(allWeekSprints.compactMap { $0.tag?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
-    }
+    var allDistinctTags: [String] { allWeekSprints.distinctTags }
 }
 
 enum WeeklyAnalytics {
@@ -118,22 +116,6 @@ enum WeeklyAnalytics {
             dailyAverageHours: dailyAvgHours,
             formattedDailyAverage: formattedAvg,
             elapsedDaysCount: elapsedDays
-        )
-    }
-
-    static func calculate(
-        store: DayLogStore,
-        weekOffset: Int = 0,
-        referenceDate: Date = Date(),
-        settings: GoalSettings = .shared,
-        calendar: Calendar? = nil
-    ) -> WeeklySummary {
-        calculate(
-            logs: store.allLogs(),
-            weekOffset: weekOffset,
-            referenceDate: referenceDate,
-            settings: settings,
-            calendar: calendar
         )
     }
 

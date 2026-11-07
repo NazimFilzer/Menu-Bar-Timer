@@ -62,9 +62,7 @@ struct MonthlySummary: Equatable {
         days.flatMap { $0.completedSprints }.sorted(by: { $0.startTime > $1.startTime })
     }
 
-    var allDistinctTags: [String] {
-        Array(Set(allMonthSprints.compactMap { $0.tag?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })).sorted()
-    }
+    var allDistinctTags: [String] { allMonthSprints.distinctTags }
 }
 
 enum MonthlyAnalytics {
@@ -158,22 +156,6 @@ enum MonthlyAnalytics {
         )
     }
 
-    static func calculate(
-        store: DayLogStore,
-        monthOffset: Int = 0,
-        referenceDate: Date = Date(),
-        settings: GoalSettings = .shared,
-        calendar: Calendar? = nil
-    ) -> MonthlySummary {
-        calculate(
-            logs: store.allLogs(),
-            monthOffset: monthOffset,
-            referenceDate: referenceDate,
-            settings: settings,
-            calendar: calendar
-        )
-    }
-
     private static func elapsedDayCount(isCurrentMonth: Bool, monthOffset: Int, referenceDate: Date,
                                         totalDays: Int, calendar: Calendar) -> Int {
         if isCurrentMonth { return calendar.component(.day, from: referenceDate) }
@@ -186,11 +168,10 @@ enum MonthlyAnalytics {
         hourlyRate: Double,
         currencySymbol: String
     ) -> [TagAttribution] {
-        let grouped = Dictionary(grouping: sprints) { sprint -> String? in
-            let tag = sprint.tag?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return tag?.isEmpty == false ? tag : nil
-        }
-        let results = grouped.map { tag, sprints in
+        // Case-insensitive like the tag filter; the first spelling in the month is shown.
+        let grouped = Dictionary(grouping: sprints) { $0.cleanTag?.lowercased() }
+        let results = grouped.map { key, sprints in
+            let tag = key == nil ? nil : sprints.first?.cleanTag
             let seconds = sprints.reduce(0) { $0 + ($1.duration ?? 0) }
             let pct = totalSeconds > 0 ? (seconds / totalSeconds * 1000).rounded() / 10 : 0
             let earnings = EarningsCalculator.calculate(durationInSeconds: seconds, hourlyRate: hourlyRate)

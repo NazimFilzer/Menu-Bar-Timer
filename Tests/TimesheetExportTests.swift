@@ -68,7 +68,7 @@ func testPeriodTimesheetExport() {
     let store = DayLogStore(storage: storage)
     for sprint in [later, second, overnight, open, first, outside] { store.save(sprint: sprint) }
     let originalLogs = storage.loadAll()
-    let week = WeeklyAnalytics.calculate(store: store, referenceDate: monday, settings: settings)
+    let week = WeeklyAnalytics.calculate(logs: store.allLogs(), referenceDate: monday, settings: settings)
     // Reversed input still exports oldest first.
     let exported = DailyTimesheet.clipboardText(days: Array(week.days.reversed()))
     let rows = exported.components(separatedBy: "\n")
@@ -81,21 +81,21 @@ func testPeriodTimesheetExport() {
     assertTrue(rows.allSatisfy { $0.components(separatedBy: "\t").count == 4 })
     assertEqual(DailyTimesheet.clipboardText(days: []), "")
 
-    let october = MonthlyAnalytics.calculate(store: store, referenceDate: monday, settings: settings)
+    let october = MonthlyAnalytics.calculate(logs: store.allLogs(), referenceDate: monday, settings: settings)
     let monthRows = DailyTimesheet.clipboardText(days: october.days).components(separatedBy: "\n")
     assertEqual(monthRows.count, 31)
     assertEqual(monthRows[25], rows[0])
     assertEqual(monthRows[28], rows[3])
     assertEqual(monthRows[30], "\t\t\t", "Trailing empty dates remain blank")
-    let analytics = InsightsAnalytics.calculatePeriodSummary(store: store, startDate: monday,
+    let analytics = InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: monday,
                                                             endDate: sunday, settings: settings)
     assertEqual(analytics.days.map(\.id), week.days.map(\.id))
     assertEqual(DailyTimesheet.clipboardText(days: analytics.days), exported,
                 "Analytics copies the same daily rows as Week")
-    let reversed = InsightsAnalytics.calculatePeriodSummary(store: store, startDate: sunday,
+    let reversed = InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: sunday,
                                                            endDate: monday, settings: settings)
     assertEqual(reversed.days, analytics.days, "Reversed custom dates produce the same chronological days")
-    let monthAnalytics = InsightsAnalytics.calculatePeriodSummary(store: store, startDate: october.monthStartDate,
+    let monthAnalytics = InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: october.monthStartDate,
                                                                 endDate: october.monthEndDate, settings: settings)
     assertEqual(DailyTimesheet.clipboardText(days: monthAnalytics.days), monthRows.joined(separator: "\n"))
 
@@ -113,11 +113,11 @@ func testPeriodTimesheetExport() {
     assertEqual(yearRows.count, 33)
     assertEqual(yearRows[0], DayLog(sprints: [yearEndSprint]).clipboardText)
     assertTrue(yearRows.dropFirst().allSatisfy { $0 == "\t\t\t" })
-    let previousMonth = MonthlyAnalytics.calculate(store: store, monthOffset: -1, referenceDate: monday, settings: settings)
+    let previousMonth = MonthlyAnalytics.calculate(logs: store.allLogs(), monthOffset: -1, referenceDate: monday, settings: settings)
     assertEqual(DailyTimesheet.clipboardText(days: previousMonth.days), "", "A wholly empty period has nothing to copy")
     assertEqual(storage.loadAll(), originalLogs, "Generating summaries never changes stored sprints")
     let reloaded = DayLogStore(storage: storage)
-    assertEqual(DailyTimesheet.clipboardText(days: WeeklyAnalytics.calculate(store: reloaded, referenceDate: monday, settings: settings).days), exported)
+    assertEqual(DailyTimesheet.clipboardText(days: WeeklyAnalytics.calculate(logs: reloaded.allLogs(), referenceDate: monday, settings: settings).days), exported)
 
     // A local calendar day can be 23 or 25 hours. Use elapsed time for break math.
     var dstCalendar = Calendar(identifier: .gregorian)
@@ -167,11 +167,11 @@ func testDailyTimesheetClipboard() {
     vm.copyAllDisplayedSprints()
     assertEqual(NSPasteboard.general.string(forType: .string), "10:00:00\t11:00:00\t\t10", "Empty days leave the clipboard intact")
 
-    let week = WeeklyAnalytics.calculate(store: store, referenceDate: yesterday, settings: vm.goal)
+    let week = WeeklyAnalytics.calculate(logs: store.allLogs(), referenceDate: yesterday, settings: vm.goal)
     assertTrue(vm.copyTimesheet(days: week.days))
     let copiedWeek = NSPasteboard.general.string(forType: .string)
     assertEqual(copiedWeek, DailyTimesheet.clipboardText(days: week.days))
-    let month = MonthlyAnalytics.calculate(store: store, referenceDate: today, settings: vm.goal)
+    let month = MonthlyAnalytics.calculate(logs: store.allLogs(), referenceDate: today, settings: vm.goal)
     assertTrue(vm.copyTimesheet(days: month.days))
     assertEqual(NSPasteboard.general.string(forType: .string), DailyTimesheet.clipboardText(days: month.days))
     let copiedMonth = NSPasteboard.general.string(forType: .string)

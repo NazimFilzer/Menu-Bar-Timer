@@ -190,13 +190,6 @@ class TimerViewModel {
         engine.totalCurrentSprintPaused > currentPauseElapsed + 1
     }
 
-    var menuBarTitle: String {
-        if isPaused { return TimeFormatter.format(shortClock: currentPauseElapsed) }
-        if isRunning { return TimeFormatter.format(shortClock: currentElapsed) }
-        let acc = todayLog.accumulatedTotal
-        return acc > 0 ? todayLog.accumulatedShortLabel : ""
-    }
-
     var totalTodayElapsed: TimeInterval {
         todayLog.accumulatedTotal + liveSprintElapsed(on: Date())
     }
@@ -270,16 +263,6 @@ class TimerViewModel {
         )
     }
 
-    var progressFraction: Double {
-        let g = goal.dailyGoalSeconds
-        guard g > 0 else { return 0 }
-        return min(totalTodayElapsed / g, 1.0)
-    }
-
-    var progressLabel: String {
-        "\(totalTodayShortLabel) / \(goal.goalLabel)"
-    }
-
     var todayEarnings: Double {
         guard goal.hasHourlyRate else { return 0.0 }
         let hours = totalTodayElapsed / 3600.0
@@ -292,11 +275,6 @@ class TimerViewModel {
 
     var targetEarningsLabel: String {
         goal.targetEarningsLabel
-    }
-
-    var isDailyGoalReached: Bool {
-        let g = goal.dailyGoalSeconds
-        return g > 0 && totalTodayElapsed >= g
     }
 
     // MARK: - Past Days History Navigation
@@ -601,10 +579,6 @@ class TimerViewModel {
             try? await Task.sleep(for: .seconds(2))
             self?.isAllCopied = false
         }
-    }
-
-    func copyAllTodaySprints() {
-        copyAllDisplayedSprints()
     }
 
     @discardableResult

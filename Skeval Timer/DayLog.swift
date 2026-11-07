@@ -12,8 +12,6 @@ struct DayLog {
         completedSprints.compactMap { $0.duration }.reduce(0, +)
     }
 
-    var accumulatedLabel: String { TimeFormatter.format(clock: accumulatedTotal) }
-
     var accumulatedShortLabel: String { TimeFormatter.format(shortDuration: accumulatedTotal) }
 
     var totalPausedDuration: TimeInterval {

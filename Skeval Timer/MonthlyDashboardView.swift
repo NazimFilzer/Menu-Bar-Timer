@@ -8,35 +8,11 @@ struct MonthlyDashboardView: View {
     private var monthlySummary: MonthlySummary {
         _ = vm.logRevision
         return MonthlyAnalytics.calculate(
-            store: vm.store,
+            logs: vm.store.allLogs(),
             monthOffset: monthOffset,
             referenceDate: Date(),
             settings: vm.goal
         )
-    }
-
-    private var greetingText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let timeGreeting: String
-        switch hour {
-        case 5..<12:
-            timeGreeting = "Good morning"
-        case 12..<17:
-            timeGreeting = "Good afternoon"
-        case 17..<22:
-            timeGreeting = "Good evening"
-        default:
-            timeGreeting = "Good night"
-        }
-
-        let fullName = NSFullUserName()
-        let userName = NSUserName()
-        let displayName = !fullName.isEmpty ? fullName.components(separatedBy: " ").first ?? fullName : userName
-        if !displayName.isEmpty {
-            return "\(timeGreeting), \(displayName) 👋"
-        } else {
-            return "\(timeGreeting) 👋"
-        }
     }
 
     var body: some View {
@@ -93,7 +69,7 @@ struct MonthlyDashboardView: View {
     private func monthlyGreetingCardView(summary: MonthlySummary) -> some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(greetingText)
+                Text(DashboardGreeting.text())
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(theme.textPrimary)
 

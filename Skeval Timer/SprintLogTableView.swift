@@ -11,12 +11,9 @@ enum TagFilter: Equatable {
         case .all:
             return true
         case .untagged:
-            return sprint.tag == nil || sprint.tag!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return sprint.cleanTag == nil
         case .tag(let filterTag):
-            guard let tag = sprint.tag?.trimmingCharacters(in: .whitespacesAndNewlines) else {
-                return false
-            }
-            return tag.caseInsensitiveCompare(filterTag) == .orderedSame
+            return sprint.cleanTag?.caseInsensitiveCompare(filterTag) == .orderedSame
         }
     }
 }
@@ -75,7 +72,7 @@ struct SprintLogTableView: View {
     }()
 
     private var untaggedCount: Int {
-        allSprints.filter { $0.tag == nil || $0.tag!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+        allSprints.filter { $0.cleanTag == nil }.count
     }
 
     private var filteredSprints: [Sprint] {

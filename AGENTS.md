@@ -8,7 +8,7 @@
 - **Persistence**: `DayLogStore.swift` & `DayLogStorage.swift` (storage protocol seam: `DiskDayLogAdapter` vs `InMemoryDayLogAdapter`), `GoalSettings.swift` (persists goals, hourly rate, currency, theme, eye-break settings, working schedule).
 
 Other repository directories:
-- `Tests/`: Plain Swift test suite compiled by `scripts/run-tests.sh` via `TestRunner.swift` (39,923 assertions).
+- `Tests/`: Plain Swift test suite compiled by `scripts/run-tests.sh` via `TestRunner.swift`.
 - `HealthChecks/`: Real AppKit runtime check with event loop (`scripts/run-tests.sh --runtime-health`, 20 checks).
 - `Preview/`: Standalone sample preview app with isolated mock data (`scripts/run-preview.sh`).
 - `scripts/`: Development, test, build, deployment, and data verification scripts.
@@ -39,7 +39,7 @@ Single-context layout with a root `CONTEXT.md` defining core domain terms (sprin
 
 The Xcode target requires macOS 26.2 or newer. Open `Skeval Timer.xcodeproj` in Xcode to browse or edit the app.
 
-- `./scripts/run-tests.sh` compiles and runs the domain, persistence, analytics, and lifecycle checks (39,923 assertions).
+- `./scripts/run-tests.sh` compiles and runs the domain, persistence, analytics, and lifecycle checks and prints the assertion count.
 - `./scripts/run-tests.sh --runtime-health` runs the AppKit health check with disposable data and live event loop (20 checks).
 - `./scripts/run-preview.sh` builds and opens the sample preview app with isolated logs.
 - `./scripts/run-app.sh` builds and opens the app; pass `--configuration Release` for a Release build.
@@ -51,6 +51,7 @@ The Xcode target requires macOS 26.2 or newer. Open `Skeval Timer.xcodeproj` in 
 
 - **Activation Policy (ADR 0001)**: The app runs as an `.accessory` (menu bar only, no Dock icon) by default. When the Dashboard window is opened, `NSApp.setActivationPolicy(.regular)` is set with Dock and Cmd+Tab presence. When the Dashboard window closes, it reverts to `.accessory`.
 - **Zero Background Polling (ADR 0003 & Eye-break)**: Never introduce HID event polling or background timers while idle. Use `NSWorkspace.willSleepNotification` and `NSWorkspace.didWakeNotification` for sleep/wake. Eye-break reminders must piggyback on the active 1-second engine tick only.
+- **No Hidden SwiftUI Content**: Hidden SwiftUI views still re-render on every engine tick. The Dashboard window builds its content in `showDashboard()` and drops it in `hideDashboard()`; the popover builds its content on open and drops it in `popoverDidClose`. Wrap values that change every tick in `Live { … }` so only that piece re-renders.
 - **Sleep/Wake Resolution (ADR 0002)**: On system sleep, ticks suspend. On wake, the timer holds until the user chooses "Count as Work" or "Count as Paused". Resolving as work counts the sleep interval and decision delay as active work; resolving as paused credits both to `pausedDuration`.
 - **Timer Lifecycle & Resource Cleanup**: `SprintEngine` owns a single repeating 1-second timer. `SprintEngine.deinit` must invalidate the timer and remove workspace observers to prevent leaks and runloop wakeups.
 - **Data Attribution**: Sprints belong to their start day even across midnight. Live active sprint counts toward today's total on its start day; reports and catch-up use completed sprints plus current active net work.

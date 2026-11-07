@@ -29,9 +29,9 @@ func testDeleteDaySprints() {
         assertEqual(store.log(for: previousDay).completedSprints, [crossing])
         assertEqual(store.log(for: nextDay).completedSprints, [neighbor])
         assertTrue(DayLogStore(storage: storage).log(for: date).sprints.isEmpty)
-        assertEqual(WeeklyAnalytics.calculate(store: store, referenceDate: date, settings: vm.goal).days.first { calendar.isDate($0.date, inSameDayAs: date) }?.sprintCount, 0)
-        assertEqual(MonthlyAnalytics.calculate(store: store, referenceDate: date, settings: vm.goal).days.first { calendar.isDate($0.date, inSameDayAs: date) }?.sprintCount, 0)
-        assertEqual(InsightsAnalytics.calculatePeriodSummary(store: store, startDate: date, endDate: date, settings: vm.goal).days.first?.sprintCount, 0)
+        assertEqual(WeeklyAnalytics.calculate(logs: store.allLogs(), referenceDate: date, settings: vm.goal).days.first { calendar.isDate($0.date, inSameDayAs: date) }?.sprintCount, 0)
+        assertEqual(MonthlyAnalytics.calculate(logs: store.allLogs(), referenceDate: date, settings: vm.goal).days.first { calendar.isDate($0.date, inSameDayAs: date) }?.sprintCount, 0)
+        assertEqual(InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: date, endDate: date, settings: vm.goal).days.first?.sprintCount, 0)
         vm.deleteCompletedSprints(for: date)
         assertEqual(vm.logRevision, revision + 1, "Deleting an empty day does not refresh logs")
     }

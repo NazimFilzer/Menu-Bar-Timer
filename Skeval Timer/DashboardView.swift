@@ -28,6 +28,33 @@ enum DashboardDestination: String, CaseIterable, Identifiable {
     }
 }
 
+/// "Good morning, Name 👋" shown at the top of the Week and Month pages.
+enum DashboardGreeting {
+    static func text(now: Date = Date()) -> String {
+        let hour = Calendar.current.component(.hour, from: now)
+        let timeGreeting: String
+        switch hour {
+        case 5..<12:
+            timeGreeting = "Good morning"
+        case 12..<17:
+            timeGreeting = "Good afternoon"
+        case 17..<22:
+            timeGreeting = "Good evening"
+        default:
+            timeGreeting = "Good night"
+        }
+
+        let fullName = NSFullUserName()
+        let userName = NSUserName()
+        let displayName = !fullName.isEmpty ? fullName.components(separatedBy: " ").first ?? fullName : userName
+        if !displayName.isEmpty {
+            return "\(timeGreeting), \(displayName) 👋"
+        } else {
+            return "\(timeGreeting) 👋"
+        }
+    }
+}
+
 struct DashboardView: View {
     @Bindable var vm: TimerViewModel
     @AppStorage("skevalDashboardDestination") private var destinationKey = DashboardDestination.today.rawValue

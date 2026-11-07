@@ -11,7 +11,7 @@ struct TodayDashboardView: View {
         Binding(get: { vm.selectedDate }, set: { vm.selectDate($0) })
     }
     private var tags: [String] {
-        Array(Set(vm.displayedCompletedSprints.compactMap(\.tag))).sorted()
+        vm.displayedCompletedSprints.distinctTags
     }
 
     var body: some View {

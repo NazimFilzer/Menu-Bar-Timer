@@ -44,7 +44,7 @@ Login is the earliest completed sprint's start and Logout is the latest actual e
 
 Open `Skeval Timer.xcodeproj` in Xcode. The target requires macOS 26.2 or newer.
 
-Run the domain, persistence, analytics, and lifecycle tests with `./scripts/run-tests.sh` (39,923 assertions).
+Run the domain, persistence, analytics, and lifecycle tests with `./scripts/run-tests.sh`; it prints the assertion count.
 
 Run `./scripts/run-tests.sh --runtime-health` for a separate AppKit check (20 checks) of live decimal earnings, dashboard and popover rendering, pause/resume, and timer shutdown with disposable data. The [health check report](docs/v2-health-check.md) records the findings and timer cleanup fix.
 

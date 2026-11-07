@@ -166,7 +166,7 @@ struct PeriodTimesheetView: View {
             }
             ScrollView {
                 SprintLogTableView(vm: vm, sprints: day.completedSprints.sorted { $0.startTime > $1.startTime },
-                                   distinctTags: Array(Set(day.completedSprints.compactMap(\.tag))).sorted(),
+                                   distinctTags: day.completedSprints.distinctTags,
                                    defaultDate: day.date, theme: theme, title: "SPRINT HISTORY")
             }
         }
