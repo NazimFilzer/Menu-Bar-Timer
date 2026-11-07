@@ -225,7 +225,15 @@ class TimerViewModel {
         // Read both tick values so the view updates from the engine's existing timer.
         _ = currentPauseElapsed
         let live = timelineLiveSprint()
-        return DailyTimeline.calculate(sprints: store.allLogs().values.flatMap { $0 }, live: live,
+        // A sprint belongs to its start day, so only the selected day and the day before
+        // (overnight sprints) can appear. Shortcut: a completed sprint longer than 24 hours
+        // that started two days earlier is not drawn. The live sprint is always passed in.
+        let logs = store.allLogs()
+        let dayBefore = calendar.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+        let sprints = [dayBefore, selectedDate].flatMap {
+            logs[TimeFormatter.format(dateKey: $0, calendar: calendar)] ?? []
+        }
+        return DailyTimeline.calculate(sprints: sprints, live: live,
                                        date: selectedDate, hours: hours ?? goal.timelineHours,
                                        now: now, calendar: calendar)
     }

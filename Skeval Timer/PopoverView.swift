@@ -354,7 +354,6 @@ private struct ClockSectionView: View {
                 .font(.system(size: 44, weight: .light, design: .monospaced))
                 .foregroundColor(vm.isPaused ? Color.orange : (vm.isRunning ? theme.neonTeal : theme.textPrimary))
                 .shadow(color: vm.isPaused ? Color.orange.opacity(0.4) : (vm.isRunning ? theme.neonTeal.opacity(0.5) : Color.clear), radius: 10, y: 2)
-                .animation(.easeInOut(duration: 0.2), value: vm.currentElapsedLabel)
 
             if vm.isPaused {
                 VStack(spacing: 3) {
@@ -470,7 +469,6 @@ private struct DailyGoalProgressView: View {
                         )
                         .frame(width: geo.size.width * CGFloat(vm.displayedProgressFraction), height: 6)
                         .shadow(color: theme.neonTeal.opacity(0.6), radius: 4)
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: vm.displayedProgressFraction)
                 }
             }
             .frame(height: 6)

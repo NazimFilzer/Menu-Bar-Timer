@@ -228,3 +228,39 @@ func testDailyTimelineViewModelAndSettings() {
     let reopened = DayLogStore(storage: InMemoryDayLogAdapter(initialLogs: store.allLogs()))
     assertEqual(reopened.allLogs(), store.allLogs())
 }
+
+@MainActor
+func testDailyTimelineReadsOnlyNearbyDays() {
+    let suite = "skeval-timeline-nearby-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    let store = DayLogStore(storage: InMemoryDayLogAdapter())
+    // Old history, an overnight sprint from yesterday, and two sprints today.
+    for daysAgo in 2...40 {
+        let s = cal.date(byAdding: .day, value: -daysAgo, to: today)!.addingTimeInterval(9 * 3600)
+        store.save(sprint: Sprint(startTime: s, endTime: s.addingTimeInterval(3600)))
+    }
+    let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+    store.save(sprint: Sprint(startTime: yesterday.addingTimeInterval(10 * 3600), endTime: yesterday.addingTimeInterval(11 * 3600)))
+    let overnight = Sprint(startTime: yesterday.addingTimeInterval(22 * 3600), endTime: today.addingTimeInterval(3600))
+    store.save(sprint: overnight)
+    for hour in [9.0, 13.0] {
+        store.save(sprint: Sprint(startTime: today.addingTimeInterval(hour * 3600), endTime: today.addingTimeInterval((hour + 1) * 3600)))
+    }
+    let vm = TimerViewModel(engine: SprintEngine(store: store, observeWorkspace: false), store: store,
+                            goal: GoalSettings(userDefaults: defaults))
+    vm.selectDate(today)
+    let now = today.addingTimeInterval(20 * 3600)
+    let fast = vm.dailyTimeline(now: now)
+    let full = DailyTimeline.calculate(sprints: store.allLogs().values.flatMap { $0 }, date: today,
+                                       hours: vm.goal.timelineHours, now: now, calendar: cal)
+    assertEqual(fast.segments.map(\.id), full.segments.map(\.id), "Nearby days give the same sprints as full history")
+    assertEqual(fast.segments.map(\.number), full.segments.map(\.number), "Sprint numbers match full history")
+    assertEqual(fast.segments.first?.id, overnight.id, "Yesterday's overnight sprint continues into today")
+    assertEqual(fast.segments.first?.number, 2, "The overnight sprint keeps its number from its start day")
+    assertTrue(fast.segments.first?.continuesBefore == true)
+    assertEqual(fast.segments.count, 3)
+    assertEqual(fast.gaps, full.gaps, "Untracked gaps are unchanged")
+}

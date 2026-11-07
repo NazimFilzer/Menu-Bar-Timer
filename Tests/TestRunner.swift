@@ -2179,6 +2179,7 @@ struct TestMain {
             testLiveCatchUpViewModel()
             testFinishForecastViewModel()
             testDailyTimelineViewModelAndSettings()
+            testDailyTimelineReadsOnlyNearbyDays()
             testPeriodPaceViewModel()
             testEyeBreakReminders()
             testSprintEngine()

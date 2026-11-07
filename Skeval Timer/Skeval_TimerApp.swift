@@ -294,7 +294,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         } onChange: {
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.updateStatusItem(force: true)
+                self.updateStatusItem(force: false) // the presentation check already covers text, state, and theme
                 self.observeState()
             }
         }
