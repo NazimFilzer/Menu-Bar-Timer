@@ -309,7 +309,7 @@ private struct BillingCard: View {
                         .font(.system(size: 11, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                     Spacer()
-                    Text(EarningsCalculator.format(amount: vm.goal.hourlyRate * 8, currencySymbol: vm.goal.currencySymbol) + " for 8 hours")
+                    Text("\(vm.goal.targetEarningsLabel) for your \(vm.goal.goalLabel) daily goal")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundColor(theme.neonTeal)
                 }

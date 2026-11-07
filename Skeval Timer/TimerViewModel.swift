@@ -51,6 +51,19 @@ class TimerViewModel {
     let engine: SprintEngine
     let store: DayLogStore
 
+    /// Changes on activity transitions and at most about once a minute while a sprint runs.
+    /// The timeline draws 64 pt per hour (about 1 pt per minute) and shows whole minutes,
+    /// so it observes this instead of the 1-second tick.
+    private(set) var timelineRevision = 0
+    private var timelineMinuteKey = ""
+
+    private func refreshTimelineIfMinuteChanged() {
+        let key = "\(Int(currentElapsed / 60))|\(Int(currentPauseElapsed / 60))|\(Int(Date().timeIntervalSinceReferenceDate / 60))"
+        guard key != timelineMinuteKey else { return }
+        timelineMinuteKey = key
+        timelineRevision += 1
+    }
+
     private(set) var notifiedMilestones: Set<Int> = []
     private var lastNotifiedDayKey: String = TimeFormatter.format(dateKey: Date())
     private var lastActiveDayKey: String = TimeFormatter.format(dateKey: Date())
@@ -114,11 +127,13 @@ class TimerViewModel {
             }
             self.checkAndHandleDayChange()
             self.checkMilestoneNotifications()
+            self.refreshTimelineIfMinuteChanged()
         }
 
         engine.onPauseTick = { [weak self] pauseElapsed in
             self?.currentPauseElapsed = pauseElapsed
             self?.checkAndHandleDayChange()
+            self?.refreshTimelineIfMinuteChanged()
         }
 
         engine.onSprintCompleted = { [weak self] sprint in
@@ -130,6 +145,7 @@ class TimerViewModel {
         }
         engine.onSleepIntervalDetected = { [weak self] interval in
             self?.pendingSleepInterval = interval
+            self?.timelineRevision += 1
             self?.sendSleepNotification(interval: interval)
         }
     }
@@ -144,6 +160,7 @@ class TimerViewModel {
         if activityChanged {
             eyeBreakReminder.restart(at: newState.currentElapsed, settings: eyeBreakSettings)
         }
+        if activityChanged || sprintChanged { timelineRevision += 1 }
         if newState.isRecovery && !state.isRecovery {
             recoveryEndDate = newState.currentSprint?.startTime ?? Date()
         }
@@ -215,8 +232,7 @@ class TimerViewModel {
     func dailyTimeline(hours: TimelineHours? = nil, now: Date = Date(),
                        calendar: Calendar = .current) -> DailyTimeline {
         _ = logRevision
-        // Read both tick values so the view updates from the engine's existing timer.
-        _ = currentPauseElapsed
+        _ = timelineRevision
         let live = timelineLiveSprint()
         // A sprint belongs to its start day, so only the selected day and the day before
         // (overnight sprints) can appear. Shortcut: a completed sprint longer than 24 hours
@@ -231,16 +247,18 @@ class TimerViewModel {
                                        now: now, calendar: calendar)
     }
 
+    /// Reads the engine directly (not observed), so the timeline does not re-render every tick.
     private func timelineLiveSprint() -> TimelineLiveSprint? {
-        guard let sprint = currentSprint else { return nil }
-        if recoveryMode {
+        let state = engine.state
+        guard let sprint = state.currentSprint else { return nil }
+        if state.isRecovery {
             return TimelineLiveSprint(sprint: sprint, status: .recovery, netWork: nil,
                                       paused: sprint.pausedDuration, unresolvedStart: sprint.startTime)
         }
-        let unresolved = pendingSleepInterval?.sleepStartedAt ?? engine.sleepStartedAt
-        let status: TimelineSprintStatus = unresolved != nil ? .sleep : (isPaused ? .paused : .active)
-        let paused = unresolved == nil ? totalCurrentSprintPaused : sprint.pausedDuration
-        return TimelineLiveSprint(sprint: sprint, status: status, netWork: currentElapsed,
+        let unresolved = engine.pendingSleepInterval?.sleepStartedAt ?? engine.sleepStartedAt
+        let status: TimelineSprintStatus = unresolved != nil ? .sleep : (state.isPaused ? .paused : .active)
+        let paused = unresolved == nil ? engine.totalCurrentSprintPaused : sprint.pausedDuration
+        return TimelineLiveSprint(sprint: sprint, status: status, netWork: state.currentElapsed,
                                   paused: paused, unresolvedStart: unresolved)
     }
 

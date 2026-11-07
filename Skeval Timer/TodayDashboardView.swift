@@ -18,12 +18,16 @@ struct TodayDashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 dateNavigation
-                if vm.isViewingToday { sprintTag }
-                metrics
-                dailyGoal
+                // Values that change every tick live in their own views, so the
+                // sprint list and timeline around them do not rebuild each second.
+                if vm.isViewingToday { Live { sprintTag } }
+                Live { metrics }
+                Live { dailyGoal }
                 if vm.isViewingToday {
-                    CatchUpCardView(summary: vm.catchUpSummary(for: .day),
-                                    dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                    Live {
+                        CatchUpCardView(summary: vm.catchUpSummary(for: .day),
+                                        dailyGoalLabel: vm.goal.goalLabel, theme: theme)
+                    }
                     FinishForecastCardView(vm: vm, theme: theme)
                 }
                 if !vm.goal.hasHourlyRate {

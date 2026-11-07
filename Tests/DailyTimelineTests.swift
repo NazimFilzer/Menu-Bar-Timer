@@ -264,3 +264,31 @@ func testDailyTimelineReadsOnlyNearbyDays() {
     assertEqual(fast.segments.count, 3)
     assertEqual(fast.gaps, full.gaps, "Untracked gaps are unchanged")
 }
+
+@MainActor
+func testTimelineRefreshesPerMinuteNotPerTick() {
+    let suite = "skeval-timeline-minute-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let store = DayLogStore(storage: InMemoryDayLogAdapter())
+    let engine = SprintEngine(store: store, observeWorkspace: false)
+    let vm = TimerViewModel(engine: engine, store: store, goal: GoalSettings(userDefaults: defaults),
+                            deliverEyeBreakNotification: {})
+    let before = vm.timelineRevision
+    engine.clockIn(at: Date().addingTimeInterval(-65))
+    assertTrue(vm.timelineRevision > before, "Clock-in refreshes the timeline immediately")
+    engine.onTick?(65)
+    let afterFirstTick = vm.timelineRevision
+    for second in 66...95 { engine.onTick?(TimeInterval(second)) }
+    // At most one more change, in case the wall-clock minute rolls over during the loop.
+    assertTrue(vm.timelineRevision - afterFirstTick <= 1, "Ticks within one minute do not redraw the timeline")
+    let beforeNextMinute = vm.timelineRevision
+    engine.onTick?(125)
+    assertTrue(vm.timelineRevision > beforeNextMinute, "A new minute of work refreshes the timeline")
+    let beforePause = vm.timelineRevision
+    engine.pause()
+    assertTrue(vm.timelineRevision > beforePause, "Pausing refreshes the timeline immediately")
+    assertEqual(vm.dailyTimeline().segments.last?.status, .paused, "The timeline reads live status from the engine")
+    engine.resume()
+    engine.clockOut()
+}

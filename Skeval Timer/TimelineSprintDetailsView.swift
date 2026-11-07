@@ -9,7 +9,10 @@ struct TimelineSprintDetailsView: View {
     @State private var showingRecoveryEnd = false
 
     private var segment: TimelineSegment? {
-        vm.dailyTimeline().segments.first { $0.id == sprintID }
+        // The details sheet shows seconds, so it follows the 1-second tick (the timeline does not).
+        _ = vm.currentElapsed
+        _ = vm.currentPauseElapsed
+        return vm.dailyTimeline().segments.first { $0.id == sprintID }
     }
 
     var body: some View {

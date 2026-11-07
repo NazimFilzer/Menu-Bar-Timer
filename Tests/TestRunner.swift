@@ -2174,6 +2174,7 @@ struct TestMain {
             testFinishForecastViewModel()
             testDailyTimelineViewModelAndSettings()
             testDailyTimelineReadsOnlyNearbyDays()
+            testTimelineRefreshesPerMinuteNotPerTick()
             testPeriodPaceViewModel()
             testEyeBreakReminders()
             testSprintEngine()
