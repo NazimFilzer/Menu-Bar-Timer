@@ -43,10 +43,12 @@ final class PreviewController: NSObject {
         dashboard.window?.title = "Skeval v2 preview · Sample data"
         if timelinePreview {
             dashboard.window?.title = "Timeline columns preview · Sample data"
-            dashboard.window?.contentView = NSHostingView(rootView:
-                DailyTimelineView(vm: vm, theme: ThemeManager.shared.theme,
-                                  temporaryHours: .constant(TimelineHours(startHour: 8, endHour: 14)))
-                    .padding(20))
+            dashboard.makeContent = { [vm] in
+                NSHostingView(rootView:
+                    DailyTimelineView(vm: vm, theme: ThemeManager.shared.theme,
+                                      temporaryHours: .constant(TimelineHours(startHour: 8, endHour: 14)))
+                        .padding(20))
+            }
         }
     }
 

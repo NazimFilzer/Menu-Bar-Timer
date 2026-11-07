@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import SwiftUI
 
 // MARK: - Mini Test Assertion Framework
 
@@ -774,6 +775,8 @@ func testDashboardWindowControllerLifecycle() {
     let controller = DashboardWindowController(vm: vm)
     assertTrue(controller.window != nil, "Dashboard window should be created")
     assertFalse(controller.isWindowVisible, "Dashboard window should initially be hidden")
+    let hasDashboardContent = { controller.window?.contentView is NSHostingView<DashboardView> }
+    assertFalse(hasDashboardContent(), "Hidden dashboard must not keep live SwiftUI views (they update every tick)")
 
     var recordedPolicy: NSApplication.ActivationPolicy? = nil
     controller.onActivationPolicyChanged = { policy in
@@ -783,12 +786,14 @@ func testDashboardWindowControllerLifecycle() {
     // Show dashboard -> transitions to regular policy and makes window visible
     controller.showDashboard()
     assertTrue(controller.isWindowVisible, "Window should be visible after showDashboard")
+    assertTrue(hasDashboardContent(), "Shown dashboard builds its SwiftUI content")
     assertEqual(recordedPolicy, .regular, "Activation policy should transition to .regular")
     assertEqual(NSApp.activationPolicy(), .regular, "NSApp activation policy should be .regular")
 
     // Hide dashboard -> transitions back to accessory policy and hides window
     controller.hideDashboard()
     assertFalse(controller.isWindowVisible, "Window should be hidden after hideDashboard")
+    assertFalse(hasDashboardContent(), "Hiding the dashboard drops its SwiftUI content")
     assertEqual(recordedPolicy, .accessory, "Activation policy should transition to .accessory")
     assertEqual(NSApp.activationPolicy(), .accessory, "NSApp activation policy should be .accessory")
 

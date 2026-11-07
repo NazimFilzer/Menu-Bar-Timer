@@ -6,6 +6,10 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     private let vm: TimerViewModel
 
     var onActivationPolicyChanged: ((NSApplication.ActivationPolicy) -> Void)? = nil
+    /// Builds the window's SwiftUI content. It exists only while the window is shown,
+    /// because hidden SwiftUI views still update on every timer tick.
+    lazy var makeContent: () -> NSView = { [unowned self] in NSHostingView(rootView: DashboardView(vm: vm)) }
+    private var content: NSView?
 
     var isWindowVisible: Bool {
         window?.isVisible ?? false
@@ -29,9 +33,6 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         window.setFrameAutosaveName("SkevalDashboard")
         if !window.setFrameUsingName("SkevalDashboard") { window.center() }
 
-        let hostingView = NSHostingView(rootView: DashboardView(vm: vm))
-        window.contentView = hostingView
-
         super.init(window: window)
         window.delegate = self
     }
@@ -43,12 +44,18 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     func showDashboard() {
         NSApp.setActivationPolicy(.regular)
         onActivationPolicyChanged?(.regular)
+        if content == nil {
+            content = makeContent()
+            window?.contentView = content
+        }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
     func hideDashboard() {
         window?.orderOut(nil)
+        content = nil
+        window?.contentView = nil
         NSApp.setActivationPolicy(.accessory)
         onActivationPolicyChanged?(.accessory)
     }

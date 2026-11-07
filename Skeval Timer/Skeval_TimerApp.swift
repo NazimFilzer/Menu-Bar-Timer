@@ -11,7 +11,7 @@ struct SkevalTimerApp: App {
 }
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, NSPopoverDelegate {
     static weak var shared: AppDelegate?
 
     var statusItem: NSStatusItem!
@@ -58,11 +58,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         popover = NSPopover()
         popover.behavior = .transient
         popover.animates = false
+        popover.delegate = self
         updatePopoverSize()
-        let hostingController = PopoverHostingController(
-            rootView: PopoverView(vm: vm)
-        )
-        popover.contentViewController = hostingController
 
         registerGlobalHotkeys()
         setupStateObservation()
@@ -112,9 +109,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // Built on open and dropped on close: hidden SwiftUI views still update every tick.
+            if popover.contentViewController == nil {
+                popover.contentViewController = PopoverHostingController(rootView: PopoverView(vm: vm))
+            }
             popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        popover.contentViewController = nil
     }
 
     private func setupDayChangeObservers() {
