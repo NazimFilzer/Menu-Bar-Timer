@@ -21,7 +21,7 @@ struct FinishForecast {
     static func calculate(
         logs: [String: [Sprint]], settings: GoalSettings, state: SprintState,
         sleepHeld: Bool = false, plannedBreakMinutes: Int = 0,
-        now: Date = Date(), calendar: Calendar = .current
+        now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> FinishForecast {
         let todayKey = TimeFormatter.format(dateKey: now, calendar: calendar)
         let liveSprint = state.isRunning ? state.currentSprint : nil

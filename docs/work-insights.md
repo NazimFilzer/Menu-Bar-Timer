@@ -10,7 +10,7 @@ Goal grid rows are labelled Week 1, Week 2, and so on within each month. Each ro
 
 ## Daily goal rate
 
-Each week's consistency rate is measured against scheduled working days (defaulting to the 5 working days, Monday through Friday, e.g. `0/5`, `3/5`). Saturday and Sunday are treated as extra time: work on weekends never inflates the required days denominator and is never penalized as a missed goal. Reaching the daily goal on a weekend or day off counts as an extra met goal day in the numerator. Unscheduled days with partial work display the net hours worked as extra time.
+Each week's consistency rate is measured against its finished scheduled working days (defaulting to Monday through Friday, e.g. `0/5`, `3/5`). Today and later days join the denominator only once they are over. Saturday and Sunday are treated as extra time: work on weekends never inflates the required days denominator and is never penalized as a missed goal. Reaching the daily goal on a weekend or day off counts as an extra met goal day in the numerator. Unscheduled days with partial work display the net hours worked as extra time.
 
 Today stays in progress and past days use the current daily goal and working schedule. The card states these details in its footnotes.
 

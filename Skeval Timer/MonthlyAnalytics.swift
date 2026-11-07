@@ -113,9 +113,12 @@ enum MonthlyAnalytics {
         // Tag attribution breakdown
         let tagBreakdowns = calculateTagBreakdown(sprints: allCompletedSprintsInMonth, totalSeconds: totalMonthlySeconds, hourlyRate: settings.hourlyRate, currencySymbol: settings.currencySymbol)
 
-        // Month-over-month comparison
+        // Month-over-month comparison. The current month is compared with the same
+        // number of days at the start of last month, like the Week page does.
         let priorDate = cal.date(byAdding: .month, value: -1, to: firstOfMonth) ?? firstOfMonth
-        let priorTotalSeconds = AnalyticsMetrics.monthDates(containing: priorDate, calendar: cal).reduce(0.0) {
+        let priorDates = AnalyticsMetrics.monthDates(containing: priorDate, calendar: cal)
+        let comparedPriorDates = isCurrentMonth ? Array(priorDates.prefix(elapsedDays)) : priorDates
+        let priorTotalSeconds = comparedPriorDates.reduce(0.0) {
             $0 + DayLog(sprints: logs[TimeFormatter.format(dateKey: $1, calendar: cal)] ?? []).accumulatedTotal
         }
 
@@ -123,7 +126,8 @@ enum MonthlyAnalytics {
             currentSeconds: totalMonthlySeconds,
             priorSeconds: priorTotalSeconds,
             hourlyRate: settings.hourlyRate,
-            currencySymbol: settings.currencySymbol
+            currencySymbol: settings.currencySymbol,
+            priorLabel: isCurrentMonth ? "same days last month" : "last month"
         )
 
         return MonthlySummary(
@@ -209,7 +213,8 @@ enum MonthlyAnalytics {
         currentSeconds: TimeInterval,
         priorSeconds: TimeInterval,
         hourlyRate: Double,
-        currencySymbol: String
+        currencySymbol: String,
+        priorLabel: String
     ) -> MonthOverMonthComparison {
         let secDiff = currentSeconds - priorSeconds
         let hoursDiff = ((secDiff / 3600.0) * 10).rounded() / 10.0
@@ -234,7 +239,8 @@ enum MonthlyAnalytics {
         let formattedPct = priorSeconds == 0 && currentSeconds > 0 ? "N/A" : "\(pctPrefix)\(Int(round(pctChange)))%"
 
         let summaryText = comparisonText(hoursDifference: hoursDiff, percentage: formattedPct,
-                                         hasPriorWork: priorSeconds > 0, isNeutral: isNeu, prefix: hoursPrefix)
+                                         hasPriorWork: priorSeconds > 0, isNeutral: isNeu, prefix: hoursPrefix,
+                                         priorLabel: priorLabel)
 
         return MonthOverMonthComparison(
             currentSeconds: currentSeconds,
@@ -251,10 +257,10 @@ enum MonthlyAnalytics {
         )
     }
     private static func comparisonText(hoursDifference: Double, percentage: String, hasPriorWork: Bool,
-                                       isNeutral: Bool, prefix: String) -> String {
-        if isNeutral { return "Same as last month (0%)" }
-        if !hasPriorWork { return "\(prefix)\(hoursDifference)h vs last month (no prior work)" }
-        return "\(prefix)\(hoursDifference)h (\(percentage)) vs last month"
+                                       isNeutral: Bool, prefix: String, priorLabel: String) -> String {
+        if isNeutral { return "Same as \(priorLabel) (0%)" }
+        if !hasPriorWork { return "\(prefix)\(hoursDifference)h vs \(priorLabel) (no prior work)" }
+        return "\(prefix)\(hoursDifference)h (\(percentage)) vs \(priorLabel)"
     }
 
 }

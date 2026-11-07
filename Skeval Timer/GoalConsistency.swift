@@ -40,7 +40,11 @@ struct GoalConsistency: Equatable {
         while monday <= end {
             let weekDays = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
             let days = weekDays.map { day($0, start: rangeStart, end: end, logs: logs, settings: settings, now: now, calendar: calendar) }
-            let counted = weekDays.filter { settings.isWorkingDay($0, calendar: calendar) }.count
+            // Only finished scheduled days count: today is in progress, and days after
+            // the range (future days, or past the selected month) have no result yet.
+            let counted = days.filter {
+                $0.isScheduledWorkingDay && $0.status != .inProgress && $0.status != .outsideRange
+            }.count
             weeks.append(GoalConsistencyWeek(start: monday, days: days, countedDays: counted))
             guard let next = calendar.date(byAdding: .day, value: 7, to: monday) else { break }
             monday = next

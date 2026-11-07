@@ -113,3 +113,28 @@ func testLiveCatchUpViewModel() {
     vm.delete(sprint: sprint)
     assertEqual(vm.catchUpSummary(for: .week, now: now).clockedSeconds, 0, "Deleting a sprint immediately updates catch-up")
 }
+
+func testDateKeysIgnoreSystemCalendar() {
+    let settings = auditSettings()
+    var gregorian = Calendar(identifier: .gregorian)
+    gregorian.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+    let tuesday = auditDate(2026, 10, 13, calendar: gregorian)
+    let key = TimeFormatter.format(dateKey: tuesday, calendar: gregorian)
+    let logs = [key: [Sprint(startTime: tuesday, endTime: tuesday.addingTimeInterval(2 * 3600))]]
+    for identifier in [Calendar.Identifier.japanese, .buddhist, .republicOfChina] {
+        var system = Calendar(identifier: identifier)
+        system.timeZone = gregorian.timeZone
+        assertEqual(TimeFormatter.format(dateKey: tuesday, calendar: system), "2026-10-13",
+                    "Stored day keys stay Gregorian under the \(identifier) calendar")
+        assertEqual(TimeFormatter.parseDateKey("2026-10-13", calendar: system), gregorian.startOfDay(for: tuesday),
+                    "Day keys parse back under the \(identifier) calendar")
+        let today = CatchUpAnalytics.calculate(logs: logs, period: .day, referenceDate: tuesday.addingTimeInterval(3 * 3600),
+                                               settings: settings, calendar: system)
+        assertEqual(today.clockedSeconds, 2 * 3600, "Today's work is found under the \(identifier) calendar")
+        settings.daysOff = [key]
+        assertFalse(settings.isWorkingDay(tuesday, calendar: system), "Days off match under the \(identifier) calendar")
+        settings.daysOff = []
+    }
+    assertEqual(TimeFormatter.format(dateKey: tuesday, calendar: gregorian), "2026-10-13",
+                "Gregorian keys are unchanged after other calendars are used")
+}

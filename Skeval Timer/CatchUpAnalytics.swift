@@ -63,7 +63,7 @@ enum CatchUpAnalytics {
     static func calculate(
         logs: [String: [Sprint]], period: CatchUpPeriod, referenceDate: Date = Date(),
         settings: GoalSettings, liveSprint: Sprint? = nil, liveElapsed: TimeInterval = 0,
-        calendar: Calendar = .current
+        calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> CatchUpSummary {
         let today = calendar.startOfDay(for: referenceDate)
         let dates = period.dates(containing: referenceDate, calendar: calendar).filter { $0 <= today }

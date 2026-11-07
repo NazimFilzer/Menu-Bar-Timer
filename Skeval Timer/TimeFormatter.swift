@@ -134,9 +134,13 @@ enum TimeFormatter {
         return date
     }
 
+    /// Stored keys are always Gregorian. Only the caller's time zone is used, so a
+    /// Japanese or Buddhist system calendar still finds "2026-11-07", not "0008-11-07".
     private static func configureDateKeyCalendar(_ calendar: Calendar) {
-        guard dateKeyFormatter.calendar.identifier != calendar.identifier || dateKeyFormatter.timeZone != calendar.timeZone else { return }
-        dateKeyFormatter.calendar = calendar
+        guard dateKeyFormatter.timeZone != calendar.timeZone else { return }
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        dateKeyFormatter.calendar = gregorian
         dateKeyFormatter.timeZone = calendar.timeZone
     }
 

@@ -1316,7 +1316,23 @@ func testMonthOverMonthComparison() {
     assertEqual(momPos.percentageChange, 20.0)
     assertEqual(momPos.earningsDifference, 20000.0)
     assertEqual(momPos.formattedEarningsDifference, "+₹20,000")
-    assertEqual(momPos.summaryText, "+20.0h (+20%) vs last month")
+    assertEqual(momPos.summaryText, "+20.0h (+20%) vs same days last month")
+
+    // Case 1b: The current month (1–15 Sep) is compared with 1–15 Aug only.
+    // Work on 20 Aug happened later in the month and must not count against September.
+    let aug20 = cal.date(from: DateComponents(year: 2026, month: 8, day: 20))!
+    var logsLate = logsPos
+    logsLate["2026-08-20"] = [Sprint(startTime: aug20, endTime: aug20.addingTimeInterval(360000))]
+    let momLate = MonthlyAnalytics.calculate(logs: logsLate, monthOffset: 0, referenceDate: refDate,
+                                             settings: settings, calendar: cal).monthOverMonth
+    assertEqual(momLate.priorSeconds, 360000, "Only 1–15 Aug counts while 15 Sep is today")
+    assertEqual(momLate.hoursDifference, 20.0, "Partial month is compared like for like")
+    // A finished month is still compared with the whole previous month.
+    let octRef = cal.date(from: DateComponents(year: 2026, month: 10, day: 5))!
+    let momPast = MonthlyAnalytics.calculate(logs: logsLate, monthOffset: -1, referenceDate: octRef,
+                                             settings: settings, calendar: cal).monthOverMonth
+    assertEqual(momPast.priorSeconds, 720000, "A past month compares with all of the month before")
+    assertTrue(momPast.summaryText.hasSuffix("vs last month"), "Past months keep the whole-month label")
 
     // Case 2: Negative comparison (September: 80h vs August: 100h -> -20h (-20%))
     let sSepNeg = Sprint(startTime: sepDate, endTime: sepDate.addingTimeInterval(288000), pausedDuration: 0) // 80h
@@ -2136,6 +2152,7 @@ struct TestMain {
         testSprintTaggingAndBackwardCompatibility()
         testGoalSettingsExpansion()
         testEarningsCalculator()
+        testDateKeysIgnoreSystemCalendar()
         testGoalConsistencyIncludesWeekendWork()
         testSprintPatternsUseNetCompletedWork()
         testWeekComparisonBoundaries()

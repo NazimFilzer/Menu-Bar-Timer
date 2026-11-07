@@ -26,7 +26,8 @@ func testGoalConsistencyIncludesWeekendWork() {
     assertEqual(result.weeks[0].days[6].status, .extraTime, "Sunday partial work is extra time, not belowGoal")
     settings.daysOff = [TimeFormatter.format(dateKey: saturday, calendar: cal)]
     assertEqual(calculate().countedDays, 5, "Work on a marked day off is extra time and does not inflate scheduled working days")
-    assertEqual(calculate(now).countedDays, 10, "Two weeks have ten scheduled working days")
+    assertEqual(calculate(now).countedDays, 5, "Today (Monday, in progress) and later days are not in the rate yet")
+    assertEqual(calculate(now).weeks.last?.countedDays, 0, "A week with only today so far has no finished days")
     assertEqual(calculate(now).weeks.last?.days.first?.status, .inProgress)
     assertEqual(store.allLogs(), before, "Report calculations never change stored sprints")
 
@@ -126,6 +127,7 @@ func testWorkInsightsCalendarTransitions() {
         let goal = GoalConsistency.calculate(logs: [:], startDate: monday, endDate: sunday,
                                              settings: settings, now: sunday, calendar: cal)
         assertEqual(goal.weeks.count, 1)
-        assertEqual(goal.countedDays, 7, "Calendar stepping keeps all scheduled days in the week")
+        assertEqual(goal.weeks.first?.days.count, 7, "Calendar stepping keeps all seven days in the week")
+        assertEqual(goal.countedDays, 6, "Six finished scheduled days; Sunday (today) is still in progress")
     }
 }

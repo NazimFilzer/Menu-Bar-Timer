@@ -22,7 +22,7 @@ struct PeriodPaceForecast: Equatable {
 
     static func calculate(
         logs: [String: [Sprint]], period: CatchUpPeriod, settings: GoalSettings,
-        state: SprintState, now: Date = Date(), calendar: Calendar = .current
+        state: SprintState, now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> PeriodPaceForecast {
         let today = calendar.startOfDay(for: now)
         let scheduled = period.dates(containing: now, calendar: calendar).filter {

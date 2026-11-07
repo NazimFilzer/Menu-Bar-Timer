@@ -243,7 +243,7 @@ class TimerViewModel {
                                   paused: paused, unresolvedStart: unresolved)
     }
 
-    func finishForecast(now: Date = Date(), calendar: Calendar = .current) -> FinishForecast {
+    func finishForecast(now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)) -> FinishForecast {
         _ = logRevision
         return FinishForecast.calculate(
             logs: store.allLogs(), settings: goal, state: state,
@@ -254,7 +254,7 @@ class TimerViewModel {
     }
 
     func periodPaceForecast(for period: CatchUpPeriod, now: Date = Date(),
-                            calendar: Calendar = .current) -> PeriodPaceForecast {
+                            calendar: Calendar = Calendar(identifier: .gregorian)) -> PeriodPaceForecast {
         _ = logRevision
         return PeriodPaceForecast.calculate(
             logs: store.allLogs(), period: period, settings: goal, state: state,
