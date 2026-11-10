@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Today tab on the shared dashboard grammar</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only. No persistence.
+  Question: what should Today look like when it uses the same grammar as Month (accent icon left,
+  in-card headers, label/value fact rows, one period navigator), so Today, Week and Month read as one product?
+  Follows the Today critique: .impeccable/critique/2026-11-10T11-45-06Z__skeval-timer-todaydashboardview-swift.md
+  The app is native SwiftUI; this HTML only judges layout and hierarchy. Sizes are in points.
+
+  ?variant=  G Shared grammar (component sheet) · A Same layout, new grammar · B Week-style strip · C Month-style side column · R Current (reference)
+  ?state=    active · paused · idle · reached · empty · past
+  ?tag=      header · row · popover · card       (where the sprint tag lives)
+  ?theme=    light · dark
+  Keys: ← → variant · 1–6 state · T tag option · D dark/light
+-->
+<style>
+:root{
+ --bg:#FFFAE6;--card:#FFFFFF;--border:#E8E0BA;--accent:#E0B24C;--accent-wash:#E0B24C29;--accent-text:#876B2E;--accent-icon:#B48F3D;
+ --ink:#38301C;--muted:#807552;--warn:#995900;--warn-wash:#FF950020;--good:#22774D;--good-wash:#2E9E6620;--danger:#C15047;
+ --orange:#FF9500;--track:#E8E0BA80;--gap:#80755208;--on-accent:#000;
+ --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;--round:"SF Pro Rounded",ui-rounded,-apple-system,sans-serif;--mono:"SF Mono",ui-monospace,Menlo,monospace}
+body.dark{--bg:#1F1C14;--card:#29291F;--border:#4A4532;--accent:#E0B24C;--accent-wash:#E0B24C29;--accent-text:#E8C66F;--accent-icon:#E0B24C;
+ --ink:#F0ECE0;--muted:#C4BCA4;--warn:#FFB45C;--warn-wash:#FF950026;--good:#6FD39A;--good-wash:#2E9E6630;--track:#4A453280;--gap:#FFFFFF08}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:13px;background:#cfc8b4;color:var(--ink);padding:22px 0 120px;display:flex;justify-content:center}
+body.dark{background:#0d0c09}
+.win{width:1140px;display:flex;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0004;overflow:hidden;min-height:760px}
+/* sidebar (unchanged app chrome) */
+.side{width:195px;background:var(--card);border-right:1px solid var(--border);padding:22px 10px;display:flex;flex-direction:column;gap:4px;flex:none}
+.side h2{font-size:17px;padding:0 8px}.side small{color:var(--muted);padding:0 8px 16px;font-size:12px}
+.side .it{padding:9px 10px;border-radius:8px;font-size:14px;color:var(--muted);display:flex;gap:10px}.side .it.on{background:var(--accent-wash);color:var(--ink);font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tb{display:flex;align-items:center;gap:14px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border)}
+.tb h1{font-size:17px}.tb .sub{margin-top:3px}
+.state{text-align:right}.state b{font-size:11px;display:block}.state span{font-family:var(--mono);font-size:13px}
+.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+.sp{flex:1}.row{display:flex;gap:12px;align-items:center}.row>*{min-width:0}.col{display:flex;flex-direction:column}
+/* ---- shared grammar (the components under test) ---- */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.ch{display:flex;align-items:center;gap:6px;min-height:20px}           /* CardHeader */
+.ch .ic{color:var(--accent-icon);font-size:12px;width:14px;text-align:center}
+.ch .t{white-space:nowrap;font:700 11px var(--round);letter-spacing:.8px;text-transform:uppercase;color:var(--ink)}
+.ch .acts{margin-left:auto;display:flex;gap:6px;align-items:center}
+.hero{font:700 28px var(--mono);letter-spacing:-.3px;line-height:1.1}   /* HeroFigure */
+.hero.r{font:600 28px var(--round)}
+.money{font:700 18px var(--mono);color:var(--good)}
+.cap{font:500 12px var(--round);color:var(--muted)}
+.sec{font:700 9px var(--round);letter-spacing:.9px;text-transform:uppercase;color:var(--muted);margin:2px 0 6px}
+.fr{display:flex;align-items:baseline;gap:8px;padding:5px 0}            /* FactRow */
+.fr .l{font:500 12px var(--round);color:var(--muted)}.fr .v{margin-left:auto;font:700 13px var(--mono)}
+.fr .v.em{font-size:16px}.fr .d{display:block;text-align:right;font:500 10.5px var(--round);color:var(--muted)}
+.hr{height:1px;background:var(--border);margin:12px 0}
+.bar{height:8px;border-radius:4px;background:var(--track);position:relative;overflow:hidden}.bar i{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.bar.done i{background:var(--good)}
+.pill{display:inline-flex;gap:5px;align-items:center;font:600 11px var(--round);padding:3px 9px;border-radius:99px;background:var(--accent-wash);color:var(--accent-text);white-space:nowrap}
+.pill.w{background:var(--warn-wash);color:var(--warn)}.pill.g{background:var(--good-wash);color:var(--good)}
+.chip{font:700 10.5px var(--round);color:var(--accent-text);background:#E0B24C24;border:1px solid #E0B24C59;border-radius:99px;padding:2px 7px;white-space:nowrap}
+.chip.add{background:transparent;border-style:dashed;color:var(--muted)}
+button{font:inherit;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap}
+button.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+button.stop{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
+button.pause{background:var(--warn-wash);border-color:transparent;color:var(--warn);font-weight:600}
+button.res{background:var(--orange);border-color:var(--orange);color:#000;font-weight:600}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+button.lg{font-size:13px;padding:6px 14px;border-radius:8px}
+button[disabled]{opacity:.35;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}.seg span{padding:3px 10px;font-size:12px;cursor:pointer}.seg span.on{background:var(--accent);color:#000;font-weight:600}
+/* PeriodNavigator */
+.nav{display:flex;align-items:center;gap:6px}
+.nav .chev{width:26px;height:26px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.nav .lab{font:600 13px var(--mono);padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);display:inline-flex;gap:7px;align-items:center}
+.nav .lab.static{border-color:transparent;background:transparent}
+.nav .kbd{font:500 10.5px var(--round);color:var(--muted);margin-left:6px}
+/* info popover */
+.info{position:relative;display:inline-flex}.info>button{width:18px;height:18px;padding:0;border-radius:50%;font:700 10px var(--round);color:var(--muted)}
+.info .bub{display:none;position:absolute;left:24px;top:-6px;width:290px;z-index:5;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font:500 11.5px/1.45 var(--round);color:var(--muted);box-shadow:0 6px 18px #0002}
+.info.open .bub{display:block}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:5px;overflow:hidden}.stepper span{padding:1px 7px;font:700 11px var(--round);color:var(--muted);cursor:pointer}.stepper b{padding:1px 8px;font:700 12px var(--mono);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+/* timeline */
+.tl{position:relative;margin-left:54px;border-left:1px solid var(--border)}
+.tl .h{position:absolute;left:-54px;width:46px;text-align:right;font:500 11px var(--round);color:var(--muted);transform:translateY(-7px)}
+.tl .ln{position:absolute;left:0;right:0;border-top:1px solid var(--track)}
+.tl .gap{position:absolute;left:8px;right:8px;border-radius:4px;background:var(--gap);display:flex;align-items:center;justify-content:center;gap:8px;font:500 11px var(--round);color:var(--muted)}
+.tl .sb{position:absolute;left:8px;right:8px;border-radius:6px;background:var(--accent-wash);border:1px solid #E0B24C66;padding:5px 10px;display:flex;gap:8px;align-items:flex-start;font-size:12px;overflow:hidden}
+.tl .sb.live{background:var(--card);border:1.5px solid var(--accent)}
+.tl .sb.paused{border-color:var(--orange);background:var(--warn-wash)}
+.tl .sb .dur{margin-left:auto;font:600 11px var(--mono)}
+.tl .now{position:absolute;left:-54px;right:0;display:flex;align-items:center;gap:8px;color:var(--accent-icon);pointer-events:none;z-index:2}
+.tl .now b{width:46px;text-align:right;font:700 10px var(--round)}.tl .now i{flex:1;height:1.5px;background:currentColor}
+.tl .fut{position:absolute;left:0;right:0;background:var(--gap)}
+.st{display:inline-flex;align-items:center;gap:4px;font:700 10px var(--round);padding:1px 7px;border-radius:99px;background:var(--accent-wash);color:var(--accent-text)}
+.st.p{background:var(--warn-wash);color:var(--warn)}
+.st::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+/* list */
+table{width:100%;border-collapse:collapse}th{font:700 10px var(--round);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 8px;border-bottom:1px solid var(--border)}
+td{padding:9px 8px;border-bottom:1px solid var(--track);font-size:12px}td.m{font:600 12px var(--mono)}
+/* field */
+.field{border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--muted);font-size:13px;background:var(--card)}
+.note{font-size:12px;color:#4a4020;background:#fff3c4;border:1px dashed #d8b84a;border-radius:8px;padding:10px 12px;line-height:1.5}
+body.dark .note{background:#3a331c;color:#efe3b8;border-color:#7a6a2a}
+.callout{outline:2px dashed #d0602a;outline-offset:3px;border-radius:12px}
+/* grammar sheet */
+.gs{display:grid;grid-template-columns:150px 1fr;gap:14px 18px;align-items:start}.gs>.k{font:700 11px var(--round);color:var(--muted);padding-top:6px}
+#sw{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:16px;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;box-shadow:0 6px 24px #0006;z-index:20;max-width:1100px;justify-content:center}
+#sw button{background:#333;color:#fff;border:0;padding:4px 9px;border-radius:99px;font-size:11.5px}#sw button.on{background:#fff;color:#111}#sw .sep{width:1px;height:18px;background:#555}
+#sw .g{color:#999;font-size:11px}
+</style>
+</head>
+<body>
+<div class="win" id="win"></div>
+<div id="sw"></div>
+<script>
+// ---------- Sample data (in memory only, mirrors the preview app) ----------
+const RATE=1500, DG=8, WG=40, NOW=17*60+52;            // now = 5:52 PM, Tue 10 Nov 2026
+const M=(h,m=0)=>h*60+m;
+const S1={id:1,name:'Sprint 1',start:M(7),end:M(9,10),paused:10,tag:'Development'};
+const STATES={
+ active:{label:'Active', run:'active', live:{start:M(17,10),paused:0}, done:[S1]},
+ paused:{label:'Paused', run:'paused', live:{start:M(17,10),paused:6}, done:[S1]},
+ idle:{label:'Idle', run:'idle', done:[S1]},
+ reached:{label:'Goal reached', run:'idle', done:[S1,{id:2,name:'Sprint 2',start:M(9,30),end:M(13,0),paused:15,tag:'Client'},{id:3,name:'Sprint 3',start:M(13,45),end:M(16,40),paused:0,tag:'Development'}]},
+ empty:{label:'Empty day', run:'idle', done:[]},
+ past:{label:'Past day', run:'active', live:{start:M(17,10),paused:0}, past:true, done:[{id:9,name:'Sprint 1',start:M(7),end:M(11,10),paused:10,tag:'Client'}]},
+};
+const fd=m=>{m=Math.max(0,Math.round(m));return m<60?`${m}m`:`${Math.floor(m/60)}h ${m%60}m`};
+const fdl=m=>{m=Math.round(m);return m<1?'<1m':fd(m)};
+const clock=m=>{m=((Math.round(m)%1440)+1440)%1440;const h=Math.floor(m/60),mm=m%60;return `${h%12||12}:${String(mm).padStart(2,'0')} ${h<12?'AM':'PM'}`};
+const hms=m=>{const s=Math.round(m*60);return [s/3600|0,(s/60|0)%60,s%60].map(x=>String(x).padStart(2,'0')).join(':')};
+const money=m=>'₹'+(m/60*RATE).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const net=s=>s.end-s.start-s.paused;
+function derive(k){
+ const s=STATES[k]; const past=!!s.past;
+ const liveMin=s.live&&!past?NOW-s.live.start-s.live.paused:0;
+ const doneMin=s.done.reduce((a,x)=>a+net(x),0);
+ const worked=doneMin+liveMin, left=Math.max(0,DG*60-worked), reached=worked>=DG*60;
+ const weekWorked=(past?0:240)+(past?doneMin:worked);    // Mon 9 = 4h
+ const expected=past?8*60:16*60, behind=Math.max(0,expected-weekWorked);
+ const breaks=+(Q.get('breaks')||0);
+ const finish=s.run==='idle'&&!reached?NOW+left+breaks:NOW+left+breaks;
+ return {...s,k,past,liveMin,doneMin,worked,left,reached,pct:Math.min(100,Math.round(worked/(DG*60)*100)),
+  weekWorked,behind,finish,breaks,dayLabel:past?'Mon, Nov 9, 2026':'Tue, Nov 10, 2026',short:past?'Monday':'Today',
+  timerMin:s.live?NOW-s.live.start-s.live.paused:0};
+}
+// ---------- Shared grammar components ----------
+const CardHeader=(t,ic,acts='')=>`<div class="ch"><span class="ic">${ic}</span><span class="t">${t}</span>${acts?`<span class="acts">${acts}</span>`:''}</div>`;
+const FactRow=(l,v,o={})=>`<div class="fr"><span class="l">${l}</span><span style="margin-left:auto;text-align:right"><span class="v ${o.em?'em':''}" style="${o.c?`color:${o.c}`:''}">${v}</span>${o.d?`<span class="d" style="${o.dc?`color:${o.dc}`:''}">${o.d}</span>`:''}</span></div>`;
+const Info=(txt)=>`<span class="info"><button onclick="this.parentNode.classList.toggle('open')" title="${txt.replace(/"/g,'&quot;')}">i</button><span class="bub">${txt}</span></span>`;
+function PeriodNavigator({label,picker=true,canBack=true,canFwd,reset,kbd='⌘[ ⌘]'}){
+ return `<div class="nav"><button class="chev" ${canBack?'':'disabled'} title="Previous, Command [">‹</button>
+  <span class="lab ${picker?'':'static'}">${picker?'<span style="color:var(--accent-icon)">▦</span>':''}${label}</span>
+  <button class="chev" ${canFwd?'':'disabled'} title="Next, Command ]">›</button>
+  ${reset?`<button style="margin-left:4px">${reset}</button>`:''}<span class="kbd">${kbd}</span></div>`;
+}
+const Bar=(pct,done)=>`<div class="bar ${done?'done':''}"><i style="width:${pct?Math.max(2,pct):0}%"></i></div>`;
+// ---------- Pieces ----------
+function toolbar(d,subtitle){
+ const run=d.run, st=run==='active'?'Active':run==='paused'?'Paused':'Idle';
+ const col=run==='active'?'var(--accent-text)':run==='paused'?'var(--warn)':'var(--muted)';
+ return `<div class="tb"><div><h1>Today</h1>${subtitle?`<div class="cap" style="font-family:var(--font);font-size:12px">${subtitle}</div>`:''}</div><div class="sp"></div>
+ <div class="state"><b style="color:${col}">${st}</b><span>${hms(d.timerMin)}</span></div>
+ ${run==='active'?'<button class="pause lg">❚❚ Pause</button><button class="stop lg">■ Clock out</button>':run==='paused'?'<button class="res lg">▶ Resume</button><button class="stop lg">■ Clock out</button>':'<button class="pri lg">▶ Clock in</button>'}</div>`;
+}
+const sidebar=`<div class="side"><h2>Skeval Timer</h2><small>Work and earnings</small>${['◷ Today','▦ Week','▦ Month','⟋ Analytics','⚙ Settings'].map((x,i)=>`<div class="it ${i?'':'on'}">${x}</div>`).join('')}</div>`;
+const nav=d=>PeriodNavigator({label:d.dayLabel,canFwd:d.past,reset:d.past?'Today':null});
+function paceText(d){
+ if(d.behind<1) return `<span class="pill g">✓ On schedule this week</span>`;
+ return `<span class="pill w">⟲ ${fd(d.behind)} behind schedule this week</span>`;
+}
+const forecastHelp=`Estimate only, not a scheduled clock-out. Assumes you keep working and take only the upcoming breaks. Upcoming breaks count only breaks still ahead, including lunch; they don't pause the timer and reset each day.`;
+function forecastBlock(d,size='hero'){
+ if(d.past) return `<div class="cap">No forecast for a past day.</div>`;
+ if(d.reached) return `<div class="row"><span class="hero r" style="color:var(--good)">✓ Done</span></div><div class="cap" style="margin-top:4px">Daily goal reached. No more work is needed today.</div>`;
+ const verb=d.run==='active'?'If you keep working':d.run==='paused'?'If you resume now':'If you clock in now';
+ const nextDay=d.finish>=1440;
+ return `<div class="row" style="gap:8px;align-items:baseline"><span class="cap" style="font-size:13px">Around</span><span class="hero r" style="color:var(--accent-text)">${clock(d.finish)}</span>${nextDay?'<span class="cap">Nov 11</span>':''}${Info(forecastHelp)}</div>
+  <div class="cap" style="margin-top:4px">${verb}${nextDay?' · <span style="color:var(--warn)">crosses midnight; the sprint stays on its start day</span>':''}</div>`;
+}
+const breaks=d=>d.past||d.reached?'':`<div class="fr"><span class="l">Upcoming breaks</span><span style="margin-left:auto" class="stepper"><span>−</span><b>${d.breaks} min</b><span>+</span></span></div>`;
+function goalFacts(d){
+ return `${FactRow('Worked',fd(d.worked),{d:d.run!=='idle'&&!d.past?'includes the running sprint':null})}
+  ${FactRow(d.reached?'Over goal':'Left today',d.reached?fd(d.worked-DG*60):fd(d.left),{c:d.reached?'var(--good)':null,em:true})}`;
+}
+// Tag control (option under test)
+function tagControl(d,where){
+ if(d.past||Q_TAG!==where) return '';
+ const running=d.run!=='idle';
+ const has=running&&Q.get('tagged')!=='0';
+ if(where==='header') return has?`<span class="chip" title="Tag of the running sprint. Click to change.">#Development ▾</span>`:`<span class="chip add" title="Tag for the ${running?'running':'next'} sprint">＃ ${running?'Tag sprint':'Tag next sprint'}</span>`;
+ return '';
+}
+function tagCard(d){
+ if(d.past||Q_TAG!=='card') return '';
+ return `<div class="card">${CardHeader(d.run==='idle'?'Next sprint tag':'Sprint tag','#')}<div class="field" style="margin-top:10px">Optional project or client</div>${d.run==='paused'?`<div style="margin-top:8px;font:600 12px var(--mono);color:var(--warn)">Paused for ${hms(6)}</div>`:''}</div>`;
+}
+// Timeline, drawn full height (no scroll inside the page scroll), from first sprint − 1h to now + 2h
+function timeline(d,pph=34){
+ const segs=d.done.map(x=>({...x,kind:'done'}));
+ if(d.live&&!d.past) segs.push({id:'L',name:`Sprint ${d.done.length+1}`,start:d.live.start,end:NOW,paused:d.live.paused,kind:d.run});
+ const first=segs.length?Math.min(...segs.map(s=>s.start)):M(9);
+ const startH=Math.max(6,Math.floor(first/60)-1), endH=d.past?Math.ceil(Math.max(...segs.map(s=>s.end))/60)+1:Math.min(24,Math.ceil(NOW/60)+2);
+ const y=m=>(m-startH*60)/60*pph, H=(endH-startH)*pph;
+ let html='';
+ for(let h=startH;h<=endH;h++) html+=`<div class="ln" style="top:${y(h*60)}px"></div>`+(!d.past&&Math.abs(y(h*60)-y(NOW))<14?'':`<div class="h" style="top:${y(h*60)}px">${(h%12)||12}${h<12||h===24?'AM':'PM'}</div>`);
+ if(!d.past) html+=`<div class="fut" style="top:${y(NOW)}px;height:${H-y(NOW)}px"></div>`;
+ const sorted=[...segs].sort((a,b)=>a.start-b.start);
+ for(let i=0;i<sorted.length-1;i++){const g0=sorted[i].end,g1=sorted[i+1].start; if(g1-g0>=20) html+=`<div class="gap" style="top:${y(g0)+3}px;height:${y(g1)-y(g0)-6}px">${(y(g1)-y(g0))>26?`<b>${fd(g1-g0)} untracked</b><span>${clock(g0)} – ${clock(g1)}</span>`:''}</div>`;}
+ for(const s of segs){
+  const live=s.kind!=='done', h=Math.max(28,y(s.end)-y(s.start)-2);
+  const dur=live?`${fdl(net(s))}`:fd(net(s));
+  const st=live?`<span class="st ${s.kind==='paused'?'p':''}">${s.kind==='paused'?'Paused':'Running'}</span>`:'';
+  const tag=(live&&Q_TAG==='row')?(Q.get('tagged')!=='0'?`<span class="chip" title="Click to change">#Development ▾</span>`:`<span class="chip add">＃ Tag</span>`):(s.tag?`<span class="chip">#${s.tag}</span>`:'');
+  html+=`<div class="sb ${live?'live':''} ${s.kind==='paused'?'paused':''}" style="top:${y(s.start)+1}px;height:${h}px"><b>${s.name}</b>${st}<span class="cap">${clock(s.start)} – ${live?'now':clock(s.end)}</span>${tag}<span class="dur">${dur}${s.paused?` <span class="cap" style="font-family:var(--mono);font-size:10px">· ${fd(s.paused)} paused</span>`:''}</span></div>`;
+ }
+ // Now line sits on the block's top edge only when it would not cross a label: draw it after the live block ends.
+ if(!d.past) html+=`<div class="now" style="top:${y(NOW)}px"><b>Now</b><i></i></div>`;
+ return `<div class="tl" style="height:${H+6}px">${html}</div>`;
+}
+function list(d){
+ if(!d.done.length) return `<div class="cap" style="padding:18px 0;text-align:center">No completed sprints ${d.past?'on this day':'yet today'}.</div>`;
+ return `<table><tr><th>Sprint</th><th>Start</th><th>End</th><th>Paused</th><th>Work</th><th>Tag</th><th></th></tr>${d.done.map(s=>`<tr><td><b>${s.name}</b></td><td class="m">${clock(s.start)}</td><td class="m">${clock(s.end)}</td><td class="m" style="color:var(--warn)">${s.paused?fd(s.paused):'—'}</td><td class="m">${fd(net(s))}</td><td>${s.tag?`<span class="chip">#${s.tag}</span>`:''}</td><td style="text-align:right"><button class="ghost">⋯</button></td></tr>`).join('')}</table>`;
+}
+function sprintCard(d,opts={}){
+ const view=Q.get('view')==='list'?'list':'timeline';
+ const seg=`<span class="seg"><span class="${view==='timeline'?'on':''}" onclick="setQ('view','timeline')">Timeline</span><span class="${view==='list'?'on':''}" onclick="setQ('view','list')">List</span></span>`;
+ const acts=`${tagControl(d,'header')}${seg}<button ${d.done.length?'':'disabled'} title="Copy this day's Login, Logout, blank Lunch and Break as one spreadsheet row">⧉ Copy all</button><button>＋ Add sprint</button><button class="ghost" title="Visible hours, Export CSV">⋯</button>`;
+ return `<div class="card ${opts.cls||''}">${CardHeader(`${d.short}'s sprints`,'▤',acts)}
+  <div style="margin-top:14px">${view==='list'?list(d):timeline(d,opts.pph)}</div></div>`;
+}
+const note=t=>`<div class="note"><b>Prototype note:</b> ${t}</div>`;
+const workedCard=(d,title='Worked')=>`<div class="card">${CardHeader(title,'◷')}
+ <div style="margin-top:12px" class="hero">${fd(d.worked)}</div><div class="cap" style="margin-top:3px">of ${DG}h daily goal</div>
+ <div class="row" style="gap:6px;align-items:baseline;margin-top:10px"><span class="money">${money(d.worked)}</span><span class="cap" style="font-size:11px">at ₹1,500/h</span></div>
+ <div style="margin-top:12px">${Bar(d.pct,d.reached)}</div>
+ <div class="row cap" style="margin-top:6px"><span style="${d.reached?'color:var(--good)':''}">${d.reached?'Daily goal reached':fd(d.left)+' left'}</span><span class="sp"></span><b style="font:700 11px var(--mono);color:${d.reached?'var(--good)':'var(--accent-text)'}">${d.pct}%</b></div></div>`;
+
+// ---------- Variants ----------
+const V={
+G:{name:'Shared grammar',render:d=>`${toolbar(d)}<div class="pg">
+ <div class="card">${CardHeader('Dashboard grammar','◆')}<div class="cap" style="margin:6px 0 16px">One set of parts for Today, Week and Month, taken from Month. Each tab keeps its own content; only the parts are shared.</div>
+ <div class="gs">
+  <div class="k">PeriodNavigator<br><span style="font-weight:500">above the content, all tabs</span></div>
+  <div class="col" style="gap:10px">${PeriodNavigator({label:'Tue, Nov 10, 2026',canFwd:false})}${PeriodNavigator({label:'Mon, Nov 9, 2026',canFwd:true,reset:'Today'})}${PeriodNavigator({label:'Nov 9 – Nov 15, 2026',canFwd:false})}${PeriodNavigator({label:'November 2026',canFwd:false})}${PeriodNavigator({label:'October 2026',canFwd:true,reset:'This month'})}
+   <div class="cap">Same chevrons, same label field (opens a picker), reset button only when off the current period, titled <b>Today · This week · This month</b>. ⌘[ ⌘] everywhere, Month included.</div></div>
+  <div class="k">CardHeader</div>
+  <div class="col" style="gap:10px">${CardHeader('Worked','◷')}${CardHeader('Daily goal','◎','<span class="pill w">⟲ 2h behind</span>')}${CardHeader("Today's sprints",'▤','<button>⧉ Copy all</button><button>＋ Add sprint</button>')}
+   <div class="cap">Accent icon left (accentIcon), 11pt Rounded Bold, 0.8 tracking, uppercase, ink. Optional trailing badge or actions. Replaces MetricCard titles, the goal card label, "WHEN CAN I FINISH?", "Sprint tag", Week's label() and MonthCardTitle.</div></div>
+  <div class="k">HeroFigure</div>
+  <div class="col" style="gap:6px"><div class="row" style="gap:28px;align-items:baseline"><span class="hero">2h 42m</span><span class="hero r" style="color:var(--accent-text)">11:10 PM</span><span class="money">₹4,050.00</span></div>
+   <div class="cap">Durations 28pt SF Mono Bold (Month's Worked). Clock times 28pt Rounded Semibold, monospaced digits. Money 18pt Mono in successText. One scale on every tab: Week's 20pt and Today's 24pt go.</div></div>
+  <div class="k">FactRow / section label</div>
+  <div class="col" style="max-width:340px"><div class="sec">Schedule to date</div>${FactRow('Expected by today','16h')}${FactRow('Clocked','6h 42m')}${FactRow('Behind','9h 18m',{c:'var(--warn)',em:true})}</div>
+  <div class="k">Progress bar</div><div class="col" style="gap:6px;max-width:340px">${Bar(34)}${Bar(100,true)}${Bar(0)}<div class="cap">8pt theme capsule; never a native ProgressView (it greys when the window is inactive). 0% draws nothing.</div></div>
+  <div class="k">Words</div><div class="cap" style="line-height:1.6">“Daily goal”, never “Daily target”. Pace = “<b>Xh behind schedule</b>” or “<b>On schedule</b>”, never “left this week”. Sentence case on every button: “Copy all”, “Add sprint”. Explanations live in ⓘ and .help, not under the figures.</div>
+ </div></div>
+ ${note('Variants A–C apply this grammar to Today in three different structures. R is the current Today for comparison. Use T in the bar to move the Sprint tag between its four homes.')}</div>`},
+
+A:{name:'Same layout, new grammar',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:stretch">
+  <div class="col" style="gap:16px">${workedCard(d)}${tagCard(d)}</div>
+  <div class="card col">${CardHeader(d.past?'Result':'When can I finish?','◎',d.past?'':paceText(d))}
+   <div style="margin-top:14px">${forecastBlock(d)}</div><div class="hr"></div>
+   <div class="sec">Daily goal · ${DG}h</div>${goalFacts(d)}${breaks(d)}</div>
+ </div>
+ ${sprintCard(d)}
+ ${note('Closest to today’s layout. Worked and Earnings merge into one Month-style Worked card (no ₹ card of its own). The goal card leads with the finish time; the goal becomes fact rows; the week pace is a header badge in Week’s words; the two always-on sentences moved into ⓘ. One sprint card, header holds the view switch and all actions.')}</div>`},
+
+B:{name:'Week-style strip',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ <div class="card"><div style="display:grid;grid-template-columns:200px 1fr 1fr;gap:26px;align-items:start">
+  <div class="col" style="gap:14px">
+   <div>${CardHeader('Worked','◷')}<div class="hero" style="margin-top:8px">${fd(d.worked)}</div><div class="cap">of ${DG}h daily goal</div></div>
+   <div>${CardHeader('Earned','₹')}<div class="money" style="margin-top:8px">${money(d.worked)}</div><div class="cap">at ₹1,500/h</div></div>
+  </div>
+  <div>${CardHeader(d.past?'Result':'When can I finish?','◎')}<div style="margin-top:10px">${forecastBlock(d)}</div><div style="margin-top:12px">${Bar(d.pct,d.reached)}</div><div class="row cap" style="margin-top:6px"><span>${d.reached?'Daily goal reached':fd(d.left)+' left today'}</span><span class="sp"></span><b style="font:700 11px var(--mono);color:var(--accent-text)">${d.pct}%</b></div>${breaks(d)}</div>
+  <div style="border-left:1px solid var(--border);padding-left:22px">${CardHeader('Week pace','⟲')}<div style="margin:10px 0 6px">${d.past?'<span class="cap">See Week</span>':paceText(d)}</div>
+   <div class="sec" style="margin-top:10px">This week</div>${FactRow('Expected by today',fd(d.past?480:960))}${FactRow('Clocked',fd(d.weekWorked))}${FactRow('Behind',fd(d.behind),{c:'var(--warn)',em:true})}</div>
+ </div></div>
+ ${tagCard(d)}
+ ${sprintCard(d)}
+ ${note('Mirrors Week exactly: one wide summary card, totals on the left, the answer in the middle, the week context on the right. Day and week read as the same instrument at two zoom levels. Week pace gets real fact rows instead of a one-line pill.')}</div>`},
+
+C:{name:'Month-style side column',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start">
+  ${sprintCard(d,{pph:30})}
+  <div class="col" style="gap:18px">
+   ${workedCard(d)}
+   <div class="card">${CardHeader(d.past?'Result':'When can I finish?','◎')}<div style="margin-top:12px">${forecastBlock(d)}</div>${d.past?'':`<div class="hr"></div>`}${breaks(d)}${d.past?'':FactRow('Left today',d.reached?'—':fd(d.left),{em:true})}</div>
+   ${d.past?'':`<div class="card">${CardHeader('Week pace','⟲')}<div style="margin:10px 0 4px">${paceText(d)}</div>${FactRow('Expected by today',fd(960))}${FactRow('Clocked',fd(d.weekWorked))}</div>`}
+   ${tagCard(d)}
+  </div></div>
+ ${note('Same skeleton as Month: the day’s picture (timeline) is the big card on the left, like the calendar; a 300pt column holds Worked, Finish and Week pace. Stacks below the timeline in a narrow window, like Month. The timeline is drawn full height, so there is no scroll area inside the page.')}</div>`},
+
+R:{name:'Current (reference)',render:d=>`${toolbar(d,'Your timer, earnings, and daily sprint history')}<div class="pg">
+ <div class="row"><button class="chev" style="border-radius:8px">‹</button><span class="field" style="color:var(--ink)">▦ ${d.past?'Nov 9, 2026':'Nov 10, 2026'}</span><button ${d.past?'':'disabled'}>›</button>${d.past?'<button>Back to today</button>':''}<span class="sp"></span><span class="cap">${d.past?'Monday, 9 Nov 2026':'Tuesday, 10 Nov 2026'}</span></div>
+ <div style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start">
+  <div class="col" style="gap:12px">
+   <div class="card" style="padding:14px;border-radius:10px"><div class="row"><span style="font:700 12px var(--round);letter-spacing:.8px;color:var(--muted)">WORK TIME</span><span class="sp"></span><span style="color:var(--accent-icon)">◷</span></div><div style="font:700 24px var(--mono);margin:6px 0">${fd(d.worked)}</div><div class="cap">Includes the active sprint</div></div>
+   <div class="card" style="padding:14px;border-radius:10px"><div class="row"><span style="font:700 12px var(--round);letter-spacing:.8px;color:var(--muted)">EARNINGS</span><span class="sp"></span><span style="color:var(--accent-icon)">▭</span></div><div style="font:700 24px var(--mono);margin:6px 0">${money(d.worked)}</div><div class="cap">₹1,500 per hour</div></div>
+   ${d.past?'':`<div class="card" style="padding:14px;border-radius:10px"><div style="font-size:11px;font-weight:700;color:var(--muted)">⌖ ${d.run==='idle'?'Next sprint tag':'Sprint tag'}</div><div class="field" style="margin-top:8px">Optional project or client</div>${d.run==='paused'?`<div style="margin-top:8px;font:12px var(--mono);color:var(--warn)">Paused for ${hms(6)}</div>`:''}</div>`}
+  </div>
+  <div class="card"><div class="row"><span style="font:700 11px var(--font);letter-spacing:.8px;color:var(--muted)">DAILY TARGET · 8h</span><span class="sp"></span><span class="cap">${d.pct}%</span></div><div style="margin:10px 0" class="bar"><i style="width:${d.pct}%;background:#999"></i></div><b style="font-size:14px">${d.reached?'✓ Daily goal reached':fd(d.left)+' remaining'}</b>
+   ${d.past?'':`<div class="hr"></div><div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--muted)">⏱ WHEN CAN I FINISH?</div><div class="row" style="align-items:baseline;margin-top:6px"><span>Around</span><span class="hero r" style="color:var(--accent-text)">${clock(d.finish)}</span></div><div class="cap" style="font-family:var(--font);margin:4px 0 8px">If you keep working, with only the upcoming breaks above. This is an estimate, not a scheduled clock-out.</div><div>Upcoming breaks: 0 min ⇕</div><div class="cap" style="font-family:var(--font);margin:4px 0 8px">Count only breaks still ahead. This does not pause the timer. It resets each day.</div><span class="pill w">⟲ Week pace: ${fd(d.behind)} left this week</span>`}</div>
+ </div>
+ <div class="row"><b style="font-size:13px">${d.short}'s sprints</b><span class="sp"></span><span class="seg"><span class="on">Timeline</span><span>List</span></span><button>⧉ Copy all</button></div>
+ <div class="card"><div class="row"><span class="cap">6AM to 12AM</span><span class="sp"></span><button>＋ Add sprint</button><button>⚟ Hours</button><button>Now</button></div><div style="height:180px;margin-top:12px;overflow:hidden;position:relative" class="cap">
+  <div style="position:absolute;inset:0 0 auto 0;padding:8px 60px">8h 0m untracked · 9:10 AM to 5:10 PM</div>
+  ${d.live&&!d.past?`<div style="position:absolute;top:90px;left:54px;right:8px;border-top:1.5px solid var(--accent-icon)"></div><div class="card" style="position:absolute;top:${d.run==='paused'?82:100}px;left:60px;right:8px;padding:6px 10px"><b style="color:var(--ink)">${'Sprint 2'}</b> <span class="st" style="background:#2E9E6620;color:#2E9E66">${d.run==='paused'?'Paused':'Active'}</span> 5:10 PM to now <span style="float:right;font-family:var(--mono)">1s</span></div>`:''}
+  <div style="position:absolute;bottom:0;left:0;right:0;text-align:center;font-style:italic">(fixed 400pt scroll area inside the page scroll)</div></div><div class="cap" style="margin-top:8px">ⓘ Gaps are untracked time. Select a sprint for details.</div></div>
+ ${note('The current Today, condensed. Four heading voices, grey native progress bar, “Daily target”, “left this week”, the date shown three times, stale “1s” on the running sprint, and the paused row crossed by the Now line.')}</div>`},
+};
+
+// ---------- Switcher ----------
+const Q=new URLSearchParams(location.search);
+const keys=Object.keys(V), states=Object.keys(STATES), TAGS=['header','row','popover','card'];
+const TAGN={header:'In sprint card header',row:'On the running sprint row',popover:'Popover only',card:'Own card (today)'};
+let vk=keys.includes(Q.get('variant'))?Q.get('variant'):'A', sk=states.includes(Q.get('state'))?Q.get('state'):'active';
+let Q_TAG=TAGS.includes(Q.get('tag'))?Q.get('tag'):'header';
+function setQ(k,v){Q.set(k,v);draw()}
+function draw(){
+ document.body.classList.toggle('dark',Q.get('theme')==='dark');
+ Q.set('variant',vk);Q.set('state',sk);Q.set('tag',Q_TAG);
+ const d=derive(sk);
+ document.getElementById('win').innerHTML=sidebar+`<div class="main">${V[vk].render(d)}</div>`;
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> ${V[vk].name}</span><button id="nx">→</button><span class="sep"></span>
+  ${states.map((s,i)=>`<button class="${s===sk?'on':''}" data-s="${s}">${i+1} ${STATES[s].label}</button>`).join('')}<span class="sep"></span>
+  <span class="g">Tag (T):</span>${TAGS.map(t=>`<button class="${t===Q_TAG?'on':''}" data-t="${t}">${TAGN[t]}</button>`).join('')}<span class="sep"></span>
+  <button data-th="1">${Q.get('theme')==='dark'?'☾ Dark':'☀ Light'} (D)</button>`;
+ try{history.replaceState(null,'','?'+Q.toString())}catch(e){}
+ document.getElementById('pv').onclick=()=>step(-1);document.getElementById('nx').onclick=()=>step(1);
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sk=b.dataset.s;draw()});
+ document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{Q_TAG=b.dataset.t;draw()});
+ document.querySelector('[data-th]').onclick=toggleTheme;
+ if(Q_TAG==='popover'&&vk!=='G'&&vk!=='R'&&!d.past){
+  document.querySelector('.pg').insertAdjacentHTML('beforeend',note('Popover only: Today has no tag control. Tag the running sprint from the menu bar popover; correct any sprint’s tag in its details sheet (select it on the timeline).'));
+ }
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+function toggleTheme(){Q.set('theme',Q.get('theme')==='dark'?'light':'dark');draw()}
+addEventListener('keydown',e=>{if(e.target.closest('input,textarea,[contenteditable]'))return;
+ if(e.key==='ArrowLeft')step(-1); if(e.key==='ArrowRight')step(1);
+ const n=+e.key; if(n>=1&&n<=states.length){sk=states[n-1];draw()}
+ if(e.key==='t'||e.key==='T'){Q_TAG=TAGS[(TAGS.indexOf(Q_TAG)+1)%TAGS.length];draw()}
+ if(e.key==='d'||e.key==='D')toggleTheme();});
+draw();
+</script>
+</body>
+</html>
