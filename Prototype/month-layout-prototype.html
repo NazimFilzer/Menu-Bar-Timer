@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Month dashboard layouts</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only. No persistence.
+  Question: how should the Month page tell its story so each number appears once, is correct,
+  and the shape of the month (chart) comes early, after the Month critique (.impeccable/critique/)?
+  Standalone HTML, like the other files in Prototype/. The app is native SwiftUI.
+  Variants (?variant=): A Summary then chart · B Calendar month · C Goal burn-up · R Current layout (reference)
+  States (?state=): behind · ontrack · past · empty     Keys: ← → variants, 1-4 states.
+  Colours copy the "Sky" light theme. Content width = 900 pt.
+  All variants fix: October days no longer counted, one "left" number, future days drawn as future,
+  timesheet stops at today, flat bars (no glow or gradient).
+-->
+<style>
+:root{--bg:#EBF7FA;--card:#FAFFFF;--border:#BFDCE3;--accent:#52A3B5;--accent-soft:#52A3B524;--text:#1F3B45;--text2:#597A85;
+ --accent-text:#2F6F80;--warn:#8A4B08;--warn-soft:#B4530918;--good:#1E6B45;--good-soft:#2F7F571c;--met:#2F7F57;--muted:#E3EFF2;
+ --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;--mono:"SF Mono",Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#c9d6da;color:var(--text);padding:24px 0 110px;display:flex;justify-content:center}
+.win{width:940px;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0003;overflow:hidden}
+.tb{display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border)}
+.tb h1{font-size:20px}.tb small{display:block;color:var(--text2);font-size:12px;margin-top:2px}
+.sp{flex:1}.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase}
+.ttl{display:flex;align-items:center;gap:6px;margin-bottom:12px}.ttl .ic{color:var(--accent-text);font-size:12px}
+.big{font-family:var(--mono);font-size:30px;font-weight:700}.mid{font-family:var(--mono);font-size:20px;font-weight:700}
+.sub{font-size:12px;color:var(--text2)}.row{display:flex;gap:14px;align-items:center}.row>*{min-width:0}
+.col{display:flex;flex-direction:column;gap:6px}
+.bar{height:10px;border-radius:5px;background:var(--muted);overflow:hidden;position:relative}.bar i{display:block;height:100%;background:var(--accent)}
+.bar .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text)}
+.bar.done i{background:var(--met)}
+.good{color:var(--good)}.warn{color:var(--warn)}.acc{color:var(--accent-text)}
+.hr{height:1px;background:var(--border);margin:12px 0}
+button{font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+button.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--accent-soft);color:var(--accent-text)}
+.pill.w{background:var(--warn-soft);color:var(--warn)}.pill.g{background:var(--good-soft);color:var(--good)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.split{display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start}
+.mono{font-family:var(--mono)}
+/* bar chart */
+.chart{position:relative;height:170px;display:flex;align-items:flex-end;gap:5px;border-bottom:1px solid var(--border)}
+.chart .c{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative;border-radius:4px}
+.chart .c.off{background:#dcebef66}
+.chart .c b{display:block;width:100%;border-radius:4px 4px 2px 2px;background:#8CC3CF}
+.chart .c.met b{background:var(--met)}.chart .c.today b{background:var(--accent)}
+.chart .c.fut::after{content:"";position:absolute;bottom:0;left:30%;right:30%;height:3px;border-radius:2px;background:var(--border)}
+.chart .goal{position:absolute;left:0;right:0;border-top:1px dashed var(--accent-text);opacity:.6}
+.chart .goal span{position:absolute;right:0;top:-18px;font-size:10px;color:var(--accent-text);font-weight:600;background:var(--card);padding:0 4px}
+.xl{display:flex;gap:5px;margin-top:5px}.xl span{flex:1;text-align:center;font:600 10px var(--mono);color:var(--text2)}
+.xl span.t{color:var(--accent-text);font-weight:800}.xl span.o{opacity:.55}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .h{font-size:11px;font-weight:600;color:var(--text2);text-align:center;padding-bottom:2px}
+.cal .d{height:74px;border-radius:9px;border:1px solid var(--border);background:var(--card);padding:7px 8px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.cal .d .n{font-size:11px;font-weight:600;color:var(--text2)}
+.cal .d .v{font:700 14px var(--mono);position:relative}
+.cal .d .f{position:absolute;left:0;right:0;bottom:0;background:var(--accent-soft)}
+.cal .d.met{border-color:#2F7F5766}.cal .d.met .f{background:var(--good-soft)}.cal .d.met .v{color:var(--good)}
+.cal .d.off{background:#e6f1f4;border-style:dashed}.cal .d.fut{background:transparent;border-style:dashed;opacity:.7}
+.cal .d.today{border:2px solid var(--accent)}.cal .d.blank{visibility:hidden}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--text2);margin-top:10px;flex-wrap:wrap}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* table */
+table{width:100%;border-collapse:collapse;font-size:12px}th{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);text-align:left;padding:7px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid #dcebef}td.m{font-family:var(--mono)}tr.t td{background:var(--accent-soft)}
+.tagrow{display:grid;grid-template-columns:120px 1fr 52px 70px 80px;gap:10px;align-items:center;font-size:12px;padding:5px 0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.seg{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin-bottom:8px}
+.wk{display:grid;grid-template-columns:110px repeat(7,1fr) 50px;gap:5px;align-items:center;font-size:11px;margin-top:5px}
+.wk .x{height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font:600 11px var(--mono);background:#fff;border:1px solid var(--border)}
+.wk .x.met{background:var(--good-soft);color:var(--good);border-color:#2F7F5755}.wk .x.miss{background:var(--warn-soft);color:var(--warn);border-color:#B4530944}
+.wk .x.off,.wk .x.out{background:transparent;color:var(--text2);border-style:dashed}.wk .x.now{border:2px solid var(--accent)}
+.note{font-size:12px;color:#444;background:#fff8d6;border:1px dashed #d8c66a;border-radius:8px;padding:10px 12px}
+/* reference-only legacy look */
+.grad b{background:linear-gradient(#52A3B5,#52A3B588)!important;box-shadow:0 0 6px #52A3B588}
+#sw{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:99px;padding:8px 12px;display:flex;gap:8px;align-items:center;font-size:13px;box-shadow:0 6px 24px #0006;z-index:9}
+#sw button{background:#333;color:#fff;border:0;padding:5px 10px;border-radius:99px;font-size:12px}#sw button.on{background:#fff;color:#111}#sw .sep{width:1px;height:18px;background:#555}
+</style>
+</head>
+<body>
+<div class="win" id="win"></div>
+<div id="sw"></div>
+<script>
+// ---------- Sample data (in memory only) ----------
+const RATE=1500, DG=8, MG=160;
+// Each state: month, year, today (day number or null for a past month), hours by day.
+const S={
+ behind:{label:'Behind',y:2026,m:10,today:10,live:true,h:{2:5,3:5,4:5,5:5,6:5,9:4,10:2},tags:[['Development',27],['Client',4]],prev:0},
+ ontrack:{label:'On track',y:2026,m:10,today:10,live:true,h:{2:8.5,3:8.2,4:7.5,5:8.6,6:8.1,9:8.4,10:3},tags:[['Development',41.3],['Client',11]],prev:46},
+ past:{label:'Past month',y:2026,m:9,today:null,h:{1:8.2,2:8.1,5:8.4,6:7.2,7:8.5,8:8.3,9:8,12:8.6,13:8.1,14:6.5,15:8.2,16:8.4,19:8,20:8.3,21:8.6,22:8.1,23:7.9,26:8.4,27:8.2,28:8,29:8.7,30:8.1},tags:[['Development',140.2],['Client',30]],prev:151},
+ empty:{label:'Empty',y:2026,m:10,today:10,live:false,h:{},tags:[],prev:12}
+};
+const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fh=h=>{const t=Math.round(h*60);return `${Math.floor(t/60)}h ${t%60}m`};
+const fs=h=>{const t=Math.round(h*60);return t<60?`${t}m`:fh(h)};
+const money=h=>'₹'+Math.round(h*RATE).toLocaleString('en-IN');
+function derive(k){
+ const s=S[k],n=new Date(s.y,s.m+1,0).getDate(),first=new Date(s.y,s.m,1).getDay();
+ const days=[...Array(n)].map((_,i)=>{const d=i+1,dow=(first+i)%7,work=dow>0&&dow<6,hrs=s.h[d]||0;
+  const fut=s.today!=null&&d>s.today,today=d===s.today;
+  return {d,dow,work,hrs,fut,today,met:hrs>=DG&&!fut}});
+ const total=days.reduce((a,x)=>a+x.hrs,0);
+ const elapsedWork=days.filter(x=>x.work&&!x.fut).length;            // includes today
+ const remWork=days.filter(x=>x.work&&(x.fut||x.today)).length;       // today onward
+ const expected=Math.min(MG,elapsedWork*DG); // same as the app's catch-up: daily goal × workdays through today
+ const behind=Math.max(0,expected-total),left=Math.max(0,MG-total);
+ const perDay=remWork?left/remWork:0;
+ const finished=days.filter(x=>x.work&&!x.fut&&!x.today);              // fixed: only this month's days
+ const met=finished.filter(x=>x.met).length;
+ const workedDays=days.filter(x=>x.hrs>0&&!x.today).length;
+ return {...s,k,days,n,first,total,expected,behind,left,perDay,remWork,finished,met,workedDays,
+  cur:s.today!=null,reached:total>=MG,title:`${MN[s.m]} ${s.y}`,pct:Math.min(100,Math.round(total/MG*100)),
+  avg:workedDays?days.filter(x=>!x.today).reduce((a,x)=>a+x.hrs,0)/workedDays:0}
+}
+
+// ---------- Shared pieces ----------
+const toolbar=d=>`<div class="tb"><div><h1>Month</h1><small>Goal, pace, and every day of ${d.title}</small></div><div class="sp"></div>
+ <span class="sub mono">${d.live?'Active · 00:42:10':'Idle · 00:00:00'}</span><button class="pri">${d.live?'Clock out':'Clock in'}</button></div>`;
+const nav=d=>`<div class="row"><button>‹</button><b style="font-size:15px">${d.title}</b><button ${d.cur?'disabled style="opacity:.4"':''}>›</button>${d.cur?'<span class="pill">This month</span>':'<button>Back to this month</button>'}<div class="sp"></div><span class="sub">Goal ${MG}h · ${DG}h per workday · Mon–Fri</span></div>`;
+const title=(t,ic)=>`<div class="ttl"><span class="ic">${ic}</span><span class="lbl">${t}</span></div>`;
+function paceLine(d){
+ if(!d.cur) return d.reached?`<span class="good">✓ Monthly goal reached with ${fh(d.total-MG)} extra.</span>`:`<span class="warn">Finished ${fh(MG-d.total)} short of the goal.</span>`;
+ if(d.reached) return `<span class="good">✓ Monthly goal reached.</span>`;
+ const sched=d.behind<0.05?`<span class="pill g">On schedule</span>`:`<span class="pill w">${fh(d.behind)} behind schedule</span>`;
+ return `${sched} <span>Work about <b class="mono">${fh(d.perDay)}</b> on each of the ${d.remWork} remaining workdays (including today) to reach ${MG}h.</span>`+
+  (d.perDay>DG+0.01?` <span class="warn">That's ${fs(d.perDay-DG)} more than your usual ${DG}h.</span>`:'');
+}
+function goalBar(d){const exp=d.cur?Math.min(100,d.expected/MG*100):null;
+ return `<div class="bar ${d.reached?'done':''}"><i style="width:${d.pct}%"></i>${exp!=null&&!d.reached?`<span class="tick" style="left:${exp}%" title="Where you should be today"></span>`:''}</div>
+ <div class="row sub" style="margin-top:6px"><span>${d.reached?'Goal reached':fh(d.left)+' left of '+MG+'h'}</span><div class="sp"></div>${exp!=null&&!d.reached?`<span>▍ schedule today: ${fh(d.expected)}</span>`:''}<b class="acc">${d.pct}%</b></div>`}
+function barChart(d,h=170,legacy=false){
+ const max=Math.max(DG*1.25,...d.days.map(x=>x.hrs));
+ const cols=d.days.map(x=>`<div class="c ${x.work?'':'off'} ${x.met?'met':''} ${x.today?'today':''} ${x.fut?'fut':''}" title="${DW[x.dow]} ${x.d}: ${x.hrs?fh(x.hrs):x.fut?'upcoming':'no work'}">${x.hrs?`<b style="height:${x.hrs/max*100}%"></b>`:''}</div>`).join('');
+ return `<div class="chart ${legacy?'grad':''}" style="height:${h}px"><div class="goal" style="bottom:${DG/max*100}%"><span>${DG}h daily goal</span></div>${cols}</div>
+ <div class="xl">${d.days.map(x=>`<span class="${x.today?'t':''} ${x.work?'':'o'}">${x.d}<br>${DW[x.dow][0]}</span>`).join('')}</div>`}
+const chartLegend=`<div class="legend"><span><i style="background:var(--met)"></i>Goal met</span><span><i style="background:#8CC3CF"></i>Below goal</span><span><i style="background:var(--accent)"></i>Today</span><span><i style="background:#dcebef"></i>Day off</span><span>▁ Upcoming</span></div>`;
+function tags(d,compact=false){
+ if(!d.tags.length) return `<div class="sub">No tagged sprints in ${d.title}.</div>`;
+ const tot=d.tags.reduce((a,t)=>a+t[1],0),c=['#2F6F80','#9A6B1F','#7A5BA6'];
+ return `<div class="seg">${d.tags.map((t,i)=>`<i style="flex:${t[1]};background:${c[i]}"></i>`).join('')}</div>`+
+  d.tags.map((t,i)=>compact?`<div class="row" style="font-size:12px;padding:3px 0"><span><span class="dot" style="background:${c[i]}"></span>${t[0]}</span><div class="sp"></div><span class="mono">${fh(t[1])}</span><span class="sub mono" style="width:44px;text-align:right">${Math.round(t[1]/tot*100)}%</span></div>`
+  :`<div class="tagrow"><span><span class="dot" style="background:${c[i]}"></span><b>${t[0]}</b></span><div class="bar" style="height:6px"><i style="width:${t[1]/tot*100}%;background:${c[i]}"></i></div><span class="mono">${(t[1]/tot*100).toFixed(1)}%</span><span class="mono">${fh(t[1])}</span><span class="mono acc">${money(t[1])}</span></div>`).join('')}
+function sheet(d){
+ const rows=d.days.filter(x=>!x.fut);const up=d.days.length-rows.length;
+ return `<div class="card"><div class="row" style="margin-bottom:10px">${title('Daily timesheet','▦').replace('margin-bottom:12px','margin:0')}<div class="sp"></div><button>⧉ Copy all</button><button>+ Add sprint</button></div>
+ <table><tr><th>Date</th><th>Login</th><th>Logout</th><th>Work time</th><th>Sprints</th><th style="text-align:right">Actions</th></tr>
+ ${rows.slice().reverse().slice(0,8).map(x=>`<tr class="${x.today?'t':''}"><td><b>${DW[x.dow]}, ${MN[d.m].slice(0,3)} ${x.d}</b>${x.today?' <span class="pill">Today</span>':''}</td>
+  <td class="m">${x.hrs?'07:00':'—'}</td><td class="m">${x.hrs?(x.today?'running':'12:10'):'—'}</td><td class="m">${x.hrs?fh(x.hrs):'—'}</td><td class="m">${x.hrs?1:0}</td>
+  <td style="text-align:right">${x.today?'<span class="sub">In progress</span>':x.hrs?'<button>⧉</button> <button>Details</button>':'<span class="sub">'+(x.work?'No work':'Day off')+'</span>'}</td></tr>`).join('')}
+ </table><div class="sub" style="margin-top:8px">${rows.length>8?`Showing the latest 8 of ${rows.length} days · <a class="acc" href="#">Show all</a> · `:''}${up?`${up} upcoming days hidden. `:''}Copy all pastes ${d.n} rows, earliest first; empty days paste blank.</div></div>`}
+function consistencyGrid(d){
+ const weeks=[];let w=[];const lead=(d.first+6)%7; // Monday-first
+ for(let i=0;i<lead;i++) w.push(null);
+ d.days.forEach(x=>{w.push(x);if(w.length===7){weeks.push(w);w=[]}});if(w.length){while(w.length<7)w.push(null);weeks.push(w)}
+ return `<div class="wk"><span></span>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>`<span class="sub" style="text-align:center">${x}</span>`).join('')}<span class="sub">Met</span></div>`+
+ weeks.map((wk,i)=>{const fin=wk.filter(x=>x&&x.work&&!x.fut&&!x.today);
+  return `<div class="wk"><span><b>Week ${i+1}</b> <span class="sub">${wk.find(Boolean).d}–${wk.filter(Boolean).pop().d}</span></span>${wk.map(x=>{
+  if(!x) return `<span class="x out" title="Outside ${MN[d.m]}"></span>`;
+  if(x.today) return `<span class="x now">${x.hrs?x.hrs.toFixed(1):'…'}</span>`;
+  if(x.fut) return `<span class="x out">${x.d}</span>`;
+  if(!x.work) return `<span class="x off">${x.hrs?'+'+x.hrs.toFixed(1):'off'}</span>`;
+  return `<span class="x ${x.met?'met':'miss'}">${x.met?'✓':x.hrs.toFixed(1)}</span>`}).join('')}<span class="mono">${fin.filter(x=>x.met).length}/${fin.length}</span></div>`}).join('')+
+ `<div class="legend"><span>✓ met ${DG}h</span><span>5.0 hours, below goal</span><span>off = day off</span><span>blank = outside ${MN[d.m]}</span><span title="Today is still in progress and the past days use today's goal and schedule.">ⓘ Today doesn't count yet</span></div>`}
+const note=t=>`<div class="note"><b>Prototype note:</b> ${t}</div>`;
+
+// ---------- Variants ----------
+const V={
+A:{name:'Summary then chart',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ <div class="card"><div class="row" style="align-items:flex-start;gap:28px">
+  <div class="col"><span class="lbl">Worked</span><span class="big">${fh(d.total)}</span><span class="sub">of ${MG}h monthly goal</span></div>
+  <div class="col"><span class="lbl">Earned</span><span class="big good">${money(d.total)}</span><span class="sub">at ₹${RATE.toLocaleString('en-IN')}/h</span></div>
+  <div class="col"><span class="lbl">Per worked day</span><span class="big" style="font-size:22px;margin-top:6px">${fh(d.avg)}</span><span class="sub">${d.workedDays} days with work</span></div>
+  <div class="sp"></div>${d.prev?`<span class="pill">${d.total>=d.prev?'↗':'↘'} ${fh(Math.abs(d.total-d.prev))} vs same days last month</span>`:''}</div>
+  <div style="margin-top:14px">${goalBar(d)}</div><div class="hr"></div><div style="font-size:13px;line-height:1.7">${paceLine(d)}</div></div>
+ <div class="card">${title('Every day','▮▮')}${barChart(d)}${chartLegend}</div>
+ <div class="split"><div class="card">${title('Daily goal by week','✓')}${consistencyGrid(d)}</div>
+  <div class="card">${title('Time by tag','#')}${tags(d,true)}</div></div>
+ ${sheet(d)}
+ ${note('One summary card replaces greeting, 3 metric cards, goal card and both pace cards. Each number appears once. The tick on the bar shows where the schedule expects you. Chart is second.')}</div>`},
+
+B:{name:'Calendar month',render:d=>{const lead=d.first;return `${toolbar(d)}<div class="pg">${nav(d)}
+ <div class="split">
+  <div class="card">${title(d.title,'▦')}<div class="cal">${DW.map(x=>`<div class="h">${x}</div>`).join('')}
+   ${[...Array(lead)].map(()=>'<div class="d blank"></div>').join('')}
+   ${d.days.map(x=>`<div class="d ${x.work?'':'off'} ${x.met?'met':''} ${x.fut?'fut':''} ${x.today?'today':''}"><div class="f" style="height:${Math.min(100,x.hrs/DG*100)}%"></div><span class="n">${x.d}${x.today?' · Today':''}</span><span class="v">${x.hrs?fh(x.hrs):x.fut?'':x.work?'—':''}</span></div>`).join('')}</div>
+   <div class="legend"><span><i style="background:var(--good-soft);border:1px solid #2F7F5766"></i>Met ${DG}h</span><span><i style="background:var(--accent-soft)"></i>Fill = share of daily goal</span><span><i style="border:1px dashed var(--border)"></i>Day off or upcoming</span></div></div>
+  <div class="col" style="gap:16px">
+   <div class="card"><span class="lbl">Worked</span><div class="big" style="margin:4px 0">${fh(d.total)}</div><div class="sub" style="margin-bottom:10px">of ${MG}h · <b class="good">${money(d.total)}</b></div>${goalBar(d)}</div>
+   <div class="card">${title(d.cur?'Pace':'Result','◷')}<div style="font-size:13px;line-height:1.6">${paceLine(d)}</div>
+    <div class="hr"></div><div class="row sub"><span>Workdays met</span><div class="sp"></div><b class="mono" style="color:var(--text)">${d.met} of ${d.finished.length}</b></div></div>
+   <div class="card">${title('Time by tag','#')}${tags(d,true)}</div>
+  </div></div>
+ ${sheet(d)}
+ ${note('The calendar replaces both the bar chart and the goal-consistency grid: one view shows each day’s hours, goal met, days off and what is still ahead. Summary and pace sit in a side column.')}</div>`}},
+
+C:{name:'Goal burn-up',render:d=>{
+ const W=860,H=220,P=28,max=Math.max(MG,d.total)*1.08,x=i=>P+(W-2*P)*(i/d.n),y=v=>H-P-(H-2*P)*(v/max);
+ let cum=0,exp=0;const workCount=d.days.filter(z=>z.work).length;
+ const act=[[0,0]],tgt=[[0,0]];d.days.forEach((z,i)=>{if(z.work)exp=Math.min(MG,exp+DG);tgt.push([i+1,exp]);if(!z.fut){cum+=z.hrs;act.push([i+1,cum])}});
+ const last=act[act.length-1];const proj=d.cur&&!d.reached?`<path d="M${x(last[0])},${y(last[1])} L${x(d.n)},${y(MG)}" stroke="var(--warn)" stroke-dasharray="5 5" fill="none" stroke-width="2"/>`:'';
+ const p=a=>a.map((q,i)=>(i?'L':'M')+x(q[0])+','+y(q[1])).join(' ');
+ const weeks=[];let wk=[];d.days.forEach(z=>{wk.push(z);if(z.dow===0||z.d===d.n){weeks.push(wk);wk=[]}});
+ return `${toolbar(d)}<div class="pg">${nav(d)}
+ <div class="card" style="padding:20px">
+  <div style="font-size:22px;font-weight:700;margin-bottom:6px">${!d.cur?(d.reached?`You reached ${MG}h in ${MN[d.m]}.`:`${MN[d.m]} ended ${fh(MG-d.total)} short.`):d.reached?'Monthly goal reached.':d.behind<0.05?`You're on track for ${MG}h.`:`You're ${fh(d.behind)} behind the plan for ${MG}h.`}</div>
+  <div style="font-size:13px;line-height:1.6;margin-bottom:12px">${paceLine(d).replace(/<span class="pill[^>]*>.*?<\/span>/,'')}</div>
+  <svg width="${W}" height="${H}" style="display:block">
+   ${[0,40,80,120,160].map(v=>`<line x1="${P}" x2="${W-P}" y1="${y(v)}" y2="${y(v)}" stroke="#dcebef"/><text x="2" y="${y(v)+4}" font-size="10" fill="#597A85" font-family="SF Mono,Menlo">${v}h</text>`).join('')}
+   <path d="${p(tgt)}" stroke="var(--text2)" stroke-dasharray="3 4" fill="none" stroke-width="1.5"/>
+   <path d="${p(act)} L${x(last[0])},${y(0)} L${x(0)},${y(0)} Z" fill="#52A3B51f"/>
+   <path d="${p(act)}" stroke="var(--accent)" fill="none" stroke-width="3"/>${proj}
+   ${d.cur?`<circle cx="${x(last[0])}" cy="${y(last[1])}" r="5" fill="var(--accent)"/><text x="${x(last[0])+8}" y="${y(last[1])-8}" font-size="12" font-weight="700" fill="#1F3B45" font-family="SF Mono,Menlo">${fh(d.total)} · ${money(d.total)}</text>`:''}
+  </svg>
+  <div class="legend"><span><i style="background:var(--accent)"></i>Worked so far</span><span>┄ Schedule (8h per workday, capped at 160h)</span>${d.cur&&!d.reached?'<span style="color:var(--warn)">┄ Needed from today</span>':''}</div></div>
+ <div class="card">${title('Weeks','▤')}<table><tr><th>Week</th><th>Days</th><th>Worked</th><th>Goal</th><th>Workdays met</th><th>Earned</th></tr>
+  ${weeks.map((w,i)=>{const fin=w.filter(z=>z.work&&!z.fut&&!z.today),h=w.reduce((a,z)=>a+z.hrs,0),g=w.filter(z=>z.work).length*DG,fut=w.every(z=>z.fut);
+   return `<tr class="${w.some(z=>z.today)?'t':''}"><td><b>Week ${i+1}</b></td><td class="sub">${MN[d.m].slice(0,3)} ${w[0].d}–${w[w.length-1].d}</td><td class="m">${fut?'—':fh(h)}</td><td class="m">${g}h</td><td class="m">${fut?'—':fin.filter(z=>z.met).length+'/'+fin.length}</td><td class="m acc">${fut?'—':money(h)}</td></tr>`}).join('')}</table></div>
+ <div class="split"><div>${sheet(d)}</div><div class="card">${title('Time by tag','#')}${tags(d,true)}</div></div>
+ ${note('Leads with one sentence that answers “will I hit 160h?”. A cumulative line against the plan shows the month’s story; the dashed orange line is what’s needed from today. Weeks become a table instead of the colour grid.')}</div>`}},
+
+R:{name:'Current layout (reference)',render:d=>`${toolbar(d).replace('Goal, pace, and every day of '+d.title,'Monthly totals and time by tag')}<div class="pg">
+ <div class="card row"><div class="col"><b style="font-size:18px">Good afternoon, Nazim 👋</b><span class="sub">You've logged ${fh(d.total)} in ${d.title} (${d.pct}% of target).</span></div><div class="sp"></div><span class="pill g">↗ +${fh(d.total)} vs same days last month (no prior work)</span></div>
+ <div class="grid3"><div class="card"><span class="lbl">MTD total hours</span><div class="big">${fh(d.total)}</div><span class="sub">Monthly Target: ${MG}h</span></div>
+  <div class="card"><span class="lbl">MTD earnings</span><div class="big">${money(d.total)}</div><span class="sub">7 sprints in ${d.title}</span></div>
+  <div class="card"><span class="lbl">Daily average</span><div class="big">${fh(d.total/Math.max(1,d.today||d.n))}</div><span class="sub">Month-to-date average</span></div></div>
+ <div class="card">${title('Monthly goal progress','◎')}<div class="row"><span class="mid">${fh(d.total)} / ${MG}h</span><div class="sp"></div><span class="mid acc">${money(d.total)} / ${money(MG)}</span></div><div style="margin-top:10px" class="bar"><i style="width:${d.pct}%"></i></div><div class="sub" style="margin-top:6px">${fh(d.left)} remaining to hit monthly goal</div></div>
+ ${d.cur?`<div class="card">${title('Monthly pace','◎')}<div class="mid warn">⟲ ${fh(d.behind)} left this month</div><div class="sub">Expected through today: ${fh(d.expected)} · Clocked so far: ${fh(d.total)}</div></div>
+ <div class="card"><b>◷ When can I finish up?</b><div style="font-size:13px;margin-top:8px">${fh(d.left)} left · about ${fh(d.perDay)}/workday across ${d.remWork} remaining days (including today).</div><div class="sub warn" style="margin-top:6px">More work remains than your daily goals or available time allow on the remaining scheduled days. Extra work or work on days off can still count. Consider changing the plan.</div></div>`:''}
+ <div class="card">${title('Monthly activity','▦')}${barChart(d,230,true)}</div>
+ <div class="card"><b>Daily goal consistency</b><div class="sub" style="margin:6px 0">0 of ${d.finished.length+5} days met the goal · 0% <span class="warn">(bug: includes Oct 26–30)</span></div>
+  <div class="sub">✓ Goal met. Numbers show net work hours below the goal. 0 means no work recorded. — means an unworked day off. · means outside the selected period.<br>Each week is measured against your scheduled working days…<br>Today is in progress and does not count in the rate.<br>Weeks start on Monday. Week 1 contains the first day of the selected month.<br>Past days use your current daily goal of 8h and your current working schedule.</div></div>
+ <div class="card">${title('Tag distribution & breakdown','#')}${tags(d)}</div>
+ <div class="card"><b>Daily timesheet</b><div class="sub" style="margin-top:6px">All ${d.n} days listed, including ${d.days.filter(x=>x.fut).length} upcoming days with disabled Copy / Details / Delete…</div></div>
+ ${note('Your current Month page, condensed, with the same sample data. For comparison only.')}</div>`}
+};
+
+// ---------- Switcher ----------
+const keys=Object.keys(V),states=Object.keys(S),q=new URLSearchParams(location.search);
+let vk=keys.includes(q.get('variant'))?q.get('variant'):'A',sk=states.includes(q.get('state'))?q.get('state'):'behind';
+function draw(){
+ document.getElementById('win').innerHTML=V[vk].render(derive(sk));
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> (${V[vk].name})</span><button id="nx">→</button><span class="sep"></span>${states.map((s,i)=>`<button class="${s===sk?'on':''}" data-s="${s}">${i+1} ${S[s].label}</button>`).join(' ')}`;
+ try{const u=new URL(window.location.href);u.searchParams.set('variant',vk);u.searchParams.set('state',sk);window.history.replaceState(null,'',u)}catch(e){}
+ document.getElementById('pv').onclick=()=>step(-1);document.getElementById('nx').onclick=()=>step(1);
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sk=b.dataset.s;draw()});
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+addEventListener('keydown',e=>{if(e.target.closest('input,textarea,[contenteditable]'))return;if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);const n=+e.key;if(n>=1&&n<=4){sk=states[n-1];draw()}});
+draw();
+</script>
+</body>
+</html>

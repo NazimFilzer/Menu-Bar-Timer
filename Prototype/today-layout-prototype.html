@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Today dashboard layouts</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only. No persistence.
+  Question: how should the Today page show work time, earnings, daily goal,
+  catch-up, finish forecast and sprint history so the goal is shown once?
+  Sub-shape: standalone (the app is native SwiftUI; this repo keeps HTML prototypes in Prototype/).
+  Variants (?variant=): A Hero goal card · B Two columns · C Status strip + history first · R Current layout (reference)
+  States (?state=): active · paused · reached · empty
+  Keys: ← → change variant, 1-4 change state.
+  Colours copy the app's "Sky" light theme in AppTheme.swift. Window width = 780 pt (content area at the 1000 pt minimum window).
+-->
+<style>
+:root{
+  --bg:#EBF7FA; --card:#FAFFFF; --border:#BFDCE3; --accent:#52A3B5;
+  --text:#1F3B45; --text2:#597A85; --red:#BF525C; --amber:#B45309;
+  --accent-text:#2F6F80;           /* proposed text-safe accent (>=4.5:1 on card) */
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+  --mono:"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#c9d6da;color:var(--text);padding:24px 0 110px;display:flex;justify-content:center}
+.win{width:780px;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0003;overflow:hidden}
+.tb{display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border)}
+.tb h1{font-size:20px}.tb small{display:block;color:var(--text2);font-size:12px;margin-top:2px}
+.sp{flex:1}
+.stat{text-align:right;font-size:11px;font-weight:700}.stat b{display:block;font-family:var(--mono);font-size:14px;color:var(--text);font-weight:400}
+button,.btn{font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:default}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase}
+.big{font-family:var(--mono);font-size:28px;font-weight:700}
+.mid{font-size:22px;font-weight:600}
+.sub{font-size:12px;color:var(--text2)}
+.row{display:flex;gap:16px;align-items:center}.row>*{min-width:0}
+.col{display:flex;flex-direction:column;gap:8px}
+.bar{height:10px;border-radius:5px;background:#dcebef;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.bar.done i{background:#2F7F57}
+.good{color:#1E6B45}.warn{color:var(--amber)}.acc{color:var(--accent-text)}
+.hr{height:1px;background:var(--border);margin:2px 0}
+.tag{display:flex;gap:8px;align-items:center;font-size:13px}.tag input{font:inherit;padding:5px 8px;border:1px solid var(--border);border-radius:6px;width:220px;background:#fff}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}.seg span{padding:4px 12px;font-size:12px;background:var(--card)}.seg .on{background:var(--accent);color:#fff}
+.hist h3{font-size:15px}
+.hist .head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:11px;color:var(--text2);letter-spacing:.06em;padding:6px 8px;background:#e6f1f4}td{padding:7px 8px;border-top:1px solid var(--border);font-family:var(--mono)}
+.empty{padding:22px;text-align:center;color:var(--text2);font-size:13px;border:1px dashed var(--border);border-radius:10px}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:#52A3B51f;color:var(--accent-text)}
+.pill.w{background:#B453091f;color:var(--amber)}
+.note{font-size:11px;color:var(--text2);padding:0 4px}
+.cmp{font-size:11px;color:var(--text2);background:#fff8;border:1px dashed var(--border);border-radius:8px;padding:8px 12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+/* switcher */
+#sw{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center;background:#111;color:#fff;padding:9px 16px;border-radius:99px;box-shadow:0 6px 24px #0006;font-size:13px;z-index:9}
+#sw button{background:#333;color:#fff;border:0;padding:4px 10px;border-radius:6px;cursor:pointer}
+#sw .st button.on{background:#52A3B5}
+#sw .sep{width:1px;height:20px;background:#555}
+</style>
+</head>
+<body>
+<div class="win" id="win"></div>
+<div id="sw"></div>
+<script>
+// ---------- sample data ----------
+const GOAL=8*3600, RATE=22.5;
+const S={
+ active:{label:'Active',run:'running',total:5*3600+12*60+30,sprints:[['09:02','10:48','1h 46m','#client'],['11:05','12:40','1h 35m','#dev'],['13:30','14:20','50m','#dev']],live:['16:42 →','now',"0h 42m",'#client'],cur:'00:42:10',breaks:30,pause:null,week:'−1h 20m'},
+ paused:{label:'Paused',run:'paused',total:5*3600+12*60+30,sprints:[['09:02','10:48','1h 46m','#client'],['11:05','12:40','1h 35m','#dev'],['13:30','14:20','50m','#dev']],live:['16:42 →','paused',"0h 42m",'#client'],cur:'00:42:10',breaks:30,pause:'06:12',week:'−1h 20m'},
+ reached:{label:'Goal reached',run:'idle',total:8*3600+24*60,sprints:[['09:02','12:40','3h 38m','#client'],['13:10','17:35','4h 25m','#dev'],['18:00','18:21','21m','#dev']],live:null,cur:'00:00:00',breaks:0,pause:null,week:'+0h 24m'},
+ empty:{label:'Empty',run:'idle',total:0,sprints:[],live:null,cur:'00:00:00',breaks:0,pause:null,week:'−8h 00m'}
+};
+const f=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h}h ${m}m`:`${m}m`};
+const money=s=>'$'+(s/3600*RATE).toFixed(2);
+function derive(k){const d=S[k];const left=Math.max(0,GOAL-d.total);const reached=left===0;
+ let fin=null,status=k;
+ if(!reached){const base=k==='empty'?new Date(2026,10,10,9,30):new Date(2026,10,10,16,42);fin=new Date(base.getTime()+(left+d.breaks*60)*1000);}
+ const t=x=>x?x.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'';
+ return{...d,k,left,reached,pct:Math.min(100,Math.round(d.total/GOAL*100)),fin:t(fin),
+  assume:{active:'If you keep working, with only the breaks above.',paused:'If you resume now. Paused time is not added again.',empty:'If you clock in now, with only the breaks above.',reached:'No more work is needed today.'}[k]};
+}
+// ---------- shared bits ----------
+const toolbar=d=>`<div class="tb"><div><h1>Today</h1><small>Your timer, earnings, and daily sprint history</small></div><div class="sp"></div>
+ <div class="stat" style="color:${d.run==='running'?'#1E6B45':d.run==='paused'?'#B45309':'#597A85'}">${d.run==='idle'?'IDLE':d.run.toUpperCase()}<b>${d.cur}</b></div>
+ ${d.run!=='idle'?`<button>${d.run==='paused'?'▶ Resume':'⏸ Pause'}</button>`:''}
+ <button class="btn pri">${d.run==='idle'?'▶ Clock in':'■ Clock out'}</button></div>`;
+const dateNav=()=>`<div class="row"><button>‹</button><b style="font-size:14px">Tue, 10 Nov 2026</b><button>›</button><div class="sp"></div><span class="sub">Today</span></div>`;
+const tagBox=d=>`<div class="tag">🏷 <span>${d.run==='idle'?'Next sprint tag':'Sprint tag'}</span><input placeholder="Optional project or client" value="${d.run==='idle'?'':'#client'}"/>${d.pause?`<span class="pill w">Paused for ${d.pause}</span>`:''}</div>`;
+const bar=d=>`<div class="bar ${d.reached?'done':''}"><i style="width:${d.pct}%"></i></div>`;
+const goalLine=d=>d.reached?`<span class="good">✓ Daily goal reached</span>`:`${f(d.left)} remaining`;
+const catchPill=d=>`<span class="pill ${d.week.startsWith('−')?'w':''}">Week pace ${d.week}</span>`;
+const finish=d=>d.reached?`<span class="good">✓ Goal reached. No more work needed.</span>`:
+ `<span class="sub">Finish around</span> <b class="mid acc" style="font-family:var(--mono)">${d.fin}</b> <span class="sub">· ${d.breaks} min breaks · −/+ </span>`;
+const histCard=(d,title='Today’s sprints')=>`<div class="card hist"><div class="head"><h3>${title}</h3><span class="seg"><span class="on">List</span><span>Timeline</span></span><div class="sp"></div><button ${d.sprints.length?'':'disabled style="opacity:.4"'}>⧉ Copy all</button><button class="btn pri">＋ Add sprint</button></div>
+ ${d.sprints.length||d.live?`<table><tr><th>START</th><th>END</th><th>NET</th><th>TAG</th></tr>${d.live?`<tr><td>${d.live[0].replace(' →','')}</td><td>${d.live[1]}</td><td>${d.live[2]}</td><td>${d.live[3]}</td></tr>`:''}${d.sprints.slice().reverse().map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table>`
+ :`<div class="empty">No sprints yet today.<br>Clock in to start one, or add a past sprint.</div>`}</div>`;
+const cmp=t=>`<div class="cmp">${t}</div>`;
+
+// ---------- variants ----------
+const V={
+R:{name:'Current (reference)',render:d=>`${toolbar(d)}<div class="pg">${dateNav()}${tagBox(d)}
+ <div class="grid3">
+  <div class="card col"><span class="lbl">Work time</span><span class="big">${f(d.total)}</span><span class="sub">${d.run==='idle'?'Completed sprints':'Includes the active sprint'}</span></div>
+  <div class="card col"><span class="lbl">Earnings</span><span class="big">${money(d.total)}</span><span class="sub">$22.50 per hour</span></div>
+  <div class="card col"><span class="lbl">Daily target</span><span class="big">8h</span><span class="sub">${money(GOAL)}</span></div></div>
+ <div class="card col"><div class="row"><b>Today’s goal</b><div class="sp"></div><span class="sub">${d.pct}%</span></div>${bar(d)}<span class="sub">${d.reached?'Daily goal reached':f(d.left)+' remaining'}</span></div>
+ <div class="card col"><span class="lbl">Daily catch-up</span><span class="mid ${d.reached?'good':'warn'}">${d.reached?'Goal met':f(d.left)+' to catch up'}</span><span class="sub">Daily goal: 8h · Clocked so far: ${f(d.total)} · 1 working days · 8h/day</span></div>
+ <div class="card col"><span class="lbl">When can I finish?</span>${d.reached?'<span class="mid">Daily goal reached</span>':`<span class="mid acc">Around ${d.fin}</span><span class="sub">${f(d.left)} net work left toward your daily goal · ${d.breaks} min upcoming breaks</span>`}<span class="sub">${d.assume}</span><span class="sub">Upcoming breaks: ${d.breaks} min  [−][+]</span></div>
+ ${histCard(d)}</div>`},
+
+A:{name:'Hero goal card',render:d=>`${toolbar(d)}<div class="pg">${dateNav()}
+ <div class="card col" style="gap:12px">
+  <div class="row"><div class="col" style="flex:1"><span class="lbl">Work time</span><span class="big" style="font-size:40px">${f(d.total)}</span></div>
+   <div class="col" style="text-align:right"><span class="lbl">Earnings</span><span class="mid" style="font-family:var(--mono)">${money(d.total)}</span><span class="sub">$22.50/h</span></div></div>
+  ${bar(d)}
+  <div class="row"><span style="font-size:14px;font-weight:600">${goalLine(d)}</span><div class="sp"></div><span class="sub">Goal 8h · ${d.pct}%</span></div>
+  <div class="hr"></div>
+  <div class="row">${finish(d)}<div class="sp"></div>${catchPill(d)}</div>
+  <span class="note" style="padding:0">${d.assume}${d.reached?'':' Not a scheduled clock-out.'}</span>
+ </div>
+ <div class="row">${tagBox(d)}</div>
+ ${histCard(d)}
+ ${cmp('One card holds work time, earnings, goal, forecast and pace. The goal appears once. Tag field sits below the summary.')}</div>`},
+
+B:{name:'Two columns',render:d=>`${toolbar(d)}<div class="pg">${dateNav()}
+ <div class="grid2">
+  <div class="col" style="gap:12px">
+   <div class="card col"><span class="lbl">Work time</span><span class="big">${f(d.total)}</span><span class="sub">${d.run==='idle'?'Completed sprints':'Includes the active sprint'}</span></div>
+   <div class="card col"><span class="lbl">Earnings</span><span class="big">${money(d.total)}</span><span class="sub">$22.50 per hour</span></div>
+   ${tagBox(d).replace('width:220px','')}
+  </div>
+  <div class="card col" style="gap:12px"><div class="row"><span class="lbl">Daily goal · 8h</span><div class="sp"></div><span class="sub">${d.pct}%</span></div>${bar(d)}
+   <span style="font-size:15px;font-weight:600">${goalLine(d)}</span><div class="hr"></div>
+   <span class="lbl">When can I finish?</span>${d.reached?'<span class="good mid">✓ No more work needed</span>':`<span class="mid acc" style="font-family:var(--mono)">Around ${d.fin}</span>`}
+   <span class="sub">${d.assume}</span>
+   <div class="row"><span class="sub">Upcoming breaks: ${d.breaks} min</span><button>−</button><button>+</button><div class="sp"></div>${catchPill(d)}</div></div>
+ </div>
+ ${histCard(d)}
+ ${cmp('Numbers left, plan right. Goal, forecast and pace share one card. History starts higher on the page.')}</div>`},
+
+C:{name:'Status strip + history first',render:d=>`${toolbar(d)}<div class="pg">${dateNav()}
+ <div class="card" style="padding:12px 16px"><div class="row" style="gap:20px">
+  <div class="col" style="gap:2px"><span class="lbl">Work</span><span class="mid" style="font-family:var(--mono)">${f(d.total)}</span></div>
+  <div class="col" style="gap:2px"><span class="lbl">Earned</span><span class="mid" style="font-family:var(--mono)">${money(d.total)}</span></div>
+  <div class="col" style="gap:5px;flex:1"><div class="row"><span class="lbl">Goal 8h</span><div class="sp"></div><span class="sub">${d.reached?'<span class="good">✓ reached</span>':f(d.left)+' left'}</span></div>${bar(d)}</div>
+  <div class="col" style="gap:2px;text-align:right"><span class="lbl">Finish</span><span class="mid acc" style="font-family:var(--mono)">${d.reached?'—':d.fin}</span></div></div>
+  <div class="row" style="margin-top:8px"><span class="note">${d.assume} Breaks: ${d.breaks} min [−][+]</span><div class="sp"></div>${catchPill(d)}</div></div>
+ ${histCard(d)}
+ <div class="row">${tagBox(d)}</div>
+ ${cmp('One compact strip, then history right away. Best for a short window. The least room for explanation text.')}</div>`}
+};
+// ---------- switcher ----------
+const keys=Object.keys(V),states=Object.keys(S);
+const q=new URLSearchParams(location.search);
+let vk=keys.includes(q.get('variant'))?q.get('variant'):'A', sk=states.includes(q.get('state'))?q.get('state'):'active';
+function draw(){
+ document.getElementById('win').innerHTML=V[vk].render(derive(sk));
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> (${V[vk].name})</span><button id="nx">→</button><span class="sep"></span><span class="st">${states.map((s,i)=>`<button class="${s===sk?'on':''}" data-s="${s}">${i+1} ${S[s].label}</button>`).join(' ')}</span>`;
+ const u=new URL(location);u.searchParams.set('variant',vk);u.searchParams.set('state',sk);history.replaceState(null,'',u);
+ pv.onclick=()=>step(-1);nx.onclick=()=>step(1);
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sk=b.dataset.s;draw()});
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA/.test(e.target.tagName))return;
+ if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);
+ const n=+e.key;if(n>=1&&n<=4){sk=states[n-1];draw()}});
+draw();
+</script>
+</body>
+</html>
