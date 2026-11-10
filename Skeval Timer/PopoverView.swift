@@ -81,6 +81,7 @@ struct PopoverView: View {
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .kerning(1.0)
                 .lineLimit(1).fixedSize()
+            PopoverProfileLabel(vm: vm, theme: theme)
             Spacer(minLength: 4)
             Button(action: AppDelegate.openDashboard) {
                 Label("Dashboard", systemImage: "macwindow")

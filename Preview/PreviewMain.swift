@@ -12,17 +12,18 @@ final class PreviewController: NSObject {
     init(timelinePreview: Bool = false, menuPreview: Bool = false, state: String = "idle", dark: Bool = false) {
         UserDefaults.standard.set(timelinePreview ? "today" : "week", forKey: "skevalDashboardDestination")
         UserDefaults.standard.set(true, forKey: "skevalTodayShowingTimeline")
-        let defaults = UserDefaults(suiteName: "skeval-catchup-preview-settings")!
-        defaults.removePersistentDomain(forName: "skeval-catchup-preview-settings")
-        let settings = GoalSettings(userDefaults: defaults)
+        // Two sample profiles in memory: the seeded "Skeval" one below and a small "Freelance" one.
+        let profiles = ProfileLibrary(storage: InMemoryProfileStorage())
+        let settings = GoalSettings(store: profiles.settingsStore(for: profiles.active.id))
         settings.hourlyRate = 1500
+        Self.seedFreelanceProfile(in: profiles)
         if menuPreview || CommandLine.arguments.contains("--theme") || dark {
             let themeIndex = CommandLine.arguments.firstIndex(of: "--theme")
             let themeName = themeIndex.flatMap { CommandLine.arguments.indices.contains($0 + 1) ? CommandLine.arguments[$0 + 1] : nil }
             ThemeManager.shared.current = themeName.flatMap(AppTheme.init(rawValue:)) ?? .citrus
             ThemeManager.shared.appearance = dark ? .dark : .light
         }
-        let store = DayLogStore(storage: InMemoryDayLogAdapter())
+        let store = DayLogStore(storage: profiles.dayLogStorage(for: profiles.active.id))
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let timelineDay = calendar.date(byAdding: .day, value: -1, to: today)!
@@ -41,7 +42,7 @@ final class PreviewController: NSObject {
             }
         }
         let engine = SprintEngine(store: store, observeWorkspace: false)
-        vm = TimerViewModel(engine: engine, store: store, goal: settings)
+        vm = TimerViewModel(engine: engine, store: store, goal: settings, profiles: profiles)
         if menuPreview { Self.prepareMenuState(engine: engine, state: state) }
         if timelinePreview { vm.selectDate(timelineDay) }
         dashboard = DashboardWindowController(vm: vm)
@@ -58,6 +59,22 @@ final class PreviewController: NSObject {
                                       temporaryHours: .constant(TimelineHours(startHour: 8, endHour: 14)))
                         .padding(20))
             }
+        }
+    }
+
+    private static func seedFreelanceProfile(in profiles: ProfileLibrary) {
+        guard let freelance = try? profiles.add(name: "Freelance", copyingSettingsFrom: nil) else { return }
+        let settings = GoalSettings(store: profiles.settingsStore(for: freelance.id))
+        settings.hourlyRate = 60
+        settings.currencySymbol = "$"
+        settings.dailyGoalHours = 3
+        let store = DayLogStore(storage: profiles.dayLogStorage(for: freelance.id))
+        let calendar = Calendar.current
+        for daysAgo in 1...3 {
+            let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: Date()))!
+            let start = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: day)!
+            store.save(sprint: Sprint(startTime: start, endTime: start.addingTimeInterval(Double(daysAgo) * 3600),
+                                      tag: "Client B"))
         }
     }
 

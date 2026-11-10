@@ -9,7 +9,9 @@ DESTINATION='/Applications/Skeval Timer.app'
 DERIVED_DATA="$ROOT/.build/DeployDerivedData"
 DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 BUNDLE_ID='com.nazim.Skeval-Timer'
-DATA_FILE="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Application Support/SkevalTimer/logs.json"
+DATA_DIR="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Application Support/SkevalTimer"
+# Before profiles, history lived in logs.json; now it lives in Profiles/<id>/logs.json (ADR 0004).
+DATA_FILE="$DATA_DIR/logs.json"
 
 usage() {
   cat <<'EOF'
@@ -78,9 +80,15 @@ BUILT_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUILT_APP/Co
   echo "Refusing to install unexpected bundle identifier '$BUILT_ID' (expected '$BUNDLE_ID')." >&2
   exit 1
 }
-printf 'Preserving user data at: %s\\n' "$DATA_FILE"
-if [[ -f "$DATA_FILE" ]]; then
-  /usr/bin/stat -f 'Current log: %N (%z bytes, modified %Sm)' -t '%Y-%m-%d %H:%M:%S' "$DATA_FILE"
+printf 'Preserving user data at: %s\\n' "$DATA_DIR"
+shopt -s nullglob
+LIVE_LOGS=("$DATA_DIR"/Profiles/*/logs.json)
+shopt -u nullglob
+[[ -f "$DATA_FILE" ]] && LIVE_LOGS+=("$DATA_FILE")
+if ((${#LIVE_LOGS[@]})); then
+  for log in "${LIVE_LOGS[@]}"; do
+    /usr/bin/stat -f 'Current log: %N (%z bytes, modified %Sm)' -t '%Y-%m-%d %H:%M:%S' "$log"
+  done
 else
   echo 'No log file found at the live-data location; deployment will not create or import one.'
 fi

@@ -3,6 +3,14 @@ import AppKit
 import Observation
 import UserNotifications
 
+enum ProfileSwitchAvailability: Equatable {
+    case allowed
+    /// A sprint is running or paused: offer Clock Out & Switch.
+    case needsClockOut
+    /// A sleep decision hold or recovery sprint must be resolved first.
+    case blocked
+}
+
 // MARK: - Version Tracking
 
 enum AppVersion {
@@ -45,7 +53,9 @@ class TimerViewModel {
     var manualBreakMinutesText: String = "0"
     var manualEntryError: String? = nil
 
-    var goal = GoalSettings.shared
+    var goal: GoalSettings
+    /// Nil when a caller injects its own store without profiles (most tests).
+    let profiles: ProfileLibrary?
     let eyeBreakSettings: EyeBreakSettings
     private var eyeBreakReminder = EyeBreakReminder()
     private let deliverEyeBreakNotification: () -> Void
@@ -86,12 +96,16 @@ class TimerViewModel {
     // MARK: - Init
 
     init(engine: SprintEngine? = nil, store: DayLogStore? = nil, goal: GoalSettings? = nil,
+         profiles: ProfileLibrary? = nil,
          eyeBreakSettings: EyeBreakSettings? = nil, deliverEyeBreakNotification: (() -> Void)? = nil) {
+        // Only the app's no-argument path reaches the disk-backed profile library.
+        self.profiles = profiles ?? (store == nil ? ProfileLibrary.shared : nil)
         self.eyeBreakSettings = eyeBreakSettings ?? .shared
         self.deliverEyeBreakNotification = deliverEyeBreakNotification ?? Self.sendEyeBreakNotification
         let effectiveStore = store ?? DayLogStore.shared
         self.store = effectiveStore
-        self.goal = goal ?? .shared
+        // An injected store gets in-memory settings, so it never reaches the live profile.
+        self.goal = goal ?? (store == nil ? .shared : GoalSettings(store: InMemorySettingsStore()))
         let effectiveEngine = engine ?? SprintEngine(store: effectiveStore)
         self.engine = effectiveEngine
 
@@ -104,16 +118,101 @@ class TimerViewModel {
         self.currentPauseElapsed = effectiveEngine.currentPauseElapsed
         self.recoveryEndDate = effectiveEngine.state.currentSprint?.startTime ?? Date()
 
-        let goalSec = self.goal.dailyGoalSeconds
-        if goalSec > 0 {
-            let initialPct = Int((self.todayLog.accumulatedTotal / goalSec) * 100)
-            for m in [50, 75, 100] where initialPct >= m {
-                self.notifiedMilestones.insert(m)
-            }
-        }
+        markReachedMilestones()
 
         eyeBreakReminder.restart(at: currentElapsed, settings: self.eyeBreakSettings)
         setupEngineCallbacks()
+    }
+
+    /// Milestones already passed today are not notified again.
+    private func markReachedMilestones() {
+        notifiedMilestones.removeAll()
+        let goalSec = goal.dailyGoalSeconds
+        guard goalSec > 0 else { return }
+        let reachedPct = Int((todayLog.accumulatedTotal / goalSec) * 100)
+        for m in [50, 75, 100] where reachedPct >= m {
+            notifiedMilestones.insert(m)
+        }
+    }
+
+    // MARK: - Profiles
+
+    var activeProfile: Profile? { profiles?.active }
+    var activeProfileName: String? { profiles?.active.name }
+
+    /// Whether the timer allows a profile switch right now.
+    var profileSwitchAvailability: ProfileSwitchAvailability {
+        if hasPendingSleepResolution || engine.sleepStartedAt != nil || state.isRecovery { return .blocked }
+        return state.isRunning ? .needsClockOut : .allowed
+    }
+
+    /// Switches when idle, or after clocking out when `clockingOut` is set. Returns whether it switched.
+    @discardableResult
+    func switchProfile(to id: UUID, clockingOut: Bool = false) -> Bool {
+        guard let profiles, profiles.profiles.contains(where: { $0.id == id }) else { return false }
+        guard id != profiles.active.id else { return true }
+        switch profileSwitchAvailability {
+        case .blocked: return false
+        case .needsClockOut:
+            guard clockingOut else { return false }
+            clockOut()
+            guard profileSwitchAvailability == .allowed else { return false }
+        case .allowed: break
+        }
+        profiles.activate(id: id)
+        store.replaceStorage(profiles.dayLogStorage(for: id))
+        goal.reload(from: profiles.settingsStore(for: id))
+        engine.reload()
+        resetForProfileSwitch()
+        return true
+    }
+
+    @discardableResult
+    func addProfile(name: String, startFromDefaults: Bool) throws -> Profile {
+        guard let profiles else { throw ProfileError.unknownProfile }
+        return try profiles.add(name: name, copyingSettingsFrom: startFromDefaults ? nil : profiles.active.id)
+    }
+
+    func renameProfile(id: UUID, to name: String) throws {
+        guard let profiles else { throw ProfileError.unknownProfile }
+        try profiles.rename(id: id, to: name)
+    }
+
+    /// Deletes a profile, switching away first when it is the active one. Its data moves to Backups.
+    func deleteProfile(id: UUID) throws {
+        guard let profiles else { throw ProfileError.unknownProfile }
+        guard profiles.profiles.count > 1 else { throw ProfileError.lastProfile }
+        if id == profiles.active.id {
+            guard profileSwitchAvailability == .allowed,
+                  let other = profiles.profiles.first(where: { $0.id != id }),
+                  switchProfile(to: other.id) else { throw ProfileError.profileInUse }
+        }
+        try profiles.remove(id: id)
+    }
+
+    private func resetForProfileSwitch(now: Date = Date()) {
+        lastActiveDayKey = TimeFormatter.format(dateKey: now)
+        lastNotifiedDayKey = lastActiveDayKey
+        selectedDate = now
+        plannedBreakMinutes = 0
+        pendingTag = ""
+        manualTagText = ""
+        lastCopiedId = nil
+        isAllCopied = false
+        lastCopiedTimesheetDate = nil
+        isManualEntryPresented = false
+        manualEntryError = nil
+        recoveryEndText = ""
+        recoveryEndError = nil
+        state = engine.state
+        pendingSleepInterval = engine.pendingSleepInterval
+        currentElapsed = engine.state.currentElapsed
+        currentPauseElapsed = engine.currentPauseElapsed
+        recoveryEndDate = engine.state.currentSprint?.startTime ?? now
+        refreshLogs()
+        markReachedMilestones()
+        eyeBreakReminder.restart(at: currentElapsed, settings: eyeBreakSettings)
+        timelineRevision += 1
     }
 
     private func setupEngineCallbacks() {

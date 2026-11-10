@@ -17,10 +17,12 @@ struct DashboardSettingsView: View {
                     Text("Preferences & Settings")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
-                    Text("Configure work targets, billing, eye-break reminders, and visual themes.")
+                    Text(vm.activeProfileName.map { "Goals, billing, and schedule apply to \($0). Eye breaks, theme, and system settings apply to every profile." } ?? "Configure work targets, billing, eye-break reminders, and visual themes.")
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                 }
+
+                ProfilesSettingsCard(vm: vm, theme: theme)
 
                 // 1. Productivity Goals Section
                 ProductivityGoalsCard(vm: vm, theme: theme)

@@ -20,6 +20,7 @@ with tempfile.TemporaryDirectory(prefix='skeval-tests-') as directory:
     delegate.write_text(app_source[:start] + app_source[end:])
     binary = temporary / 'SkevalTests'
     environment = os.environ.copy()
+    environment['SKEVAL_NO_LIVE_DATA'] = '1'
     xcode = '/Applications/Xcode.app/Contents/Developer'
     if Path(xcode).exists():
         environment.setdefault('DEVELOPER_DIR', xcode)

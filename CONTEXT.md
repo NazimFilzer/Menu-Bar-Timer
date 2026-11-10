@@ -14,9 +14,18 @@ Equal time takes equal space. The visible time range is configurable.
 Time between sprints with no recorded sprint. It does not establish whether the user was idle.
 _Avoid_: Idle time, inactivity
 
+## Profile
+A fully separate set of time tracking, like a Chrome profile. Each profile has its own sprints, Day Logs, tags,
+daily/weekly/monthly goals, hourly rate, currency, working days and days off, and timeline hours, plus a name and colour.
+Exactly one profile is active. Every dashboard view, report, and export shows only the active profile.
+Launch at login, eye-break reminders, and the theme are app-wide, not per profile.
+You can only switch profiles while the timer is idle: an open sprint must be clocked out first, and a sleep decision hold or Recovery Sprint must be resolved.
+The first profile, migrated from the original history, is named "Skeval".
+_Avoid_: Project (a Tag labels work inside a profile), Workspace, Account
+
 ## Day Log
 All sprints for one calendar day, keyed by the date of each sprint's `startTime` (`yyyy-MM-dd`).
-Persisted in a JSON file in Application Support. Loaded on launch; filtered to today.
+Persisted per profile in `Profiles/<id>/logs.json` in Application Support. Loaded on launch and on profile switch; filtered to today.
 
 ## Accumulated Total
 The sum of durations of all **completed** sprints in today's Day Log.

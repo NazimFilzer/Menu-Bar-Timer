@@ -1526,7 +1526,7 @@ func testEarningsTracking() {
     print("Running Today's Earnings & Hourly Rate tests...")
 
     // 2. GoalSettings rates & targets
-    let goal = GoalSettings.shared
+    let goal = auditSettings()
     let savedRate = goal.hourlyRate
     let savedHours = goal.dailyGoalHours
     defer {
@@ -1548,7 +1548,7 @@ func testEarningsTracking() {
     let storage = InMemoryDayLogAdapter()
     let store = DayLogStore(storage: storage)
     let engine = SprintEngine(store: store)
-    let vm = TimerViewModel(engine: engine, store: store)
+    let vm = TimerViewModel(engine: engine, store: store, goal: goal)
 
     // Save a completed sprint of 2 hours (7200 seconds)
     let t0 = Calendar.current.startOfDay(for: Date()).addingTimeInterval(60)
@@ -2117,6 +2117,14 @@ struct TestMain {
         testDarkThemeContrast()
         testDangerTextContrast()
         testThemeGraphicContrast()
+        testProfileRegistryRules()
+        testProfileColoursCycleThroughThePalette()
+        testProfileMigrationFromLegacyData()
+        testProfileMigrationWithoutLegacyData()
+        testProfileMigrationKeepsCorruptLegacyBytes()
+        testProfileLibraryAddRenameDeleteOnDisk()
+        testProfileSettingsStaySeparate()
+        testUnreadableRegistryIsRebuiltFromFolders()
         await MainActor.run {
             testThemeAppearanceChoice()
             testDeleteDaySprints()
@@ -2148,6 +2156,12 @@ struct TestMain {
             testTimeAndPauseMathVerification()
             testV2LiveEarningsAndHistorySynchronization()
             testSleepDecisionDelayAndRecoveryRetry()
+            testProfileSwitchingKeepsHistorySeparate()
+            testProfileSwitchRulesWhileTiming()
+            testDeletingTheActiveProfileSwitchesFirst()
+            testProfileSwitchResetsDayState()
+            testCSVFileNamesIncludeProfile()
+            testRecoverySprintBlocksProfileSwitch()
         }
         print("Results: \(passedTests) / \(totalTests) assertions passed.")
         if passedTests != totalTests { exit(1) }

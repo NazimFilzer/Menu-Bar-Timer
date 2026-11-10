@@ -3,14 +3,27 @@ import Observation
 
 @Observable
 class GoalSettings {
-    static let shared = GoalSettings()
+    static let shared = GoalSettings(store: ProfileLibrary.shared.settingsStore(for: ProfileLibrary.shared.active.id))
 
-    private let userDefaults: UserDefaults
+    /// Settings that belong to one profile. Moved into a profile's settings.json on migration.
+    static let profileKeys = [
+        "skevalTimelineStartHour", "skevalTimelineEndHour", "skevalWorkingWeekdays", "skevalDaysOff",
+        "skevalDailyGoalHours", "skevalWeeklyGoalHours", "skevalMonthlyGoalHours",
+        "skevalHourlyRate", "skevalCurrencySymbol",
+    ]
+
+    @ObservationIgnored private var store: SettingsValueStore
+    @ObservationIgnored private var isLoading = false
+
+    private func persist(_ value: Any, forKey key: String) {
+        guard !isLoading else { return }
+        store.set(value, forKey: key)
+    }
 
     var timelineHours = TimelineHours() {
         didSet {
-            userDefaults.set(timelineHours.startHour, forKey: "skevalTimelineStartHour")
-            userDefaults.set(timelineHours.endHour, forKey: "skevalTimelineEndHour")
+            persist(timelineHours.startHour, forKey: "skevalTimelineStartHour")
+            persist(timelineHours.endHour, forKey: "skevalTimelineEndHour")
         }
     }
 
@@ -21,70 +34,88 @@ class GoalSettings {
                 workingWeekdays = oldValue
                 return
             }
-            userDefaults.set(workingWeekdays.sorted(), forKey: "skevalWorkingWeekdays")
+            persist(workingWeekdays.sorted(), forKey: "skevalWorkingWeekdays")
         }
     }
 
     var daysOff: Set<String> = [] {
-        didSet { userDefaults.set(daysOff.sorted(), forKey: "skevalDaysOff") }
+        didSet { persist(daysOff.sorted(), forKey: "skevalDaysOff") }
     }
 
     var dailyGoalHours: Double = 8.0 {
         didSet {
             guard Self.validGoal(dailyGoalHours, maximum: 24) else { dailyGoalHours = oldValue; return }
-            userDefaults.set(dailyGoalHours, forKey: "skevalDailyGoalHours")
+            persist(dailyGoalHours, forKey: "skevalDailyGoalHours")
         }
     }
 
     var weeklyGoalHours: Double = 40.0 {
         didSet {
             guard Self.validGoal(weeklyGoalHours, maximum: 168) else { weeklyGoalHours = oldValue; return }
-            userDefaults.set(weeklyGoalHours, forKey: "skevalWeeklyGoalHours")
+            persist(weeklyGoalHours, forKey: "skevalWeeklyGoalHours")
         }
     }
 
     var monthlyGoalHours: Double = 160.0 {
         didSet {
             guard Self.validGoal(monthlyGoalHours, maximum: 744) else { monthlyGoalHours = oldValue; return }
-            userDefaults.set(monthlyGoalHours, forKey: "skevalMonthlyGoalHours")
+            persist(monthlyGoalHours, forKey: "skevalMonthlyGoalHours")
         }
     }
 
     var hourlyRate: Double = 0.0 {
         didSet {
             guard Self.validRate(hourlyRate) else { hourlyRate = oldValue; return }
-            userDefaults.set(hourlyRate, forKey: "skevalHourlyRate")
+            persist(hourlyRate, forKey: "skevalHourlyRate")
         }
     }
 
     var currencySymbol: String = "₹" {
-        didSet { userDefaults.set(currencySymbol, forKey: "skevalCurrencySymbol") }
+        didSet { persist(currencySymbol, forKey: "skevalCurrencySymbol") }
     }
 
-    init(userDefaults: UserDefaults = .standard) {
-        self.userDefaults = userDefaults
+    convenience init(userDefaults: UserDefaults) {
+        self.init(store: userDefaults)
+    }
+
+    init(store: SettingsValueStore) {
+        self.store = store
+        load()
+    }
+
+    /// Shows another profile's settings in place. Switches the backing store first,
+    /// so the previous profile's file is never written with the new values.
+    func reload(from store: SettingsValueStore) {
+        self.store = store
+        load()
+    }
+
+    private func load() {
+        isLoading = true
+        defer { isLoading = false }
+        func number(_ key: String) -> Double { (store.object(forKey: key) as? NSNumber)?.doubleValue ?? 0 }
         timelineHours = TimelineHours(
-            startHour: userDefaults.object(forKey: "skevalTimelineStartHour") as? Int ?? 6,
-            endHour: userDefaults.object(forKey: "skevalTimelineEndHour") as? Int ?? 24
+            startHour: (store.object(forKey: "skevalTimelineStartHour") as? NSNumber)?.intValue ?? 6,
+            endHour: (store.object(forKey: "skevalTimelineEndHour") as? NSNumber)?.intValue ?? 24
         )
-        let storedWeekdays = Set(userDefaults.array(forKey: "skevalWorkingWeekdays") as? [Int] ?? [])
+        let storedWeekdays = Set((store.object(forKey: "skevalWorkingWeekdays") as? [NSNumber] ?? []).map(\.intValue))
         workingWeekdays = !storedWeekdays.isEmpty && storedWeekdays.isSubset(of: Set(1...7))
             ? storedWeekdays : [2, 3, 4, 5, 6]
-        daysOff = Set(userDefaults.stringArray(forKey: "skevalDaysOff") ?? [])
-        let storedDaily = userDefaults.double(forKey: "skevalDailyGoalHours")
+        daysOff = Set(store.object(forKey: "skevalDaysOff") as? [String] ?? [])
+        let storedDaily = number("skevalDailyGoalHours")
         dailyGoalHours = Self.validGoal(storedDaily, maximum: 24) ? storedDaily : 8.0
 
-        let storedWeekly = userDefaults.double(forKey: "skevalWeeklyGoalHours")
+        let storedWeekly = number("skevalWeeklyGoalHours")
         weeklyGoalHours = Self.validGoal(storedWeekly, maximum: 168) ? storedWeekly : 40.0
 
-        let storedMonthly = userDefaults.double(forKey: "skevalMonthlyGoalHours")
+        let storedMonthly = number("skevalMonthlyGoalHours")
         monthlyGoalHours = Self.validGoal(storedMonthly, maximum: 744) ? storedMonthly : 160.0
 
-        let storedRate = userDefaults.double(forKey: "skevalHourlyRate")
+        let storedRate = number("skevalHourlyRate")
         hourlyRate = Self.validRate(storedRate) ? storedRate : 0.0
 
-        let storedCurrency = userDefaults.string(forKey: "skevalCurrencySymbol")
-        currencySymbol = (storedCurrency != nil && !storedCurrency!.isEmpty) ? storedCurrency! : "₹"
+        let storedCurrency = store.object(forKey: "skevalCurrencySymbol") as? String
+        currencySymbol = (storedCurrency?.isEmpty == false) ? storedCurrency! : "₹"
     }
 
     private static func validGoal(_ hours: Double, maximum: Double) -> Bool {

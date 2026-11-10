@@ -45,6 +45,6 @@ with tempfile.TemporaryDirectory(prefix='skeval-preview-') as directory:
     subprocess.run(['xcrun', 'swiftc', '-parse-as-library', *sources, str(delegate),
                     'Preview/PreviewMain.swift', '-o', str(binary)], env=environment, check=True)
 subprocess.run(['codesign', '--force', '--sign', '-', str(app)], check=True)
-subprocess.run(['open', str(app), '--args', *arguments], check=True)
+subprocess.run(['open', '--env', 'SKEVAL_NO_LIVE_DATA=1', str(app), '--args', *arguments], check=True)
 print(f'Opened {app}')
 PY

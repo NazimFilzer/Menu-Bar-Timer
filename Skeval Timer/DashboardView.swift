@@ -49,6 +49,8 @@ struct DashboardView: View {
                 DashboardResolutionView(vm: vm, theme: theme)
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Rebuild per-view state (pickers, cached reports, search) for the new profile.
+                    .id(vm.activeProfile?.id)
             }
             .background(theme.bgDark)
         }
@@ -69,7 +71,11 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 18)
                 .padding(.top, 4)
-                .padding(.bottom, 20)
+                .padding(.bottom, vm.profiles == nil ? 20 : 12)
+
+            ProfileSwitcher(vm: vm, theme: theme)
+                .padding(.horizontal, 12)
+                .padding(.bottom, vm.profiles == nil ? 0 : 14)
 
             List {
                 ForEach(DashboardDestination.allCases) { item in

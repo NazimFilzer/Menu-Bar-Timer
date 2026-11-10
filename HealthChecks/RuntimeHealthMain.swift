@@ -14,6 +14,7 @@ struct RuntimeHealthMain {
         Task { @MainActor in
             await checkLiveEarnings()
             await checkAppearanceChoice()
+            await checkProfiles()
             print("Runtime health: \(checks - failures) / \(checks) checks passed.")
             exit(failures == 0 ? 0 : 1)
         }
@@ -30,6 +31,33 @@ struct RuntimeHealthMain {
 
     private static func waitForTicks() async {
         try? await Task.sleep(for: .seconds(2.3))
+    }
+
+    /// Renders the dashboard while switching profiles with a real ticking engine.
+    private static func checkProfiles() async {
+        let library = ProfileLibrary(storage: InMemoryProfileStorage())
+        let store = DayLogStore(storage: library.dayLogStorage(for: library.active.id))
+        let settings = GoalSettings(store: library.settingsStore(for: library.active.id))
+        let engine = SprintEngine(store: store, observeWorkspace: false)
+        let vm = TimerViewModel(engine: engine, store: store, goal: settings, profiles: library,
+                                deliverEyeBreakNotification: {})
+        let dashboard = NSHostingView(rootView: DashboardView(vm: vm))
+        dashboard.frame = NSRect(x: 0, y: 0, width: 1100, height: 780)
+        let first = library.active
+        let second = try! vm.addProfile(name: "Second", startFromDefaults: true)
+
+        engine.clockIn()
+        await waitForTicks()
+        expect(!vm.switchProfile(to: second.id), "A running sprint must block a plain profile switch")
+        expect(vm.switchProfile(to: second.id, clockingOut: true), "Clock Out & Switch must switch")
+        dashboard.layoutSubtreeIfNeeded()
+        expect(engine.state == .idle && library.active.id == second.id, "The new profile must start idle")
+        expect(vm.store.allLogs().isEmpty, "The new profile must not show the first profile's sprint")
+        let ticks = vm.currentElapsed
+        await waitForTicks()
+        expect(vm.currentElapsed == ticks, "No timer may keep ticking after Clock Out & Switch")
+        expect(vm.switchProfile(to: first.id), "Idle switching back must be instant")
+        expect(vm.store.allLogs().values.joined().count == 1, "The first profile keeps its clocked-out sprint")
     }
 
     /// Switches the Light/Dark choice and checks the theme and menu bar pill follow, whatever macOS uses.

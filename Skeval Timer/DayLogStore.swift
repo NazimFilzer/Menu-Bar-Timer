@@ -1,20 +1,37 @@
 import Foundation
 
 final class DayLogStore: @unchecked Sendable {
-    static let shared = DayLogStore()
+    static let shared = DayLogStore(storage: ProfileLibrary.shared.dayLogStorage(for: ProfileLibrary.shared.active.id))
 
-    private let storage: DayLogStorage
+    private var storage: DayLogStorage
     private var logs: [String: [Sprint]] = [:]
     private let lock = NSLock()
     // Serialize mutations and saves while allowing reads during disk I/O.
     private let mutationLock = NSLock()
 
-    init(storage: DayLogStorage = DiskDayLogAdapter()) {
+    init(storage: DayLogStorage) {
         self.storage = storage
         self.logs = storage.loadAll()
     }
 
-    var storageError: String? { storage.errorDescription }
+    var storageError: String? {
+        lock.lock()
+        let current = storage
+        lock.unlock()
+        return current.errorDescription
+    }
+
+    /// Shows another profile's history. Takes the mutation lock so a save already
+    /// in flight finishes against the previous profile's storage.
+    func replaceStorage(_ newStorage: DayLogStorage) {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        let loaded = newStorage.loadAll()
+        lock.lock()
+        storage = newStorage
+        logs = loaded
+        lock.unlock()
+    }
 
     func todayLog() -> DayLog {
         log(for: Date())

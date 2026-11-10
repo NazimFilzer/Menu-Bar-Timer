@@ -8,12 +8,29 @@ DATA_FILE="$APP_SUPPORT/logs.json"
 PREFERENCES="$CONTAINER/Library/Preferences/$BUNDLE_ID.plist"
 
 printf 'Expected app bundle identifier: %s\n' "$BUNDLE_ID"
-printf 'Live work log: %s\n' "$DATA_FILE"
+printf 'Live data folder: %s\n' "$APP_SUPPORT"
 printf 'Preferences: %s\n' "$PREFERENCES"
 printf '\n'
 
-if [[ -f "$DATA_FILE" ]]; then
-  /usr/bin/stat -f 'Log file: %N (%z bytes, modified %Sm)' -t '%Y-%m-%d %H:%M:%S' "$DATA_FILE"
+REGISTRY="$APP_SUPPORT/profiles.json"
+if [[ -f "$REGISTRY" ]]; then
+  printf 'Profiles registry: %s\n' "$REGISTRY"
+  /usr/bin/python3 -c '
+import json, os, sys
+registry = json.load(open(sys.argv[1]))
+for profile in registry.get("profiles", []):
+    log = os.path.join(sys.argv[2], profile["id"], "logs.json")
+    active = " (active)" if profile["id"] == registry.get("activeID") else ""
+    size = f"{os.path.getsize(log)} bytes" if os.path.exists(log) else "no log yet"
+    name = profile["name"]
+    print(f"  {name}{active}: {log} ({size})")
+' "$REGISTRY" "$APP_SUPPORT/Profiles"
+  if [[ -f "$DATA_FILE" ]]; then
+    echo "WARNING: $DATA_FILE still exists; it is no longer read once profiles.json exists."
+  fi
+elif [[ -f "$DATA_FILE" ]]; then
+  /usr/bin/stat -f 'Log file (before profiles): %N (%z bytes, modified %Sm)' -t '%Y-%m-%d %H:%M:%S' "$DATA_FILE"
+  echo 'The next launch moves it into the "Skeval" profile and keeps the original in Backups/.'
 else
   echo 'Log file does not exist at the expected location.'
 fi
