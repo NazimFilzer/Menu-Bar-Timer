@@ -1,0 +1,525 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T07:09:58+00:00",
+  "title": "Design System: Skeval Timer",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Honey Accent",
+        "canonical": "oklch(78.6% 0.130 84)",
+        "tonalRamp": [
+          "#170700",
+          "#372000",
+          "#5B3B00",
+          "#815900",
+          "#A47B11",
+          "#C3A056",
+          "#E2C58B",
+          "#FFECBE"
+        ]
+      },
+      "accent-text": {
+        "role": "primary",
+        "displayName": "Readable Honey",
+        "canonical": "oklch(54.3% 0.086 84)",
+        "tonalRamp": [
+          "#130900",
+          "#312200",
+          "#533F10",
+          "#765D25",
+          "#997E48",
+          "#B9A274",
+          "#DAC7A1",
+          "#FCEDCF"
+        ]
+      },
+      "on-accent": {
+        "role": "neutral",
+        "displayName": "On-accent Black",
+        "canonical": "oklch(0.0% 0.000 0)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Brick Stop",
+        "canonical": "oklch(62.2% 0.160 27)",
+        "tonalRamp": [
+          "#230000",
+          "#4B0405",
+          "#761D19",
+          "#A5352F",
+          "#CC594F",
+          "#E9857A",
+          "#FFB0A5",
+          "#FFDBD2"
+        ]
+      },
+      "danger-fill": {
+        "role": "secondary",
+        "displayName": "Stop Fill",
+        "canonical": "oklch(57.7% 0.147 27)",
+        "tonalRamp": [
+          "#220000",
+          "#490908",
+          "#73221D",
+          "#A03B34",
+          "#C75E54",
+          "#E4887D",
+          "#FFB2A8",
+          "#FFDDD4"
+        ]
+      },
+      "danger-fill-deep": {
+        "role": "secondary",
+        "displayName": "Stop Fill Deep",
+        "canonical": "oklch(52.7% 0.132 27)",
+        "tonalRamp": [
+          "#200000",
+          "#460F0C",
+          "#6F2722",
+          "#9B4139",
+          "#C16359",
+          "#DE8B82",
+          "#FBB5AC",
+          "#FFDFD7"
+        ]
+      },
+      "accent-icon": {
+        "role": "primary",
+        "displayName": "Icon Honey",
+        "canonical": "oklch(66.9% 0.109 85)",
+        "tonalRamp": [
+          "#150800",
+          "#342100",
+          "#573D00",
+          "#7C5B00",
+          "#9E7D32",
+          "#BEA165",
+          "#DEC696",
+          "#FFECC6"
+        ]
+      },
+      "on-danger": {
+        "role": "neutral",
+        "displayName": "On-danger White",
+        "canonical": "oklch(100.0% 0.000 90)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "paused": {
+        "role": "secondary",
+        "displayName": "Burnt Amber",
+        "canonical": "oklch(62.9% 0.125 71)",
+        "tonalRamp": [
+          "#1A0500",
+          "#3C1C00",
+          "#623600",
+          "#8A5300",
+          "#AE7525",
+          "#CC9A5E",
+          "#EBC190",
+          "#FFE8C2"
+        ]
+      },
+      "pause-orange": {
+        "role": "secondary",
+        "displayName": "Amber Pause",
+        "canonical": "oklch(76.5% 0.175 63)",
+        "tonalRamp": [
+          "#210000",
+          "#480F00",
+          "#712900",
+          "#9E4300",
+          "#C46600",
+          "#E1903D",
+          "#FDB97B",
+          "#FFE2B3"
+        ]
+      },
+      "pause-tint": {
+        "role": "secondary",
+        "displayName": "Amber Pause Tint",
+        "canonical": "oklch(76.5% 0.175 63)",
+        "tonalRamp": [
+          "#210000",
+          "#480F00",
+          "#712900",
+          "#9E4300",
+          "#C46600",
+          "#E1903D",
+          "#FDB97B",
+          "#FFE2B3"
+        ],
+        "note": "System orange at 15% opacity."
+      },
+      "warning-text": {
+        "role": "tertiary",
+        "displayName": "Behind Amber",
+        "canonical": "oklch(52.6% 0.119 64)",
+        "tonalRamp": [
+          "#1B0400",
+          "#3D1A00",
+          "#633500",
+          "#8C5103",
+          "#B07333",
+          "#CE9966",
+          "#EDBF96",
+          "#FFE7C6"
+        ]
+      },
+      "success-text": {
+        "role": "tertiary",
+        "displayName": "On-track Green",
+        "canonical": "oklch(50.8% 0.105 157)",
+        "tonalRamp": [
+          "#001104",
+          "#002E18",
+          "#0E4F30",
+          "#26714B",
+          "#4B946B",
+          "#79B591",
+          "#A6D7B8",
+          "#D3FAE1"
+        ]
+      },
+      "sleep-indigo": {
+        "role": "secondary",
+        "displayName": "Sleep Indigo",
+        "canonical": "oklch(52.9% 0.191 278)",
+        "tonalRamp": [
+          "#080031",
+          "#1C165E",
+          "#35318E",
+          "#4F4EC2",
+          "#6D71E9",
+          "#9199FF",
+          "#B7C1FF",
+          "#E0E9FF"
+        ]
+      },
+      "window-ground": {
+        "role": "neutral",
+        "displayName": "Citrus Paper",
+        "canonical": "oklch(98.4% 0.027 95)",
+        "tonalRamp": [
+          "#0D0B06",
+          "#27251C",
+          "#454236",
+          "#656152",
+          "#878272",
+          "#A9A597",
+          "#CCC9BD",
+          "#F1EFE5"
+        ]
+      },
+      "card-surface": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "oklch(100.0% 0.000 90)",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Warm Hairline",
+        "canonical": "oklch(90.3% 0.051 97)",
+        "tonalRamp": [
+          "#0E0B02",
+          "#292512",
+          "#484229",
+          "#686242",
+          "#8A8363",
+          "#ACA68A",
+          "#CFCAB2",
+          "#F3EFDC"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ledger Ink",
+        "canonical": "oklch(31.2% 0.035 89)",
+        "tonalRamp": [
+          "#0E0B04",
+          "#292519",
+          "#484132",
+          "#69614D",
+          "#8A826D",
+          "#ACA492",
+          "#CFC9B9",
+          "#F3EEE2"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Faded Ink",
+        "canonical": "oklch(56.3% 0.052 93)",
+        "tonalRamp": [
+          "#0F0B01",
+          "#2B2511",
+          "#494228",
+          "#6B6141",
+          "#8C8261",
+          "#AEA589",
+          "#D0C9B1",
+          "#F4EEDC"
+        ]
+      },
+      "accent-wash": {
+        "role": "primary",
+        "displayName": "Honey Wash",
+        "canonical": "oklch(78.6% 0.130 84)",
+        "tonalRamp": [
+          "#170700",
+          "#372000",
+          "#5B3B00",
+          "#815900",
+          "#A47B11",
+          "#C3A056",
+          "#E2C58B",
+          "#FFECBE"
+        ],
+        "note": "Theme accent at 14-16% opacity."
+      }
+    },
+    "typographyMeta": {
+      "action-label-lg": {
+        "displayName": "Action Label Large",
+        "purpose": "Clock In button text."
+      },
+      "live-timer": {
+        "displayName": "Live Timer",
+        "purpose": "Layout B compact sprint clock: 19px medium. Idle shows Ready."
+      },
+      "goal-figure": {
+        "displayName": "Goal Figure",
+        "purpose": "Today daily goal card figure."
+      },
+      "metric-figure": {
+        "displayName": "Metric Figure",
+        "purpose": "Metric card value."
+      },
+      "page-title": {
+        "displayName": "Page Title",
+        "purpose": "Dashboard header (.title2.bold)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Dashboard prose, banners, forms (.body)."
+      },
+      "card-label": {
+        "displayName": "Card Label",
+        "purpose": "Uppercase tracked card headings."
+      },
+      "action-label": {
+        "displayName": "Action Label",
+        "purpose": "Uppercase button text."
+      },
+      "data-mono": {
+        "displayName": "Data Mono",
+        "purpose": "Timestamps and durations in rows."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Metadata, axes, hints."
+      },
+      "popover-action": {
+        "displayName": "Popover action",
+        "purpose": "Sentence-case timer actions: 12px semibold SF Rounded."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sheet-lift",
+        "value": "0 -4px 20px rgba(0,0,0,0.6)",
+        "purpose": "Popover modal sheets."
+      }
+    ],
+    "motion": [
+      {
+        "name": "spring-state",
+        "value": "spring(response: 0.3, dampingFraction: 0.8)",
+        "purpose": "State changes such as the running row appearing."
+      },
+      {
+        "name": "spring-quick",
+        "value": "spring(response: 0.25, dampingFraction: 0.8)",
+        "purpose": "Small toggles and chip changes."
+      }
+    ],
+    "themes": [
+      "Citrus",
+      "Sand",
+      "Sky",
+      "Cloud",
+      "Matcha",
+      "Mint",
+      "Rose",
+      "Slate",
+      "Confetti",
+      "Lagoon",
+      "Orchid",
+      "Terracotta"
+    ]
+  },
+  "components": [
+    {
+      "name": "Clock In",
+      "kind": "button",
+      "refersTo": "button-clock-in",
+      "description": "Layout B primary action while idle. Flat theme accent fill and visible focus.",
+      "html": "<button class=\"ds-clock-in\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><path d=\"M3 1.5v9l7.5-4.5z\" fill=\"currentColor\"/></svg><span>Clock in</span></button>",
+      "css": ".ds-clock-in { display:flex;align-items:center;justify-content:center;gap:8px;width:280px;padding:10px 0;border:0;border-radius:7px;background:#E0B24C;color:#000;font:600 12px ui-rounded,system-ui;cursor:pointer } .ds-clock-in:active { opacity:0.8 } .ds-clock-in:focus-visible { outline:2px solid #876B2E;outline-offset:2px }"
+    },
+    {
+      "name": "Pause / Clock Out row",
+      "kind": "button",
+      "refersTo": "button-clock-out",
+      "description": "Layout B controls directly below the compact timer. Orange Pause or Resume; contrast-safe danger fill for Clock Out.",
+      "html": "<div class=\"ds-run-row\"><button class=\"ds-pause\"><svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" aria-hidden=\"true\"><rect x=\"2\" y=\"1.5\" width=\"2.5\" height=\"8\" fill=\"currentColor\"/><rect x=\"6.5\" y=\"1.5\" width=\"2.5\" height=\"8\" fill=\"currentColor\"/></svg><span>Pause</span></button><button class=\"ds-clock-out\"><svg width=\"11\" height=\"11\" viewBox=\"0 0 11 11\" aria-hidden=\"true\"><rect x=\"1.5\" y=\"1.5\" width=\"8\" height=\"8\" rx=\"1\" fill=\"currentColor\"/></svg><span>Clock out</span></button></div>",
+      "css": ".ds-run-row { display:flex;gap:8px;width:280px } .ds-pause,.ds-clock-out { flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;border-radius:7px;font:600 12px ui-rounded,system-ui } .ds-pause { background:rgba(255,149,0,0.14);color:#995900;border:1px solid #E8E0BA } .ds-clock-out { background:#C15047;color:#fff;border:0 } .ds-pause:active,.ds-clock-out:active { opacity:0.8 } .ds-pause:focus-visible,.ds-clock-out:focus-visible { outline:2px solid #876B2E;outline-offset:2px }"
+    },
+    {
+      "name": "Pill Button",
+      "kind": "button",
+      "refersTo": "button-pill",
+      "description": "Secondary popover actions (Copy All, Save).",
+      "html": "<button class=\"ds-pill\">COPY ALL</button>",
+      "css": ".ds-pill { padding:5px 10px; border:none; border-radius:9999px; background:#E0B24C; color:#000; font-family: ui-rounded, 'SF Pro Rounded', system-ui; font-size:11px; font-weight:700; cursor:pointer; } .ds-pill:active { opacity:0.7; } .ds-pill:focus-visible { outline:2px solid #876B2E; outline-offset:2px; }"
+    },
+    {
+      "name": "Metric Card",
+      "kind": "card",
+      "refersTo": "metric-card",
+      "description": "Ledger cell: tracked label, mono figure, rounded subtitle.",
+      "html": "<div class=\"ds-metric\"><div class=\"ds-metric-head\"><span>EARNINGS</span><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><circle cx=\"6\" cy=\"6\" r=\"5\" fill=\"none\" stroke=\"#E0B24C\" stroke-width=\"1.5\"/></svg></div><div class=\"ds-metric-value\">$412.50</div><div class=\"ds-metric-sub\">5h 30m at $75/h</div></div>",
+      "css": ".ds-metric { width:220px; padding:14px; background:#FFFFFF; border:1px solid #E8E0BA; border-radius:10px; display:flex; flex-direction:column; gap:6px; } .ds-metric-head { display:flex; justify-content:space-between; align-items:center; font-family: ui-rounded, 'SF Pro Rounded', system-ui; font-size:12px; font-weight:700; letter-spacing:0.8px; color:#807552; } .ds-metric-value { font-family: ui-monospace, 'SF Mono', monospace; font-size:24px; font-weight:700; color:#38301C; font-variant-numeric:tabular-nums; } .ds-metric-sub { font-family: ui-rounded, 'SF Pro Rounded', system-ui; font-size:12px; font-weight:500; color:#807552; }"
+    },
+    {
+      "name": "Dashboard Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat full-width dashboard container; no shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-label\">DAILY GOAL</div><div class=\"ds-card-figure\">2h 15m left</div><div class=\"ds-card-bar\"><span></span></div></div>",
+      "css": ".ds-card { width:420px; padding:18px; background:#FFFFFF; border:1px solid #E8E0BA; border-radius:12px; color:#38301C; display:flex; flex-direction:column; gap:8px; } .ds-card-label { font-family: ui-rounded, 'SF Pro Rounded', system-ui; font-size:12px; font-weight:700; letter-spacing:0.8px; color:#807552; } .ds-card-figure { font-family: ui-rounded, 'SF Pro Rounded', system-ui; font-size:28px; font-weight:600; font-variant-numeric:tabular-nums; } .ds-card-bar { height:6px; border-radius:9999px; background:#F1EFE5; overflow:hidden; } .ds-card-bar span { display:block; width:72%; height:100%; background:#E0B24C; }"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "tag-chip",
+      "description": "Sprint tag on the running sprint and in logs.",
+      "html": "<span class=\"ds-tag\">#client</span>",
+      "css": ".ds-tag { display:inline-block; padding:2.5px 7px; border-radius:9999px; background:rgba(224,178,76,0.14); border:1px solid rgba(224,178,76,0.35); color:#876B2E; font-family: ui-rounded, 'SF Pro Rounded', system-ui; font-size:10.5px; font-weight:700; }"
+    },
+    {
+      "name": "Sidebar",
+      "kind": "nav",
+      "refersTo": "sidebar-item-selected",
+      "description": "Dashboard sidebar; selected row gets a 16% accent wash.",
+      "html": "<nav class=\"ds-side\"><a class=\"ds-side-item is-active\">Today</a><a class=\"ds-side-item\">Week</a><a class=\"ds-side-item\">Month</a><a class=\"ds-side-item\">Analytics</a><a class=\"ds-side-item\">Settings</a></nav>",
+      "css": ".ds-side { width:180px; padding:8px; background:#FFFFFF; display:flex; flex-direction:column; gap:2px; font-family:system-ui, 'SF Pro'; } .ds-side-item { padding:6px 10px; border-radius:8px; font-size:14px; color:#38301C; cursor:default; } .ds-side-item:hover { background:rgba(224,178,76,0.08); } .ds-side-item.is-active { background:rgba(224,178,76,0.16); font-weight:600; }"
+    },
+    {
+      "name": "Menu Bar Status Pill",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "AppKit-drawn menu bar extra; accent while active, paused colour while paused.",
+      "html": "<span class=\"ds-status\">01:42:07</span>",
+      "css": ".ds-status { display:inline-block; padding:2px 8px; border-radius:9999px; background:#E0B24C; color:#000; font-family:ui-monospace, 'SF Mono', monospace; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Ledger",
+    "overview": "**Creative North Star: \"The Quiet Ledger\"**\n\nSkeval Timer is a ledger first: an exact, trustworthy account of hours that feeds real pay and a real employer timesheet. Surfaces are soft paper, one tinted ground with white cards ruled by a single warm hairline. Numbers are set in monospaced type so columns line up and figures never jitter while they tick. The page stays quiet so the figures can be read in one glance, then the user goes back to work.\n\nThe popover uses the selected Layout B. A compact timer and its controls come first. Today's hours, earnings, daily goal, and finish-time forecast follow. Recent sprints have their own review date. **The popover is where you act; the dashboard is where you review full history.** Native focus, menus, alerts, and sheets keep the controls familiar.\n\nPersonality comes from the twelve pastel themes (each with a dark twin) and SF Rounded labels: approachable and warm, never clinical. Structure stays native to the Mac: a `NavigationSplitView` sidebar, system pickers and toggles, SF Symbols, and global keyboard shortcuts.\n\n**Key Characteristics:**\n- Twelve pastel themes, each with a light palette and a dark twin. The user picks Light or Dark in Settings; the app ignores the macOS appearance. Citrus is the default.\n- Monospaced figures for every duration, timestamp, and amount.\n- Small uppercase SF Rounded labels with tracking give the ledger-heading voice.\n- Flat bordered cards on the dashboard; compact state-colored controls in the popover.\n- Native Mac structure: sidebar navigation, system controls, SF Symbols, keyboard shortcuts.",
+    "keyCharacteristics": [
+      "Twelve pastel themes, each with a light palette and a dark twin. The user picks Light or Dark in Settings; the app ignores the macOS appearance. Citrus is the default.",
+      "Monospaced figures for every duration, timestamp, and amount.",
+      "Small uppercase SF Rounded labels with tracking give the ledger-heading voice.",
+      "Flat bordered cards on the dashboard; tactile, glowing controls in the popover.",
+      "Native Mac structure: sidebar navigation, system controls, SF Symbols, keyboard shortcuts."
+    ],
+    "rules": [
+      {
+        "name": "The Readable Accent Rule",
+        "body": "`accentColor` is for fills, bars, and strokes. Text in the accent hue uses `accentText`; icons use `accentIcon`. State words use `statusText(for:)`; system orange and green text use `warningText` and `successText`. Six of the twelve accents fall below 3:1 on a card, and eight fall below 5:1, so raw accent text is illegible in half the themes.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fixed Status Hues Rule",
+        "body": "The theme accent means only \"running\". It never marks paused, recovery, or stopping. The Pause control, the paused timer digits, and recovery use the orange family: system orange for fills and strokes, `warningText` for text. Stopping uses each theme's red. Sleep uses indigo. The paused state pill uses a per-theme amber in light (`statusColor(for: .paused)`; Cloud's olive #8C874D is the one exception) and one shared amber in dark.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every duration, clock time, and amount uses SF Mono or `.monospacedDigit()`, so live values never shift width while they tick.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two Voices Rule",
+        "body": "Dashboard chrome (page titles, sidebar, banners, forms) uses system text styles. Ledger content inside cards (labels, figures, actions) uses the rounded/mono pairing. Don't mix the two inside one element.",
+        "section": "typography"
+      },
+      {
+        "name": "The Glow Means Live Rule",
+        "body": "A glow marks only the timing actions and the live clock. Dashboard cards, rows, and charts never get shadows.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** set every duration, time, and amount in SF Mono or `.monospacedDigit()`.",
+      "**Do** use `accentText`, `warningText`, `successText`, `dangerText`, and `statusText(for:)` for coloured text, and `accentIcon` for icons. Keep raw `accentColor` for fills, bars, and strokes.",
+      "**Do** build new themes by filling the same seven `PopoverTheme` roles. Never add a one-off colour to a single view.",
+      "**Do** keep dashboard cards flat: card white, a 1px hairline, and 12px or 10px corners.",
+      "**Do** give timing actions tactile press feedback (scale 0.97) and a `.help` tooltip that names the shortcut.",
+      "**Do** keep paused, recovery, stopping, and sleep off the theme accent: orange, red, and indigo, in every theme."
+    ],
+    "donts": [
+      "**Don't** add shadows or glows to dashboard cards, rows, or charts. Glow belongs only to the timing actions and the live clock.",
+      "**Don't** use `accentColor` (or its alias `neonTeal`) as a text colour. Half the theme accents are under 3:1 on a card.",
+      "**Don't** use the theme accent for paused, recovery, or destructive states.",
+      "**Don't** replace system controls (toggles, segmented pickers, date pickers, sidebar list) with custom ones.",
+      "**Don't** hard-code a theme's hex value in a view. Read it from `ThemeManager.shared.theme`.",
+      "**Don't** hard-code `.light` or `.dark` colour schemes. Derive them from `theme.isLight`, so native controls match the user's Light/Dark choice."
+    ],
+    "popoverLayout": {
+      "selected": "B",
+      "width": 330,
+      "preferredHeight": 680,
+      "order": [
+        "Header",
+        "Compact timer and controls",
+        "Today work and earnings",
+        "Daily goal and forecast",
+        "Copy today timesheet",
+        "Recent sprints with independent date"
+      ],
+      "protection": "Discard and Delete require confirmation. Completed sprint Delete offers Undo.",
+      "presentation": "Flat themed controls, native focus, menus, alerts, and manual-entry sheet."
+    }
+  }
+}

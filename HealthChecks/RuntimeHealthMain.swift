@@ -13,6 +13,7 @@ struct RuntimeHealthMain {
         app.setActivationPolicy(.prohibited)
         Task { @MainActor in
             await checkLiveEarnings()
+            await checkAppearanceChoice()
             print("Runtime health: \(checks - failures) / \(checks) checks passed.")
             exit(failures == 0 ? 0 : 1)
         }
@@ -29,6 +30,33 @@ struct RuntimeHealthMain {
 
     private static func waitForTicks() async {
         try? await Task.sleep(for: .seconds(2.3))
+    }
+
+    /// Switches the Light/Dark choice and checks the theme and menu bar pill follow, whatever macOS uses.
+    private static func checkAppearanceChoice() async {
+        let suite = "skeval-runtime-appearance-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let manager = ThemeManager(defaults: defaults)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        defer { NSStatusBar.system.removeStatusItem(item) }
+        let presenter = StatusBarPresenter(statusItem: item)
+
+        NSApplication.shared.appearance = NSAppearance(named: .aqua)
+        defer { NSApplication.shared.appearance = nil }
+        manager.appearance = .dark
+        expect(!manager.theme.isLight, "Choosing Dark must use the dark twin even when macOS is light")
+        presenter.update(state: .idle, accumulatedTotal: 0, theme: manager.theme)
+        let darkImage = item.button?.image
+
+        manager.appearance = .light
+        expect(manager.theme.isLight, "Choosing Light must use the light palette")
+        presenter.update(state: .idle, accumulatedTotal: 0, theme: manager.theme)
+        expect(item.button?.image !== darkImage, "The menu bar pill must redraw when the choice changes")
+
+        NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+        try? await Task.sleep(for: .milliseconds(100))
+        expect(manager.theme.isLight, "macOS Dark Mode must not override the Light choice")
     }
 
     private static func checkLiveEarnings() async {

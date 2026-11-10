@@ -307,7 +307,7 @@ struct SingleClockPickerView: View {
                 Button(action: commitTimeText) {
                     Image(systemName: "checkmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(parsedTimeText == nil ? theme.textSecondary : theme.neonTeal)
+                        .foregroundColor(parsedTimeText == nil ? theme.textSecondary : theme.accentIcon)
                         .frame(width: 24, height: 24)
                         .background(theme.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -372,7 +372,7 @@ struct SingleClockPickerView: View {
                 }) {
                     Text("Now")
                         .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(theme.neonTeal.opacity(0.12))
@@ -505,7 +505,7 @@ struct DualClockTimePickerView: View {
 
                 Text(title)
                     .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundColor(isSelected ? theme.neonTeal : theme.textSecondary)
+                    .foregroundColor(isSelected ? theme.accentText : theme.textSecondary)
 
                 Spacer()
 

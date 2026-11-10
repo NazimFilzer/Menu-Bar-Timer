@@ -4,24 +4,29 @@ cd "$(dirname "$0")/.."
 python3 - "$@" <<'PY'
 from pathlib import Path
 import os
+import argparse
 import plistlib
 import subprocess
 import sys
 import tempfile
 
 arguments = sys.argv[1:]
-if arguments not in ([], ['--timeline']):
-    raise SystemExit('Usage: scripts/run-preview.sh [--timeline]')
-
-timeline_preview = arguments == ['--timeline']
-name = 'Skeval Timeline Preview' if timeline_preview else 'Skeval Catch-Up Preview'
-executable = 'SkevalTimelinePreview' if timeline_preview else 'SkevalPreview'
+parser = argparse.ArgumentParser()
+parser.add_argument('--timeline', action='store_true')
+parser.add_argument('--menu', action='store_true')
+parser.add_argument('--dark', action='store_true')
+parser.add_argument('--theme', default='citrus')
+parser.add_argument('--state', choices=['idle', 'active', 'paused', 'sleep', 'recovery', 'empty', 'reached'], default='idle')
+options = parser.parse_args(arguments)
+timeline_preview = options.timeline
+name = 'Skeval Menu Preview' if options.menu else ('Skeval Timeline Preview' if timeline_preview else 'Skeval Catch-Up Preview')
+executable = 'SkevalMenuPreview' if options.menu else ('SkevalTimelinePreview' if timeline_preview else 'SkevalPreview')
 app = Path(tempfile.gettempdir()) / f'{name}.app'
 contents = app / 'Contents'
 binary = contents / 'MacOS' / executable
 binary.parent.mkdir(parents=True, exist_ok=True)
 (contents / 'Info.plist').write_bytes(plistlib.dumps({
-    'CFBundleIdentifier': 'com.skeval.timeline-preview' if timeline_preview else 'com.skeval.v2-catchup-preview',
+    'CFBundleIdentifier': 'com.skeval.menu-preview' if options.menu else ('com.skeval.timeline-preview' if timeline_preview else 'com.skeval.v2-catchup-preview'),
     'CFBundleName': name,
     'CFBundleExecutable': executable,
     'CFBundlePackageType': 'APPL',

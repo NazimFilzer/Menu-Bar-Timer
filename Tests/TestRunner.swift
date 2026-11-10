@@ -1862,7 +1862,7 @@ func testPopoverHeightAndSizing() {
     // Empty and populated history use the same height to prevent UI compaction.
     assertEqual(vm.displayedCompletedSprints.count, 0)
     assertFalse(vm.recoveryMode)
-    assertEqual(vm.desiredPopoverHeight, 590.0, "Empty state without sprints should be 590 to prevent UI compaction")
+    assertEqual(vm.desiredPopoverHeight, 680.0, "Layout B keeps room for the summary and recent sprints")
 
     // Add a sprint today.
     let today = Date()
@@ -1872,18 +1872,18 @@ func testPopoverHeightAndSizing() {
     vm.selectDate(today)
 
     assertEqual(vm.displayedCompletedSprints.count, 1)
-    assertEqual(vm.desiredPopoverHeight, 590.0, "State with completed sprints should be 590")
+    assertEqual(vm.desiredPopoverHeight, 680.0, "Completed sprints do not resize the popover")
 
     // Past days navigation sizing test
     // Yesterday has 0 sprints, Today has 1 sprint
     let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
     vm.selectDate(yesterday)
     assertEqual(vm.displayedCompletedSprints.count, 0)
-    assertEqual(vm.desiredPopoverHeight, 590.0, "Viewing yesterday with 0 sprints should size stably to 590")
+    assertEqual(vm.desiredPopoverHeight, 680.0, "Empty history keeps a stable height")
 
     vm.selectDate(today)
     assertEqual(vm.displayedCompletedSprints.count, 1)
-    assertEqual(vm.desiredPopoverHeight, 590.0, "Returning to today with 1 sprint should size to 590")
+    assertEqual(vm.desiredPopoverHeight, 680.0, "Returning to today keeps a stable height")
 }
 
 @MainActor
@@ -2147,6 +2147,7 @@ struct TestMain {
         testEarningsCalculator()
         testDateKeysIgnoreSystemCalendar()
         testGoalConsistencyIncludesWeekendWork()
+        testMonthCalendarStartsOnMondayAndCountsOnlyItsOwnDays()
         testSprintPatternsUseNetCompletedWork()
         testTagsMatchIgnoringCase()
         testWeekComparisonBoundaries()
@@ -2167,9 +2168,16 @@ struct TestMain {
         testDailyTimeline()
         testDailyTimelineDST()
         testPeriodPaceForecast()
+        testWeekPace()
+        testThemeTextContrast()
+        testDarkThemeContrast()
+        testDangerTextContrast()
+        testThemeGraphicContrast()
         await MainActor.run {
+            testThemeAppearanceChoice()
             testDeleteDaySprints()
             testDailyTimesheetClipboard()
+            testPopoverTimesheetDateAndDeleteUndo()
             testLiveCatchUpViewModel()
             testFinishForecastViewModel()
             testDailyTimelineViewModelAndSettings()

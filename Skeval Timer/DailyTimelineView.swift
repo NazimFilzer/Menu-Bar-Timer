@@ -31,9 +31,8 @@ struct DailyTimelineView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Daily timeline").font(.headline)
                     Text("\(hourLabel(timeline.visible.start)) to \(hourLabel(timeline.visible.end))")
-                        .font(.caption).foregroundStyle(theme.textSecondary)
+                        .font(.subheadline).foregroundStyle(theme.textSecondary)
                 }
                 Spacer(minLength: 8)
                 Button("Add sprint", systemImage: "plus") { showingAddSprint = true }
@@ -119,7 +118,7 @@ struct DailyTimelineView: View {
                         .frame(width: labelWidth - 8, alignment: .trailing)
                     Rectangle().frame(height: 1.5)
                 }
-                .foregroundStyle(theme.accentColor)
+                .foregroundStyle(theme.accentIcon)
                 .frame(width: width - 8)
                 .offset(y: y(now, in: timeline) + 8)
                 .allowsHitTesting(false)

@@ -8,7 +8,7 @@ Open the dashboard from the menu bar popover. Use the sidebar to move between To
 
 Manual sprint entry, editing, tags, clipboard copy, and CSV export are available in the dashboard. The popover keeps quick timing controls, manual entry, and the most recent seven days. Settings are available only in the dashboard. Earnings use the hourly rate and currency configured there. Weekly, monthly, and report totals use completed sprints; daily totals also include the active sprint.
 
-Today and the current Week and Month show a catch-up card below goal progress. Its target is the daily goal multiplied by scheduled working days through today, minus all clocked work in that week or month. The active sprint counts toward catch-up, with breaks excluded. Work on days off still counts. Choose working weekdays and individual days off in Settings; the default is Monday–Friday. Weekly and monthly goal totals remain separate from this daily schedule calculation.
+Month shows a Monday-first calendar of the month (hours per day, goal met, days off, upcoming days) beside Worked, Pace, and Time by tag cards. Its Pace card lists expected work by today, clocked work, how far behind or ahead you are, hours left, workdays left, and the hours needed per remaining workday. Today and the current Week show a catch-up card below goal progress. Its target is the daily goal multiplied by scheduled working days through today, minus all clocked work in that week or month. The active sprint counts toward catch-up, with breaks excluded. Work on days off still counts. Choose working weekdays and individual days off in Settings; the default is Monday–Friday. Weekly and monthly goal totals remain separate from this daily schedule calculation.
 
 If the Mac sleeps during a sprint, the timer holds until you decide whether sleep counts as work or paused time. Resolving as work counts both sleep and the decision delay as work; resolving as paused counts both as paused time.
 
@@ -23,6 +23,10 @@ Weekly pacing spreads the week's remaining schedule-based work across remaining 
 ## Eye-break reminders
 
 In Dashboard Settings, enable eye-break reminders to receive periodic macOS notifications following the 20-20-20 rule (looking at an object at least 20 feet away for 20 seconds). Intervals can be set to 20, 30, or 45 minutes (default 20 minutes, disabled by default). Reminders run only while a sprint is actively ticking, piggybacking on the 1-second engine clock without background polling or extra timers. Details and clinical evidence are documented in the [eye-break reminders feature note](docs/eye-break-reminders.md) and [research note](docs/eye-break-recommendations.md).
+
+## Themes and Dark Mode
+
+Pick one of twelve themes in Dashboard Settings, and choose **Light** or **Dark** with the switch next to the theme grid. Every theme has both versions. The choice is saved, applies to the dashboard, the popover, and the menu bar pill, and does not follow the macOS appearance.
 
 ## Copy All
 
@@ -46,7 +50,7 @@ Open `Skeval Timer.xcodeproj` in Xcode. The target requires macOS 26.2 or newer.
 
 Run the domain, persistence, analytics, and lifecycle tests with `./scripts/run-tests.sh`; it prints the assertion count.
 
-Run `./scripts/run-tests.sh --runtime-health` for a separate AppKit check (20 checks) of live decimal earnings, dashboard and popover rendering, pause/resume, and timer shutdown with disposable data. The [health check report](docs/v2-health-check.md) records the findings and timer cleanup fix.
+Run `./scripts/run-tests.sh --runtime-health` for a separate AppKit check (24 checks) of live decimal earnings, dashboard and popover rendering, pause/resume, the Light/Dark choice, and timer shutdown with disposable data. The [health check report](docs/v2-health-check.md) records the findings and timer cleanup fix.
 
 Run `./scripts/run-preview.sh` to open a separate native preview app with disposable sample logs. It opens Week; on Tuesday, October 13, 2026, the sample shows 16h expected, 6h clocked, and 10h left to catch up. Use the app menu's "Show menu bar preview" action to inspect the quick controls. Preview preferences and logs are isolated from the installed timer.
 

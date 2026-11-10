@@ -98,7 +98,7 @@ struct AnalyticsDashboardView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
                                 .background(isSelected ? theme.neonTeal.opacity(0.2) : Color.clear)
-                                .foregroundColor(isSelected ? theme.neonTeal : theme.textSecondary)
+                                .foregroundColor(isSelected ? theme.accentText : theme.textSecondary)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
@@ -152,7 +152,7 @@ struct AnalyticsDashboardView: View {
 
                     Text(summary.dateRangeLabel)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -251,7 +251,7 @@ struct AnalyticsDashboardView: View {
                 HStack(spacing: 7) {
                     Image(systemName: "chart.xyaxis.line")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentIcon)
 
                     Text("PRODUCTIVITY TREND LINE")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -433,7 +433,7 @@ struct AnalyticsDashboardView: View {
 
             Text(point.formattedDuration)
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(theme.neonTeal)
+                .foregroundColor(theme.accentText)
 
             if vm.goal.hourlyRate > 0 {
                 Divider().frame(height: 18).background(theme.dividerColor)
@@ -464,7 +464,7 @@ struct AnalyticsDashboardView: View {
                 HStack(spacing: 7) {
                     Image(systemName: "square.grid.3x3.fill")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentIcon)
 
                     Text("ANNUAL ACTIVITY HEATMAP")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -476,7 +476,7 @@ struct AnalyticsDashboardView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(theme.neonTeal.opacity(0.18))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                         .clipShape(Capsule())
                 }
 
@@ -660,7 +660,7 @@ struct AnalyticsDashboardView: View {
             if cell.totalSeconds > 0 {
                 Text(cell.formattedDuration)
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(theme.neonTeal)
+                    .foregroundColor(theme.accentText)
 
                 Text("(\(cell.sprintCount) sprint\(cell.sprintCount == 1 ? "" : "s"))")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
@@ -705,7 +705,7 @@ private struct SummaryCard: View {
                 Spacer()
                 Image(systemName: icon)
                     .font(.system(size: 12))
-                    .foregroundColor(theme.neonTeal)
+                    .foregroundColor(theme.accentIcon)
             }
 
             Text(value)

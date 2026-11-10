@@ -11,7 +11,7 @@ struct EyeBreakSettingsCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("EYE-BREAK REMINDERS", systemImage: "eye")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(theme.neonTeal)
+                .foregroundStyle(theme.accentText)
                 .kerning(1)
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Remind me to look away", isOn: Binding(

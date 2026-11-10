@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Week dashboard layouts</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only. No persistence.
+  Question: how should the Week page show total, earnings, weekly goal, pace, chart,
+  comparison and timesheet, so the weekly goal is shown once and the chart comes early?
+  Standalone HTML, like the other files in Prototype/. The app is native SwiftUI.
+  Variants (?variant=): A Hero goal card · B Two columns · C Chart first · R Current layout (reference)
+  States (?state=): progress · reached · past · empty   Keys: ← → variants, 1-4 states.
+  Colours copy the "Sky" light theme. Window = 780 pt wide (content area at the minimum window size).
+-->
+<style>
+:root{--bg:#EBF7FA;--card:#FAFFFF;--border:#BFDCE3;--accent:#52A3B5;--text:#1F3B45;--text2:#597A85;
+ --accent-text:#2F6F80;--warn:#8A4B08;--good:#1E6B45;--font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;--mono:"SF Mono",Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:#c9d6da;color:var(--text);padding:24px 0 110px;display:flex;justify-content:center}
+.win{width:780px;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0003;overflow:hidden}
+.tb{display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border)}
+.tb h1{font-size:20px}.tb small{display:block;color:var(--text2);font-size:12px;margin-top:2px}
+.sp{flex:1}.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text2);text-transform:uppercase}
+.big{font-family:var(--mono);font-size:26px;font-weight:700}.mid{font-size:20px;font-weight:600}
+.sub{font-size:12px;color:var(--text2)}.row{display:flex;gap:14px;align-items:center}.row>*{min-width:0}
+.col{display:flex;flex-direction:column;gap:8px}
+.bar{height:10px;border-radius:5px;background:#dcebef;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.bar.done i{background:#2F7F57}
+.good{color:var(--good)}.warn{color:var(--warn)}.acc{color:var(--accent-text)}
+.hr{height:1px;background:var(--border)}
+button{font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:#52A3B51f;color:var(--accent-text)}
+.pill.w{background:#B453091f;color:var(--warn)}.pill.g{background:#2F7F571f;color:var(--good)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid2{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+/* chart */
+.chart{display:flex;align-items:flex-end;gap:12px;height:150px;position:relative;padding:0 6px;border-bottom:1px solid var(--border)}
+.chart .d{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:4px;font-size:11px;color:var(--text2)}
+.chart .b{width:100%;max-width:48px;border-radius:5px 5px 0 0;background:var(--accent)}.chart .b.t{background:#2F6F80}.chart .b.z{background:#dcebef;min-height:3px}
+.goalline{position:absolute;left:0;right:0;border-top:2px dashed #B45309aa}
+.gl{position:absolute;right:4px;font-size:10px;color:var(--warn);background:var(--card);padding:0 3px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:11px;color:var(--text2);padding:6px 8px;background:#e6f1f4;letter-spacing:.06em}td{padding:6px 8px;border-top:1px solid var(--border);font-family:var(--mono)}
+.cmp{font-size:11px;color:var(--text2);background:#fff8;border:1px dashed var(--border);border-radius:8px;padding:8px 12px}
+.empty{padding:18px;text-align:center;color:var(--text2);font-size:13px}
+#sw{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center;background:#111;color:#fff;padding:9px 16px;border-radius:99px;box-shadow:0 6px 24px #0006;font-size:13px;z-index:9}
+#sw button{background:#333;color:#fff;border:0;padding:4px 10px;border-radius:6px;cursor:pointer}#sw .on{background:#52A3B5!important}#sw .sep{width:1px;height:20px;background:#555}
+</style>
+</head>
+<body>
+<div class="win" id="win"></div><div id="sw"></div>
+<script>
+const WG=40,DG=8,RATE=22.5,DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const S={
+ progress:{label:'In progress',range:'9–15 Nov',cur:true,today:1,h:[7.67,5.2,0,0,0,0,0],live:true,prev:'+1h 10m'},
+ reached:{label:'Goal reached',range:'9–15 Nov',cur:true,today:4,h:[9,8.5,8.2,8.5,7.2,0,0],live:false,prev:'+3h 05m'},
+ past:{label:'Past week',range:'2–8 Nov',cur:false,today:-1,h:[8,7.5,8.5,8,6,1.5,0],live:false,prev:'−0h 40m'},
+ empty:{label:'Empty',range:'9–15 Nov',cur:true,today:0,h:[0,0,0,0,0,0,0],live:false,prev:'−4h 00m'}
+};
+const fh=h=>{const m=Math.round(h*60);return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`};
+const money=h=>'$'+(h*RATE).toFixed(2);
+function derive(k){const d=S[k];const total=d.h.reduce((a,b)=>a+b,0);const left=Math.max(0,WG-total);
+ const elapsed=d.cur?Math.min(5,d.today+1):5;const behind=Math.max(0,DG*elapsed-total);
+ const remDays=d.cur?Math.max(0,5-d.today):0;const per=remDays&&left?left/remDays:0;
+ const worked=d.h.filter(x=>x>0).length;
+ return{...d,k,total,left,pct:Math.min(100,Math.round(total/WG*100)),reached:left===0,behind,remDays,per,avg:worked?total/worked:0,elapsed};}
+const tbar=d=>`<div class="bar ${d.reached?'done':''}"><i style="width:${d.pct}%"></i></div>`;
+const toolbar=d=>`<div class="tb"><div><h1>Week</h1><small>Weekly goals and daily work patterns</small></div><div class="sp"></div>${d.live?'<span class="pill g">● Sprint 00:42:10</span>':''}</div>`;
+const nav=d=>`<div class="row"><button>‹</button><b style="font-size:14px">${d.range} 2026</b><button ${d.cur?'disabled style="opacity:.4"':''}>›</button>${d.cur?'':'<button>This week</button>'}<div class="sp"></div></div>`;
+const goalText=d=>d.reached?`<span class="good mid">✓ Weekly goal reached</span>`:`<span class="mid">${fh(d.left)} left of ${WG}h</span>`;
+const paceText=d=>{if(!d.cur)return `<span class="sub">Week ended at ${d.pct}% of goal.</span>`;
+ if(d.reached)return `<span class="sub">Scheduled work is done for this week.</span>`;
+ const ahead=d.total>DG*d.elapsed;
+ return `<span class="pill ${ahead?'g':'w'}">${ahead?fh(d.total-DG*d.elapsed)+' ahead':fh(d.behind)+' behind'} schedule</span> <span class="sub">${d.remDays?`About ${fh(d.per)} per workday for ${d.remDays} more ${d.remDays==1?'day':'days'}.`:'No scheduled workdays left.'}</span>`;};
+const chart=(d,title='Daily work')=>{const mx=10;return `<div class="card col"><div class="row"><b>${title}</b><div class="sp"></div><span class="sub">Dashed line = daily goal ${DG}h</span></div>
+ <div class="chart"><div class="goalline" style="bottom:${DG/mx*100}%"></div>${d.h.map((h,i)=>`<div class="d"><span>${h?h.toFixed(1)+'h':''}</span><div class="b ${h?(i===d.today?'t':''):'z'}" style="height:${h/mx*100}%"></div></div>`).join('')}</div>
+ <div class="row">${DAYS.map((x,i)=>`<span class="sub" style="flex:1;text-align:center;${i===d.today?'font-weight:700;color:var(--text)':''}">${x}</span>`).join('')}</div></div>`;};
+const cmpCard=d=>`<div class="card col"><b>${d.cur?'Same point last week':'Compared with the previous week'}</b><span class="mid acc">${d.prev}</span><span class="sub">${d.total?'Compared by clock time up to now.':'No work yet to compare.'}</span></div>`;
+const sheet=d=>`<div class="card col"><div class="row"><b>Daily timesheet · ${d.range}</b><div class="sp"></div><button>⧉ Copy all</button></div>
+ ${d.total?`<table><tr><th>DAY</th><th>LOGIN</th><th>LOGOUT</th><th>BREAK</th></tr>${d.h.map((h,i)=>h?`<tr><td>${DAYS[i]}</td><td>09:0${i}</td><td>${17+(i%2)}:1${i}</td><td>${30+i*5}</td></tr>`:'').join('')}</table>`:'<div class="empty">No completed sprints this week.</div>'}</div>`;
+const note=t=>`<div class="cmp">${t}</div>`;
+const stat=(l,v,s)=>`<div class="card col"><span class="lbl">${l}</span><span class="big">${v}</span><span class="sub">${s}</span></div>`;
+
+const V={
+R:{name:'Current (reference)',render:d=>`${toolbar(d)}<div class="pg">
+ <div class="card row"><div class="col"><b style="font-size:18px">Good afternoon 👋</b><span class="sub">You've logged ${fh(d.total)} this week (${d.pct}% of your target).</span></div></div>
+ <div class="grid3">${stat("TODAY'S HOURS",d.cur&&d.today>=0?fh(d.h[d.today]):'—','Daily Target: 8h')}${stat("TODAY'S EARNINGS",d.cur&&d.today>=0?money(d.h[d.today]):'—','2 sprints logged')}${stat('DAILY AVERAGE',fh(d.avg),d.cur?'Current week average':'Historical week average')}</div>
+ <div class="card col"><div class="row"><span class="lbl">Weekly goal progress</span><div class="sp"></div><span class="pill">${d.pct}% of ${WG}h goal</span></div><div class="row"><div class="col"><span class="lbl">Logged hours</span><b class="mid">${fh(d.total)} / ${WG}h</b></div><div class="sp"></div><div class="col"><span class="lbl">Earnings progress</span><b class="mid acc">${money(d.total)}</b></div></div>${tbar(d)}<div class="row"><span class="sub">${d.reached?'✓ Weekly goal achieved':fh(d.left)+' remaining to hit goal'}</span><div class="sp"></div><span class="sub">Rate: $22.50/hr</span></div></div>
+ ${d.cur?`<div class="card col"><span class="lbl">Weekly pace</span><span class="mid ${d.behind?'warn':'good'}">${d.reached?'Target reached':fh(d.behind)+' left this week'}</span><span class="sub">Expected through today: ${fh(DG*d.elapsed)} · Clocked so far: ${fh(d.total)} · ${d.elapsed} working days · 8h/day</span></div>
+ <div class="card col"><b>When can I finish up?</b><span class="sub">${d.reached?'Scheduled target reached for this week.':fh(d.left)+' left · about '+fh(d.per)+'/workday across '+d.remDays+' remaining days (including today).'}</span><span class="sub">${WG}h scheduled this week · ${fh(d.total)} clocked. Breaks excluded.</span></div>`:''}
+ ${chart(d,'Daily activity')}${cmpCard(d)}${sheet(d)}</div>`},
+
+A:{name:'Hero goal card',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ <div class="card col" style="gap:12px">
+  <div class="row"><div class="col" style="flex:1"><span class="lbl">Week total</span><span class="big" style="font-size:38px">${fh(d.total)}</span></div>
+   <div class="col" style="text-align:right"><span class="lbl">Earnings</span><span class="mid" style="font-family:var(--mono)">${money(d.total)}</span><span class="sub">Avg ${fh(d.avg)} per day worked</span></div></div>
+  ${tbar(d)}<div class="row">${goalText(d)}<div class="sp"></div><span class="sub">${d.pct}% of ${WG}h</span></div>
+  <div class="hr"></div><div class="row" style="flex-wrap:wrap">${paceText(d)}</div></div>
+ ${chart(d)}${cmpCard(d)}${sheet(d)}
+ ${note('One card holds total, earnings, average, goal and pace. The goal shows once. The greeting is gone.')}</div>`},
+
+B:{name:'Two columns',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ <div class="grid2"><div class="col" style="gap:12px">${stat('Week total',fh(d.total),d.cur?'Includes the active sprint':'Completed sprints')}${stat('Earnings',money(d.total),'$22.50 per hour')}${stat('Daily average',fh(d.avg),'Days with work only')}</div>
+  <div class="card col" style="gap:12px"><div class="row"><span class="lbl">Weekly goal · ${WG}h</span><div class="sp"></div><span class="sub">${d.pct}%</span></div>${tbar(d)}${goalText(d)}<div class="hr"></div>
+   <span class="lbl">${d.cur?'Pace':'Result'}</span>${paceText(d)}
+   ${d.cur&&!d.reached?`<span class="sub">Expected through today: ${fh(DG*d.elapsed)} · Clocked: ${fh(d.total)}. Breaks excluded.</span>`:''}</div></div>
+ ${chart(d)}${cmpCard(d)}${sheet(d)}
+ ${note('Numbers left, goal and plan right. Catch-up and pace share one card. The chart follows the summary.')}</div>`},
+
+C:{name:'Chart first',render:d=>`${toolbar(d)}<div class="pg">${nav(d)}
+ ${chart(d)}
+ <div class="card" style="padding:12px 16px"><div class="row" style="gap:18px"><div class="col" style="gap:2px"><span class="lbl">Total</span><span class="mid" style="font-family:var(--mono)">${fh(d.total)}</span></div>
+  <div class="col" style="gap:2px"><span class="lbl">Earned</span><span class="mid" style="font-family:var(--mono)">${money(d.total)}</span></div>
+  <div class="col" style="gap:5px;flex:1"><div class="row"><span class="lbl">Goal ${WG}h</span><div class="sp"></div><span class="sub">${d.reached?'<span class="good">✓ reached</span>':fh(d.left)+' left'}</span></div>${tbar(d)}</div></div>
+  <div class="row" style="margin-top:8px;flex-wrap:wrap">${paceText(d)}</div></div>
+ ${sheet(d)}${cmpCard(d)}
+ ${note('Chart on top, one slim summary strip under it. Shortest. The timesheet comes before the comparison.')}</div>`}
+};
+const keys=Object.keys(V),states=Object.keys(S),q=new URLSearchParams(location.search);
+let vk=keys.includes(q.get('variant'))?q.get('variant'):'B',sk=states.includes(q.get('state'))?q.get('state'):'progress';
+function draw(){
+ document.getElementById('win').innerHTML=V[vk].render(derive(sk));
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> (${V[vk].name})</span><button id="nx">→</button><span class="sep"></span>${states.map((s,i)=>`<button class="${s===sk?'on':''}" data-s="${s}">${i+1} ${S[s].label}</button>`).join(' ')}`;
+ try{const u=new URL(window.location.href);u.searchParams.set('variant',vk);u.searchParams.set('state',sk);window.history.replaceState(null,'',u)}catch(e){}
+ document.getElementById('pv').onclick=()=>step(-1);document.getElementById('nx').onclick=()=>step(1);
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sk=b.dataset.s;draw()});
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);const n=+e.key;if(n>=1&&n<=4){sk=states[n-1];draw()}});
+draw();
+</script>
+</body>
+</html>

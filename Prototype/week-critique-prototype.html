@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Week tab after the critique</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only (mirrors the preview app: Mon 4h, Tue 2h, previous weeks 5h/day). No persistence.
+  Question: what should the Week page look like once every critique finding is fixed
+  (.impeccable/critique/2026-11-10T08-52-45Z__skeval-timer-weeklydashboardview-swift.md)?
+  The pace card, chart and timesheet are shared with Month, so ?page=month shows the same parts on the Month page.
+
+  Variants (?variant=): A Hero + chart · B Day ledger · C Rest of the week · R Current layout (reference)
+  States   (?state=):   behind · ontrack · paused · past · empty
+  Page     (?page=):    week · month          Theme (?theme=): light · dark
+  Keys: ← → variant · 1-5 state · M Week/Month · D light/dark
+
+  Every variant applies these fixes:
+   - The week (or month) navigator is in the page header and every card follows it; ⌘[ ⌘] change period.
+   - One "left" number. Being behind schedule is "10h 0m behind schedule", never "left".
+   - No greeting card, no Today's hours or earnings; each figure appears once.
+   - One duration format (6h 0m). Flat fills: no gradients, glows or shadows. Goal met = theme success colour + ✓.
+   - Accent text uses the readable accent; paused shows "Paused" in amber, never the accent.
+   - The timesheet fits the window: short dates, one ⋯ menu per row, upcoming days hidden, one help tooltip.
+  Colours copy the default Citrus theme and its dark twin from DESIGN.md. Window = 1140 pt (the preview's default).
+-->
+<style>
+:root{--bg:#FFFAE6;--card:#FFFFFF;--border:#E8E0BA;--rule:#F1EBCF;--text:#38301C;--text2:#807552;
+ --accent:#E0B24C;--accent-soft:#E0B24C29;--bar:#EACB85;--accent-text:#876B2E;--accent-icon:#B48F3D;
+ --warn:#995900;--warn-soft:#FF950021;--good:#22774D;--good-soft:#2E9E6621;--met:#3A9E6B;--ghost:#80755240;
+ --orange:#FF9500;--danger:#C15047;--off:#F6F0D8;--sb:#FFFFFF;--chrome:#d9d2b8;
+ --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;--round:"SF Pro Rounded",ui-rounded,-apple-system,sans-serif;--mono:"SF Mono",ui-monospace,Menlo,monospace}
+body.dark{--bg:#1F1C14;--card:#29291F;--border:#454030;--rule:#36342A;--text:#F0EDE2;--text2:#C4BEA8;
+ --accent:#E0B24C;--accent-soft:#E0B24C2E;--bar:#8E7740;--accent-text:#EBC774;--accent-icon:#E0B24C;
+ --warn:#FFB35C;--warn-soft:#FF950029;--good:#73D3A0;--good-soft:#2E9E662E;--met:#4DBF84;--ghost:#C4BEA840;
+ --off:#24221A;--sb:#29291F;--chrome:#111}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--chrome);color:var(--text);padding:24px 0 120px;display:flex;justify-content:center;font-size:13px}
+.win{width:1140px;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0004;overflow:hidden;display:flex;min-height:780px}
+/* sidebar + header: context only */
+.side{width:178px;background:var(--sb);border-right:1px solid var(--border);padding:44px 12px 16px;display:flex;flex-direction:column;gap:2px}
+.side h2{font-size:15px;padding:0 8px}.side .s{font-size:11px;color:var(--text2);padding:0 8px 14px}
+.side a{display:flex;gap:8px;padding:6px 8px;border-radius:8px;font-size:13px;color:var(--text2);text-decoration:none}
+.side a.on{background:var(--accent-soft);color:var(--text);font-weight:600}
+.main{flex:1;min-width:0}
+.hd{display:flex;align-items:center;gap:14px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border)}
+.hd h1{font-size:17px}.nav{display:flex;align-items:center;gap:6px;margin-top:4px}
+.nav b{font:600 12px var(--mono);min-width:150px;text-align:center}
+.nav button{padding:2px 8px}.kbd{font-size:10px;color:var(--text2);margin-left:4px}
+.state{text-align:right}.state small{display:block;font:700 11px var(--font)}.state span{font:500 13px var(--mono)}
+.sp{flex:1}.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+/* shared parts */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.lbl{font:700 11px var(--round);letter-spacing:.07em;color:var(--text2);text-transform:uppercase}
+.ttl{display:flex;align-items:center;gap:7px;margin-bottom:14px}.ttl .ic{color:var(--accent-icon)}
+.big{font:700 30px var(--mono);letter-spacing:-.5px}.mid{font:700 18px var(--mono)}.of{font:500 14px var(--mono);color:var(--text2)}
+.sub{font-size:12px;color:var(--text2)}.mono{font-family:var(--mono)}
+.row{display:flex;gap:14px;align-items:center}.col{display:flex;flex-direction:column;gap:4px}
+.pill{display:inline-flex;gap:5px;align-items:center;font:600 12px var(--round);padding:4px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent-text)}
+.pill.w{background:var(--warn-soft);color:var(--warn)}.pill.g{background:var(--good-soft);color:var(--good)}.pill.n{background:var(--rule);color:var(--text2)}
+.warn{color:var(--warn)}.good{color:var(--good)}.acc{color:var(--accent-text)}
+button{font:inherit;font-size:12px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+button.pri{background:var(--accent);border-color:var(--accent);color:#000;font-weight:600}
+button.pause{background:var(--warn-soft);border-color:transparent;color:var(--warn);font-weight:600}
+button.resume{background:var(--orange);border-color:var(--orange);color:#000;font-weight:600}
+button.stop{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
+button:disabled{opacity:.4;cursor:default}
+a.link{color:var(--accent-text);font-weight:600;text-decoration:none;cursor:pointer}a.link:hover{text-decoration:underline}
+.vr{width:1px;align-self:stretch;background:var(--border)}
+/* progress bar with expected-by-today tick */
+.bar{height:10px;border-radius:5px;background:var(--rule);position:relative;margin-top:14px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--accent)}.bar.done i{background:var(--met)}
+.bar .tick{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--text);border-radius:1px}
+.bar .tick span{position:absolute;top:17px;transform:translateX(-50%);white-space:nowrap;font-size:10px;color:var(--text2)}
+/* bar chart */
+.chart{display:flex;gap:0}.yax{width:34px;position:relative}.yax span{position:absolute;right:6px;transform:translateY(-50%);font:600 10px var(--mono);color:var(--accent-text)}
+.plot{flex:1;position:relative;display:flex;align-items:flex-end;border-bottom:1px solid var(--border)}
+.plot .goal{position:absolute;left:0;right:0;border-top:1px dashed var(--accent-icon)}
+.c{flex:1;height:100%;position:relative;display:flex;justify-content:center;align-items:flex-end;margin:0 6px;border-radius:6px}
+.c.cmp{margin:0 2px}.c.off{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--off) 6px 8px);opacity:.7}
+.c .b{width:100%;border-radius:6px 6px 2px 2px;background:var(--bar);position:relative}
+.c.today .b{background:var(--accent)}.c.met .b{background:var(--met)}
+.c .g{position:absolute;bottom:0;left:-3px;width:5px;border-radius:2px;background:var(--ghost)}
+.c .v{position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);font:600 10px var(--mono);white-space:nowrap}
+.c.met .v{color:var(--good)}.c.today .v{color:var(--accent-text);font-weight:800}
+.c.fut::after{content:"";position:absolute;bottom:0;left:35%;right:35%;height:3px;border-radius:2px;background:var(--border)}
+.c .tip{display:none;position:absolute;bottom:calc(100% + 22px);left:50%;transform:translateX(-50%);z-index:3;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;white-space:nowrap;font-size:11px;line-height:1.5}
+.c:hover .tip{display:block}.c:hover{outline:1px solid var(--border)}
+.xl{display:flex;margin-left:34px;margin-top:6px}.xl span{flex:1;text-align:center;font:600 10px var(--round);color:var(--text2);line-height:1.3}
+.xl span.t{color:var(--accent-text);font-weight:800}.xl span.o{opacity:.6}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--text2);margin-top:12px;flex-wrap:wrap;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* timesheet */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font:700 10px var(--round);letter-spacing:.06em;text-transform:uppercase;color:var(--text2);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--rule)}td.m,th.m{font-family:var(--mono);text-align:right}td.l{font-family:var(--mono)}
+tr.t td{background:var(--accent-soft)}tr.e td{color:var(--text2)}
+.tag{font:700 10.5px var(--round);color:var(--accent-text);background:var(--accent-soft);border:1px solid #E0B24C59;border-radius:99px;padding:1px 7px}
+.menu{position:relative;display:inline-block}.menu ul{display:none;position:absolute;right:0;top:26px;z-index:4;list-style:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:170px;text-align:left}
+.menu.open ul{display:block}.menu li{padding:5px 9px;border-radius:5px;cursor:pointer;font-size:12px}.menu li:hover{background:var(--accent-soft)}.menu li.d{color:var(--danger)}
+/* ledger (B) */
+.lg{display:grid;grid-template-columns:76px 1fr 70px 112px 52px 104px 34px;align-items:center;column-gap:12px}
+.lg.h{font:700 10px var(--round);letter-spacing:.06em;text-transform:uppercase;color:var(--text2);padding:0 4px 8px;border-bottom:1px solid var(--border)}
+.lg.r{padding:9px 4px;border-bottom:1px solid var(--rule)}.lg.r.t{background:var(--accent-soft);border-radius:6px}.lg.r.o{color:var(--text2)}
+.hb{height:12px;position:relative;background:var(--rule);border-radius:4px}
+.hb i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--bar)}.hb i.t{background:var(--accent)}.hb i.m{background:var(--met)}
+.hb i.p{background:transparent;border:1.5px dashed var(--warn);opacity:.8}.hb s{position:absolute;left:0;bottom:-5px;height:3px;border-radius:2px;background:var(--ghost)}
+.hb u{position:absolute;top:-4px;bottom:-4px;width:1.5px;background:var(--accent-icon)}
+/* rest-of-week list (C) */
+.rest{display:flex;flex-direction:column}.rest div{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--rule);gap:8px}
+.rest div.o{color:var(--text2)}.rest div.t{font-weight:600}
+.headline{font:700 22px var(--round)}
+/* PACE panel: shared by every variant, the page's highlight */
+.pace{border-radius:12px;padding:16px 18px;background:var(--warn-soft);border:1.5px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.pace.g{background:var(--good-soft);border-color:color-mix(in srgb,var(--good) 40%,transparent)}
+.pace.n{background:var(--rule);border-color:var(--border)}
+.pace .pt{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.pace .pt .lbl{color:var(--text);font-size:12px}
+.pace .say{font:700 20px var(--round);margin-bottom:12px}
+.pace .figs{display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
+.pace .fig{font:700 36px var(--mono);letter-spacing:-1px;line-height:1}.pace .fig small{font:500 13px var(--mono);color:var(--text2);letter-spacing:0;margin-left:4px}
+.pace .fig2{font:700 22px var(--mono);line-height:1}.pace .fig2 small{font:500 12px var(--mono);color:var(--text2);margin-left:3px}
+.pace .cap{font:600 10px var(--round);letter-spacing:.07em;text-transform:uppercase;color:var(--text2);margin-bottom:6px}
+.pace .chip{font:700 12px var(--mono);padding:4px 9px;border-radius:7px;background:var(--card);border:1px solid var(--border)}
+.gauge{position:relative;height:30px;margin-top:30px}
+.gauge .tr{position:absolute;left:0;right:0;top:9px;height:8px;border-radius:4px;background:var(--card);border:1px solid var(--border)}
+.gauge .you{position:absolute;left:0;top:9px;height:8px;border-radius:4px;background:var(--accent)}
+.gauge .mk{position:absolute;top:2px;width:2px;height:22px;transform:translateX(-1px)}
+.gauge .mk span{position:absolute;top:24px;transform:translateX(-50%);white-space:nowrap;font:600 10px var(--mono)}
+.gauge .mk.goal{background:var(--accent-icon)}.gauge .mk.goal span{top:-15px}.gauge .mk.goal span{color:var(--accent-text)}
+.gauge .mk.need{background:var(--warn);width:3px}.gauge .mk.need span{color:var(--warn)}
+.gauge .mk.need.g{background:var(--good)}.gauge .mk.need.g span{color:var(--good)}
+.note{border:1px dashed var(--accent-icon);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.5}
+.flag{display:inline-block;background:#D6594F;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:1px}
+.grad{background:linear-gradient(90deg,var(--accent),#E0B24C99);box-shadow:0 0 6px var(--accent)}
+/* switcher (not part of the design) */
+#sw{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;background:#111;color:#fff;padding:8px 12px;border-radius:99px;font-size:12px;box-shadow:0 6px 24px #0006;z-index:10;white-space:nowrap}
+#sw button{background:#2a2a2a;color:#fff;border:0;border-radius:99px;padding:4px 10px}#sw button.on{background:#fff;color:#111}#sw .sep{width:1px;height:18px;background:#555;margin:0 4px}
+</style>
+</head>
+<body>
+<div class="win"><nav class="side" id="side"></nav><div class="main" id="win"></div></div>
+<div id="sw"></div>
+<script>
+// ---------- sample data (mirrors Preview/PreviewMain.swift) ----------
+const RATE=1500,GOAL=8,TODAY=new Date(2026,10,10),NOW='14:05';
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const key=d=>`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`,add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const same=(a,b)=>key(a)===key(b),isWork=d=>d.getDay()>=1&&d.getDay()<=5;
+function logsFor(state){
+ const L={},put=(d,h,login,logout,brk,tag)=>L[key(d)]={h,login,logout,brk,tag};
+ for(const s of[new Date(2026,9,26),new Date(2026,10,2)])for(let i=0;i<5;i++)put(add(s,i),5,'07:00','12:10',10,'#Development');
+ if(state==='empty')return L;
+ if(state==='ontrack'){put(new Date(2026,10,9),9.5,'07:00','17:00',30,'#Client');put(TODAY,6,'07:00','13:20',20,'#Development')}
+ else{put(new Date(2026,10,9),4,'07:00','11:10',10,'#Client');put(TODAY,2,'07:00','09:10',10,'#Development')}
+ return L;
+}
+const S={behind:{label:'Behind',live:null},ontrack:{label:'On track (active)',live:{st:'active',h:.75,clock:'00:45:12'}},
+ paused:{label:'Paused',live:{st:'paused',h:.75,clock:'00:45:12',for:'12m'}},past:{label:'Past period',live:null},empty:{label:'Nothing yet',live:null}};
+
+function model(page,state){
+ const L=logsFor(state),live=S[state].live,past=state==='past';
+ let start,end,label;
+ if(page==='week'){start=add(new Date(2026,10,9),past?-7:0);end=add(start,6);
+  label=`${MON[start.getMonth()]} ${start.getDate()} – ${start.getMonth()===end.getMonth()?'':MON[end.getMonth()]+' '}${end.getDate()}, ${end.getFullYear()}`}
+ else{start=past?new Date(2026,9,1):new Date(2026,10,1);end=new Date(start.getFullYear(),start.getMonth()+1,0);label=`${['October','November'][start.getMonth()-9]} ${start.getFullYear()}`}
+ const days=[];
+ for(let d=start;d<=end;d=add(d,1)){
+  const l=L[key(d)]||null,today=same(d,TODAY);let h=l?l.h:0;if(today&&live)h+=live.h;
+  const p=L[key(add(d,-7))];
+  days.push({d,dow:DOW[d.getDay()],num:d.getDate(),h,l,today,fut:d>TODAY,work:isWork(d),prev:p?p.h:0});
+ }
+ const cur=!past,workdays=days.filter(x=>x.work),goal=workdays.length*GOAL,worked=days.reduce((s,x)=>s+x.h,0);
+ const expected=cur?workdays.filter(x=>x.d<=TODAY).length*GOAL:goal,left=Math.max(goal-worked,0);
+ const rem=cur?workdays.filter(x=>x.d>=TODAY):[],perDay=rem.length?left/rem.length:0;
+ const workedDays=days.filter(x=>x.h>0).length,elapsedWork=workdays.filter(x=>past||x.d<=TODAY).length;
+ const prevSoFar=days.filter(x=>x.d<=TODAY).reduce((s,x)=>s+x.prev,0);
+ return{page,state,past,cur,label,days,goal,worked,earned:worked*RATE,goalMoney:goal*RATE,expected,delta:worked-expected,left,rem,perDay,
+  extra:perDay-GOAL,capacity:left>rem.length*GOAL+0.01,avg:workedDays?worked/workedDays:0,workedDays,elapsedWork,paceSoFar:elapsedWork?worked/elapsedWork:0,prevSoFar,live,
+  unit:page==='week'?'week':'month',maxH:Math.max(GOAL,...days.map(x=>x.h),...(page==='week'?days.map(x=>x.prev):[0]))*1.15};
+}
+
+// ---------- formatting: one duration format everywhere ----------
+const fh=h=>{const m=Math.round(Math.abs(h)*60);return m<60?`${m}m`:`${Math.floor(m/60)}h ${m%60}m`};
+const money=h=>'₹'+Math.round(h).toLocaleString('en-IN');
+const short=d=>`${d.dow} ${d.num}`;
+
+// ---------- shared parts ----------
+function header(m){
+ const lv=m.live,stWord=!lv?'Idle':lv.st==='paused'?'Paused':'Active',stCls=!lv?'':lv.st==='paused'?'warn':'acc';
+ const ctl=!lv?`<button class="pri">▶ Clock in</button>`:lv.st==='paused'?`<button class="resume">Resume</button> <button class="stop">Clock out</button>`:`<button class="pause">Pause</button> <button class="stop">Clock out</button>`;
+ return`<div class="hd"><div><h1>${m.page==='week'?'Week':'Month'}</h1>
+  <div class="nav"><button title="Previous ${m.unit} (⌘[)">‹</button><b>${m.label}</b><button title="Next ${m.unit} (⌘])" ${m.cur?'disabled':''}>›</button>
+  ${m.cur?'':`<button>This ${m.unit}</button>`}<span class="kbd">⌘[ ⌘]</span></div></div><div class="sp"></div>
+  <div class="state"><small class="${stCls}">${stWord}${lv&&lv.st==='paused'?' · '+lv.for:''}</small><span class="${stCls==='warn'?'warn':''}">${lv?lv.clock:'00:00:00'}</span></div>${ctl}</div>`;
+}
+function statusPill(m){
+ if(m.past)return m.worked>=m.goal?`<span class="pill g">✓ Goal met</span>`:`<span class="pill w">Missed by ${fh(m.goal-m.worked)}</span>`;
+ if(m.worked>=m.goal)return`<span class="pill g">✓ ${m.page==='week'?'Weekly':'Monthly'} goal reached</span>`;
+ if(m.delta>=0)return`<span class="pill g">✓ ${m.delta<1/60?'On schedule':fh(m.delta)+' ahead of schedule'}</span>`;
+ return`<span class="pill w">${fh(-m.delta)} behind schedule</span>`;
+}
+function paceLine(m){
+ if(m.past)return`Final result for ${m.label}. Expected ${fh(m.goal)} across ${m.days.filter(x=>x.work).length} workdays.`;
+ if(m.left===0)return`Anything more counts as extra this ${m.unit}.`;
+ const n=m.rem.length,over=m.extra>1/60?` — <span class="warn">${fh(m.extra)} over your ${GOAL}h goal</span>`:m.extra<-1/60?` — ${fh(-m.extra)} under your ${GOAL}h goal`:'';
+ return`${m.worked===0?'No work logged yet this '+m.unit+'. ':''}Needs <b class="mono">${fh(m.perDay)}</b> a day for the ${n} workday${n===1?'':'s'} left, including today${over}.`;
+}
+function pacePanel(m,{say=false}={}){
+ const reached=m.worked>=m.goal,need=m.past||reached?GOAL:m.perDay;
+ const tone=reached?'g':m.past?'n':(m.delta>=0&&m.extra<=1/60)?'g':'';
+ const top=Math.max(need,m.paceSoFar,GOAL)*1.18,pc=v=>Math.min(v/top*100,100);
+ const vsGoal=m.past||reached?'':Math.abs(m.extra)<1/60?`<span class="chip">= your ${GOAL}h goal</span>`
+   :`<span class="chip ${m.extra>0?'warn':'good'}">${fh(m.extra)} ${m.extra>0?'over':'under'} ${GOAL}h goal</span>`;
+ const sentence=m.past?`${m.label}: ${fh(m.paceSoFar)} a workday against ${fh(GOAL)} needed.`
+   :reached?`${m.page==='week'?'Weekly':'Monthly'} goal reached. Anything more is extra.`
+   :`Needs ${fh(m.perDay)} a day through ${m.page==='week'?'Friday':'Nov 30'}.`;
+ const main=m.past?`<div><div class="cap">Your pace</div><div class="fig">${fh(m.paceSoFar)}<small>/ workday</small></div></div>
+    <div><div class="cap">Needed</div><div class="fig2">${fh(GOAL)}<small>/ workday</small></div></div>`
+  :reached?`<div><div class="cap">Your pace</div><div class="fig good">${fh(m.paceSoFar)}<small>/ workday</small></div></div>`
+  :`<div><div class="cap">Needed from now</div><div class="fig ${tone==='g'?'good':'warn'}">${fh(m.perDay)}<small>/ workday</small></div>
+     <div class="sub" style="margin-top:6px">for the ${m.rem.length} workday${m.rem.length===1?'':'s'} left, including today</div></div>
+    <div><div class="cap">Your pace so far</div><div class="fig2">${fh(m.paceSoFar)}<small>/ workday</small></div>
+     <div class="sub" style="margin-top:6px">over ${m.elapsedWork} workday${m.elapsedWork===1?'':'s'}</div></div>
+    <div style="align-self:center">${vsGoal}</div>`;
+ const gauge=`<div class="gauge"><div class="tr"></div><div class="you" style="width:${pc(m.paceSoFar)}%"></div>
+   <div class="mk goal" style="left:${pc(GOAL)}%"><span>${GOAL}h goal</span></div>
+   ${!reached?`<div class="mk need ${tone==='g'?'g':''}" style="left:${pc(need)}%"><span>${m.past?'needed':'needed '+fh(need)}</span></div>`:''}</div>`;
+ return`<div class="pace ${tone}"><div class="pt"><span class="lbl">◷ Pace</span>${statusPill(m)}</div>
+  ${say?`<div class="say ${tone===''?'warn':''}">${sentence}</div>`:''}
+  <div class="figs">${main}</div>${gauge}
+  ${m.cur&&m.capacity?`<div class="sub warn" style="margin-top:14px">⚠ ${fh(m.left)} doesn't fit in ${m.rem.length} × ${GOAL}h workdays. Work longer days or a day off. <a class="link">Change schedule…</a></div>`:''}
+  ${m.cur&&!reached?`<div class="sub" style="margin-top:${m.capacity?4:14}px">Gauge: the bar is your pace so far; markers show your goal and the pace needed for the rest of the ${m.unit}.</div>`:''}</div>`;
+}
+function capacityLine(m){
+ return m.cur&&m.capacity?`<div class="sub warn" style="margin-top:8px">⚠ ${fh(m.left)} doesn't fit in ${m.rem.length} × ${GOAL}h workdays. Work longer days or a day off. <a class="link">Change schedule…</a></div>`:'';
+}
+function goalBar(m){
+ const pct=Math.min(m.worked/m.goal*100,100),tick=Math.min(m.expected/m.goal*100,100);
+ return`<div class="bar ${m.worked>=m.goal?'done':''}"><i style="width:${Math.max(pct,m.worked>0?1.5:0)}%"></i>${m.cur&&m.worked<m.goal?`<div class="tick" style="left:${tick}%"><span>expected by today ${fh(m.expected)}</span></div>`:''}</div>`;
+}
+function compareLine(m){
+ if(m.page!=='week')return'';
+ if(m.past)return`Previous week: ${fh(m.days.reduce((s,x)=>s+x.prev,0))}.`;
+ const d=m.worked-m.prevSoFar;
+ return`At this point last week: <b class="mono">${fh(m.prevSoFar)}</b> — ${Math.abs(d)<1/60?'the same':`${fh(d)} ${d>0?'more':'less'} this week`}.`;
+}
+function barChart(m,{ghost=false,h=200}={}){
+ const many=m.days.length>10,y=v=>v/m.maxH*100;
+ const cols=m.days.map(d=>{
+  const met=d.h>=GOAL,cls=['c',many?'cmp':'',d.today?'today':'',met?'met':'',d.fut&&d.work?'fut':'',!d.work&&d.h===0?'off':''].join(' ');
+  const v=d.h>0&&(!many||d.today||met)?`<span class="v">${met?'✓ ':''}${many?Math.round(d.h*10)/10:fh(d.h)}</span>`:'';
+  const tip=`<div class="tip"><b>${d.dow}, ${MON[d.d.getMonth()]} ${d.num}</b>${d.today?' · Today':''}<br>${d.fut?'Upcoming':!d.work&&d.h===0?'Day off':`Worked <b class="mono">${fh(d.h)}</b> · ${money(d.h*RATE)}`}${d.work&&!d.fut?`<br>${Math.round(d.h/GOAL*100)}% of ${GOAL}h goal`:''}${ghost&&!d.fut?`<br>Last week: ${fh(d.prev)}`:''}</div>`;
+  return`<div class="${cls}">${d.h>0?`<div class="b" style="height:${y(d.h)}%">${v}</div>`:''}${ghost&&d.prev>0?`<div class="g" style="height:${y(d.prev)}%"></div>`:''}${tip}</div>`}).join('');
+ const xl=m.days.map(d=>`<span class="${d.today?'t':''} ${!d.work?'o':''}">${many?d.num:d.dow+'<br>'+d.num}</span>`).join('');
+ return`<div class="chart" style="height:${h}px"><div class="yax"><span style="top:${100-y(GOAL)}%">${GOAL}h</span></div><div class="plot"><div class="goal" style="bottom:${y(GOAL)}%"></div>${cols}</div></div><div class="xl">${xl}</div>
+ <div class="legend"><span><i style="background:var(--accent)"></i>Today</span><span><i style="background:var(--met)"></i>✓ Met ${GOAL}h goal</span><span><i style="background:var(--bar)"></i>Worked</span><span><i style="background:repeating-linear-gradient(135deg,transparent 0 3px,var(--border) 3px 6px)"></i>Day off</span>${ghost?'<span><i style="background:var(--ghost)"></i>Last week</span>':''}<span>— dashed line: daily goal</span></div>`;
+}
+function tsCard(m,title='Daily timesheet'){
+ const vis=m.cur?m.days.filter(d=>!d.fut):m.days,hidden=m.days.length-vis.length,hasAny=m.days.some(d=>d.l);
+ const rows=vis.map((d,i)=>{const l=d.l;return`<tr class="${d.today?'t':''} ${l?'':'e'}"><td>${short(d)}${d.today?' · Today':''}</td><td class="l">${l?l.login:'—'}</td><td class="l">${l?l.logout:'—'}</td>
+  <td class="m">${l?l.brk+' min':'—'}</td><td class="m">${l?fh(l.h):'—'}</td><td>${l?`<span class="tag">${l.tag}</span>`:''}</td>
+  <td style="text-align:right"><div class="menu"><button onclick="tog(this)" aria-label="Actions for ${short(d)}">⋯</button><ul>
+  ${l?`<li onclick="copied(this,'Copied ${short(d)}')">Copy ${short(d)} row</li>`:''}<li>Details…</li><li>Add sprint on ${short(d)}…</li>${l?`<li class="d">Delete ${short(d)} sprints…</li>`:''}</ul></div></td></tr>`}).join('');
+ return`<div class="card"><div class="row" style="margin-bottom:12px"><span class="lbl"><span class="ic" style="color:var(--accent-icon)">▤</span> ${title}</span><div class="sp"></div>
+  <button ${hasAny?'':'disabled'} onclick="copied(this,'✓ Copied ${m.label}')" title="Copies every day in ${m.label}, earliest first: Login, Logout, blank Lunch, Break in minutes. Empty days paste as blank rows. Completed sprints only; Break includes pauses and gaps between sprints.">⧉ Copy All</button> <button>＋ Add Sprint</button></div>
+  <table><thead><tr><th>Date</th><th>Login</th><th>Logout</th><th class="m">Break</th><th class="m">Work</th><th>Tag</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  ${hidden?`<div class="sub" style="margin-top:8px">${hidden} upcoming day${hidden===1?'':'s'} hidden. Copy All still includes them as blank rows.</div>`:''}</div>`;
+}
+const note=t=>`<div class="note"><b>Prototype note.</b> ${t}</div>`;
+
+// ---------- variants ----------
+const V={
+A:{name:'Hero + chart',render:m=>`${header(m)}<div class="pg">
+ <div class="card">
+  <div class="row" style="align-items:flex-start;gap:28px">
+   <div class="col"><span class="lbl">Worked</span><div><span class="big">${fh(m.worked)}</span> <span class="of">/ ${fh(m.goal)}</span></div></div>
+   <div class="vr"></div>
+   <div class="col"><span class="lbl">Earned</span><div><span class="mid">${money(m.earned)}</span> <span class="of">/ ${money(m.goalMoney)}</span></div><span class="sub mono">₹1,500/h</span></div>
+   <div class="vr"></div>
+   <div class="col"><span class="lbl">Daily average</span><span class="mid">${fh(m.avg)}</span><span class="sub">per worked day (${m.workedDays})</span></div>
+  </div>
+  ${goalBar(m)}
+  <div style="margin-top:${m.cur&&m.worked<m.goal?30:16}px">${pacePanel(m)}</div>
+ </div>
+ <div class="card"><div class="row" style="margin-bottom:14px"><span class="lbl"><span style="color:var(--accent-icon)">▮</span> Daily work</span><div class="sp"></div>
+  ${m.page==='week'?`<label class="sub"><input type="checkbox" ${GH?'checked':''} onchange="GH=this.checked;draw()"> Show last week</label>`:''}</div>
+  ${barChart(m,{ghost:GH&&m.page==='week',h:m.page==='week'?210:180})}
+  ${m.page==='week'?`<div class="sub" style="margin-top:10px">${compareLine(m)} <span title="Compares completed work plus the active sprint up to ${NOW} on the matching day last week.">ⓘ</span></div>`:''}</div>
+ ${tsCard(m)}
+ ${note('One hero answers "am I on track?": the tick on the bar is where the schedule expects you today. PACE is the highlighted panel inside it: the needed pace is the biggest figure on the page, next to your pace so far and the gap to your goal. It replaces the Weekly pace and "When can I finish up?" cards. The "Same point last week" card becomes a toggle on the chart (thin ghost bars) plus one sentence. Hover a bar for details.')}
+</div>`},
+
+B:{name:'Day ledger',render:m=>{
+ const rows=m.days.map(d=>{const l=d.l,met=d.h>=GOAL,planned=m.cur&&d.work&&(d.fut||d.today)&&m.left>0;
+  const w=v=>Math.min(v/m.maxH*100,100),need=d.today?d.h+m.perDay:m.perDay;
+  if(m.cur&&d.fut&&!d.work)return`<div class="lg r o"><span>${short(d)}</span><span class="sub">Day off</span><span></span><span></span><span></span><span></span><span></span></div>`;
+  return`<div class="lg r ${d.today?'t':''} ${!d.work&&!l?'o':''}"><span>${short(d)}${d.today?'<br><span class="sub">Today</span>':''}</span>
+   <div class="hb">${planned?`<i class="p" style="width:${w(need)}%"></i>`:''}${d.h>0?`<i class="${d.today?'t':met?'m':''}" style="width:${w(d.h)}%"></i>`:''}${m.page==='week'&&!d.fut&&d.prev?`<s style="width:${w(d.prev)}%"></s>`:''}<u style="left:${w(GOAL)}%"></u></div>
+   <span class="mono" style="text-align:right">${d.h>0?(met?'<span class="good">✓ </span>':'')+fh(d.h):planned?`<span class="warn">${fh(need)}</span>`:!d.work?'off':'—'}</span>
+   <span class="mono sub">${l?l.login+'–'+l.logout:planned?'needed':''}</span><span class="mono sub">${l?l.brk+'m':''}</span>
+   <span>${l?`<span class="tag">${l.tag}</span>`:''}</span>
+   <span><div class="menu"><button onclick="tog(this)">⋯</button><ul>${l?`<li onclick="copied(this,'Copied')">Copy ${short(d)} row</li>`:''}<li>Details…</li><li>Add sprint…</li>${l?'<li class="d">Delete sprints…</li>':''}</ul></div></span></div>`}).join('');
+ return`${header(m)}<div class="pg">
+ <div class="card" style="padding:14px 18px"><div class="row" style="gap:24px;align-items:flex-start">
+  <div class="col" style="gap:14px;padding-top:4px;min-width:150px"><div class="col"><span class="lbl">Worked</span><div><span class="mid">${fh(m.worked)}</span> <span class="of">/ ${fh(m.goal)}</span></div></div>
+  <div class="col"><span class="lbl">Earned</span><span class="mid">${money(m.earned)}</span><span class="sub mono">of ${money(m.goalMoney)}</span></div></div>
+  <div style="flex:1;min-width:0">${pacePanel(m)}</div>
+ </div></div>
+ <div class="card"><div class="row" style="margin-bottom:12px"><span class="lbl"><span style="color:var(--accent-icon)">▤</span> ${m.page==='week'?'Week':'Month'} ledger</span><div class="sp"></div>
+  <button onclick="copied(this,'✓ Copied ${m.label}')" title="Copies every day in ${m.label}: Login, Logout, blank Lunch, Break in minutes. Completed sprints only.">⧉ Copy All</button> <button>＋ Add Sprint</button></div>
+  <div class="lg h"><span>Day</span><span>Work vs ${GOAL}h goal${m.page==='week'?' · thin line = last week':''}</span><span style="text-align:right">Work</span><span>Login–Logout</span><span>Break</span><span>Tag</span><span></span></div>
+  ${rows}
+  <div class="sub" style="margin-top:10px">${m.page==='week'?compareLine(m)+' ':''}Dashed amber bars show what the remaining workdays need.</div></div>
+ ${note('Chart and timesheet become one ledger: one row per day, a horizontal bar against the goal mark, and the timesheet columns on the same row. Remaining workdays show the needed hours as dashed amber bars, so the plan for the rest of the '+m.unit+' is read straight from the list. PACE sits beside the totals as the highlighted panel, and its needed figure is the same number on every dashed bar. Nothing is said twice.')}
+</div>`}},
+
+C:{name:'Rest of the week',render:m=>{
+ const n=m.days.length,W=560,H=210,P=26,ymax=Math.max(m.goal,m.worked,m.page==='week'?m.days.reduce((s,x)=>s+x.prev,0):0)*1.08;
+ const X=i=>P+i/n*(W-P-8),Y=v=>H-20-v/ymax*(H-34);
+ let cA=0,cE=0,cP=0,act=[[X(0),Y(0)]],exp=[[X(0),Y(0)]],prv=[[X(0),Y(0)]];
+ m.days.forEach((d,i)=>{cE+=d.work?GOAL:0;exp.push([X(i),Y(cE-(d.work?GOAL:0))],[X(i+1),Y(cE)]);cP+=d.prev;prv.push([X(i+1),Y(cP)]);if(d.d<=TODAY||m.past){cA+=d.h;act.push([X(i+1),Y(cA)])}});
+ const ti=m.days.findIndex(d=>d.today),lastWork=m.days.map(d=>d.work).lastIndexOf(true);
+ const pts=a=>a.map(p=>p.map(v=>v.toFixed(1)).join(',')).join(' ');
+ const need=m.cur&&m.left>0?`<polyline points="${X(ti+1)},${Y(m.worked)} ${X(lastWork+1)},${Y(m.goal)}" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="2 4"/>`:'';
+ const svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-height:240px">
+  <line x1="${P}" x2="${W-8}" y1="${Y(m.goal)}" y2="${Y(m.goal)}" stroke="var(--border)"/><text x="${P-4}" y="${Y(m.goal)+3}" text-anchor="end" font-size="9" fill="var(--text2)" font-family="SF Mono,Menlo">${Math.round(m.goal)}h</text>
+  <polyline points="${pts(exp)}" fill="none" stroke="var(--accent-icon)" stroke-width="1.2" stroke-dasharray="4 4"/>
+  ${m.page==='week'?`<polyline points="${pts(prv)}" fill="none" stroke="var(--ghost)" stroke-width="2"/>`:''}
+  ${need}<polyline points="${pts(act)}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>
+  ${m.cur?`<circle cx="${X(ti+1)}" cy="${Y(m.worked)}" r="4" fill="var(--accent)"/>`:''}
+  ${m.days.map((d,i)=>n<=10||d.num%5===0||d.num===1?`<text x="${(X(i)+X(i+1))/2}" y="${H-5}" text-anchor="middle" font-size="9.5" fill="${d.today?'var(--accent-text)':'var(--text2)'}" font-weight="${d.today?800:500}">${n<=10?d.dow:d.num}</text>`:'').join('')}</svg>`;
+ const restDays=m.days.filter(d=>d.d>=TODAY);
+ const rest=m.cur?restDays.slice(0,m.page==='week'?7:6).map(d=>d.today?`<div class="t"><span>Today · ${fh(d.h)} done</span><span class="mono ${m.left?'warn':'good'}">${m.left?fh(m.perDay)+' more':'✓'}</span></div>`
+   :d.work?`<div><span>${short(d)}</span><span class="mono">${m.left?fh(m.perDay):'—'}</span></div>`:`<div class="o"><span>${short(d)}</span><span>Day off</span></div>`).join('')+(m.page==='month'&&restDays.length>6?`<div class="o"><span>…${m.rem.length-5} more workdays</span><span class="mono">${fh(m.perDay)} each</span></div>`:''):'';
+ const headline=m.past?`${m.label}: ${fh(m.worked)} of ${fh(m.goal)}.`:m.left===0?`${m.page==='week'?'Weekly':'Monthly'} goal reached. Anything more is extra.`
+   :`Needs ${fh(m.perDay)} a day through ${m.page==='week'?'Friday':'Nov 30'}.`;
+ return`${header(m)}<div class="pg">
+ ${pacePanel(m,{say:true})}
+ <div class="sub mono" style="font-size:13px;margin-top:-6px;padding:0 4px">${fh(m.worked)} of ${fh(m.goal)} worked · ${money(m.earned)} earned · ${fh(m.avg)} per worked day</div>
+ <div style="display:grid;grid-template-columns:${m.cur?'1fr 290px':'1fr'};gap:16px;align-items:start">
+  <div class="card"><div class="row" style="margin-bottom:10px"><span class="lbl"><span style="color:var(--accent-icon)">↗</span> Running total</span></div>${svg}
+   <div class="legend"><span><i style="background:var(--accent)"></i>Worked</span><span>┄ Schedule (${GOAL}h per workday)</span>${m.cur&&m.left?'<span class="warn">┈ Needed from now</span>':''}${m.page==='week'?'<span><i style="background:var(--ghost)"></i>Last week</span>':''}</div>
+   ${m.page==='week'?`<div class="sub" style="margin-top:8px">${compareLine(m)}</div>`:''}</div>
+  ${m.cur?`<div class="card"><div class="lbl" style="margin-bottom:8px">Rest of the ${m.unit}</div><div class="rest">${rest}</div>
+   <div class="sub" style="margin-top:8px">Spread evenly over remaining scheduled workdays. <a class="link">Change schedule…</a></div></div>`:''}
+ </div>
+ ${tsCard(m)}
+ ${note('PACE leads the page: the sentence the biller needs, the needed pace as the biggest figure, your pace so far and a gauge. Then a running-total line: the gap between the solid line and the dashed schedule is how far behind you are, and the dotted amber line is what the rest of the '+m.unit+' needs. The day-by-day plan is a short list on the right. Note: "Today: 8h 30m more" is how the current pace maths works (today\'s done hours are already subtracted); worth checking that is what you expect.')}
+</div>`}},
+
+R:{name:'Current layout (reference)',render:m=>`${header(m).replace(/<div class="nav">[\s\S]*?<\/div><\/div>/,'<div class="sub">Weekly goals and daily work patterns</div></div>')}<div class="pg">
+ <div class="card"><b style="font-size:18px">Good afternoon 👋</b><div class="sub">You've logged ${fh(m.worked)} this week (${Math.round(m.worked/m.goal*100)}% of your target).<span class="flag">says "this week" on past weeks</span></div></div>
+ <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+  <div class="card"><span class="lbl">Today's hours</span><div class="big">2h 0m</div><span class="sub">Daily Target: 8h</span><span class="flag">belongs on Today</span></div>
+  <div class="card"><span class="lbl">Today's earnings</span><div class="big">₹3,000</div><span class="sub">1 sprint logged</span></div>
+  <div class="card"><span class="lbl">Daily average</span><div class="big">${fh(m.avg)}</div><span class="sub">Current week average</span></div></div>
+ <div class="card"><span class="lbl">Weekly goal progress</span><div class="row" style="margin-top:8px"><span class="mid">${fh(m.worked)} / 40h</span><div class="sp"></div><span class="mid acc">${money(m.earned)} / ${money(m.goalMoney)}</span></div>
+  <div class="bar"><i class="grad" style="width:${m.worked/m.goal*100}%"></i></div><div class="sub" style="margin-top:8px">${fh(m.left)} remaining to hit goal<span class="flag">gradient + glow</span></div></div>
+ <div class="card"><span class="lbl">Weekly pace</span><div class="mid warn" style="margin-top:8px">⟲ ${Math.round(-m.delta)}h left this week<span class="flag">≠ "${fh(m.left)} left" below</span></div><div class="sub">Expected through today: 16h · Clocked so far: ${Math.round(m.worked)}h</div></div>
+ <div class="card"><b>When can I finish up?</b><div style="margin-top:6px">${fh(m.left)} left · about ${fh(m.perDay)}/workday across ${m.rem.length} remaining days (including today).</div><div class="sub warn">About 30m above your normal daily goal per remaining workday.</div><div class="sub warn">More work remains than your daily goals or available time allow on the remaining scheduled days. Extra work or work on days off can still count. Consider changing the plan.<span class="flag">3 cards, 1 question</span></div></div>
+ <div class="card"><span class="lbl">Weekly activity</span> <span class="pill">CURRENT</span> <span class="sub">‹ ${m.label} ›</span><span class="flag">navigator buried in 6th card</span><div class="sub" style="margin-top:8px">Gradient bars with glow; today's hours label in raw accent (1.96:1).</div></div>
+ <div class="card"><b>Same point last week</b><div class="sub">You recorded ${fh(m.worked)}, compared with ${fh(m.prevSoFar)} last week…</div></div>
+ <div class="card"><span class="lbl">Daily timesheet</span><div class="sub" style="margin-top:6px">820pt-wide table scrolls sideways at this window size; ACTIONS off-screen, "Details" truncated to "D…"; all 7 days listed; 3 footnote paragraphs.<span class="flag">overflow</span></div></div>
+ ${note('Your current Week page, condensed, with the same sample data. Red flags mark the critique findings.')}
+</div>`}
+};
+
+// ---------- sidebar + switcher ----------
+document.getElementById('side').innerHTML='<h2>Skeval Timer</h2><div class="s">Work and earnings</div>';
+let GH=false;
+function side(page){document.getElementById('side').innerHTML='<h2>Skeval Timer</h2><div class="s">Work and earnings</div>'+['Today','Week','Month','Analytics','Settings'].map(n=>`<a class="${n.toLowerCase()===page?'on':''}">${n}</a>`).join('')}
+function tog(b){const m=b.parentElement;document.querySelectorAll('.menu.open').forEach(x=>x!==m&&x.classList.remove('open'));m.classList.toggle('open')}
+function copied(el,t){const b=el.tagName==='LI'?el.closest('.menu').querySelector('button'):el,o=b.innerHTML;b.innerHTML=t;el.closest('.menu')?.classList.remove('open');setTimeout(()=>b.innerHTML=o,2000)}
+addEventListener('click',e=>{if(!e.target.closest('.menu'))document.querySelectorAll('.menu.open').forEach(x=>x.classList.remove('open'))});
+const keys=Object.keys(V),states=Object.keys(S),q=new URLSearchParams(location.search);
+let vk=keys.includes(q.get('variant'))?q.get('variant'):'A',sk=states.includes(q.get('state'))?q.get('state'):'behind',
+ pk=q.get('page')==='month'?'month':'week',tk=q.get('theme')==='dark'?'dark':'light';
+function draw(){
+ document.body.classList.toggle('dark',tk==='dark');side(pk);
+ const m=model(pk,sk);
+ document.getElementById('win').innerHTML=(vk==='R'&&pk==='month')?header(m)+`<div class="pg">${note('The reference view is for the Week page. Switch back with M.')}</div>`:V[vk].render(m);
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> (${V[vk].name})</span><button id="nx">→</button><span class="sep"></span>${states.map((s,i)=>`<button class="${s===sk?'on':''}" data-s="${s}">${i+1} ${S[s].label}</button>`).join('')}<span class="sep"></span><button id="pk">M ${pk==='week'?'Week':'Month'}</button><button id="tk">D ${tk==='light'?'Light':'Dark'}</button>`;
+ try{const u=new URL(location.href);u.searchParams.set('variant',vk);u.searchParams.set('state',sk);u.searchParams.set('page',pk);u.searchParams.set('theme',tk);history.replaceState(null,'',u)}catch(e){}
+ pv.onclick=()=>step(-1);nx.onclick=()=>step(1);document.getElementById('pk').onclick=flipPage;document.getElementById('tk').onclick=flipTheme;
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sk=b.dataset.s;draw()});
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+function flipPage(){pk=pk==='week'?'month':'week';draw()}function flipTheme(){tk=tk==='light'?'dark':'light';draw()}
+addEventListener('keydown',e=>{if(e.target.closest('input,textarea,[contenteditable]'))return;
+ if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);if(e.key==='m'||e.key==='M')flipPage();if(e.key==='d'||e.key==='D')flipTheme();
+ const n=+e.key;if(n>=1&&n<=states.length){sk=states[n-1];draw()}});
+draw();
+</script>
+</body>
+</html>

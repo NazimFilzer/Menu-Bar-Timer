@@ -4,7 +4,6 @@ import SwiftUI
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
     PopoverView(vm: TimerViewModel())
-        .preferredColorScheme(.dark)
 }
 
 #Preview("Week · Sample Data") {
@@ -63,7 +62,6 @@ private enum SkevalDashboardPreview {
 
         return DashboardView(vm: viewModel)
             .defaultAppStorage(defaults)
-            .preferredColorScheme(.dark)
     }
 }
 #endif

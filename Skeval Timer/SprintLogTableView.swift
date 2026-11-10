@@ -25,6 +25,7 @@ struct SprintLogTableView: View {
     let defaultDate: Date
     let title: String
     let theme: PopoverTheme
+    var usesTimesheetStyle = false
 
     init(vm: TimerViewModel, summary: WeeklySummary, theme: PopoverTheme, title: String = "SPRINT LOGS & HISTORY") {
         self.vm = vm
@@ -44,13 +45,14 @@ struct SprintLogTableView: View {
         self.title = title
     }
 
-    init(vm: TimerViewModel, sprints: [Sprint], distinctTags: [String], defaultDate: Date, theme: PopoverTheme, title: String) {
+    init(vm: TimerViewModel, sprints: [Sprint], distinctTags: [String], defaultDate: Date, theme: PopoverTheme, title: String, usesTimesheetStyle: Bool = false) {
         self.vm = vm
         self.allSprints = sprints
         self.distinctTags = distinctTags
         self.defaultDate = defaultDate
         self.theme = theme
         self.title = title
+        self.usesTimesheetStyle = usesTimesheetStyle
     }
 
     @State private var searchQuery: String = ""
@@ -91,7 +93,7 @@ struct SprintLogTableView: View {
         VStack(spacing: 14) {
             // Header: Title, Count Badge & Add Sprint Button
             headerRow
-            if let exportMessage { Text(exportMessage).font(.caption).foregroundStyle(theme.neonTeal) }
+            if let exportMessage { Text(exportMessage).font(.caption).foregroundStyle(theme.accentText) }
 
             // Search & Tag Filter Bar
             filterBar
@@ -160,19 +162,21 @@ struct SprintLogTableView: View {
             HStack(spacing: 8) {
                 Image(systemName: "list.bullet.rectangle")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(theme.neonTeal)
+                    .foregroundColor(theme.accentIcon)
 
-                Text(title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.textPrimary)
-                    .kerning(0.8)
+                if !title.isEmpty {
+                    Text(title)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(theme.textPrimary)
+                        .kerning(0.8)
+                }
 
                 Text("\(allSprints.count) sprint\(allSprints.count == 1 ? "" : "s")")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2.5)
                     .background(theme.neonTeal.opacity(0.12))
-                    .foregroundColor(theme.neonTeal)
+                    .foregroundColor(theme.accentText)
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(theme.neonTeal.opacity(0.3), lineWidth: 1))
             }
@@ -337,7 +341,7 @@ struct SprintLogTableView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3.5)
                 .background(isSelected ? theme.neonTeal.opacity(0.2) : theme.cardBorder.opacity(0.25))
-                .foregroundColor(isSelected ? theme.neonTeal : theme.textSecondary)
+                .foregroundColor(isSelected ? theme.accentText : theme.textSecondary)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
@@ -353,29 +357,29 @@ struct SprintLogTableView: View {
     private var tableSurface: some View {
         VStack(spacing: 0) {
             // Header Row
-            HStack(spacing: 8) {
+            HStack(spacing: usesTimesheetStyle ? 16 : 8) {
                 Text("DATE")
-                    .frame(width: 95, alignment: .leading)
+                    .frame(minWidth: 95, maxWidth: usesTimesheetStyle ? .infinity : 95, alignment: .leading)
                 Text("START")
-                    .frame(width: 65, alignment: .leading)
+                    .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
                 Text("END")
-                    .frame(width: 65, alignment: .leading)
+                    .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
                 Text("PAUSED")
-                    .frame(width: 65, alignment: .leading)
+                    .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
                 Text("NET DURATION")
-                    .frame(width: 90, alignment: .leading)
+                    .frame(minWidth: 90, maxWidth: usesTimesheetStyle ? .infinity : 90, alignment: .leading)
                 Text("TAG")
-                    .frame(minWidth: 80, alignment: .leading)
+                    .frame(minWidth: 80, maxWidth: usesTimesheetStyle ? .infinity : nil, alignment: .leading)
                 Spacer()
                 Text("ACTIONS")
                     .frame(width: 100, alignment: .trailing)
             }
-            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .font(.system(size: usesTimesheetStyle ? 10 : 9, weight: .bold, design: .rounded))
             .foregroundColor(theme.textSecondary)
             .kerning(0.8)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(theme.cardBorder.opacity(0.2))
+            .padding(.horizontal, usesTimesheetStyle ? 14 : 12)
+            .padding(.vertical, usesTimesheetStyle ? 12 : 8)
+            .background(theme.cardBorder.opacity(usesTimesheetStyle ? 0.25 : 0.2))
 
             Divider().background(theme.dividerColor)
 
@@ -396,55 +400,55 @@ struct SprintLogTableView: View {
     }
 
     private func sprintRowView(sprint: Sprint, isEven: Bool) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: usesTimesheetStyle ? 16 : 8) {
             // Date
             Text(Self.tableDateFormatter.string(from: sprint.startTime))
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .medium, design: .rounded))
                 .foregroundColor(theme.textPrimary)
-                .frame(width: 95, alignment: .leading)
+                .frame(minWidth: 95, maxWidth: usesTimesheetStyle ? .infinity : 95, alignment: .leading)
 
             // Start Time
             Text(sprint.startLabel)
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                .foregroundColor(theme.textSecondary)
-                .frame(width: 65, alignment: .leading)
+                .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .regular, design: .monospaced))
+                .foregroundColor(usesTimesheetStyle ? theme.textPrimary : theme.textSecondary)
+                .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
 
             // End Time
             Text(sprint.endLabel)
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                .foregroundColor(theme.textSecondary)
-                .frame(width: 65, alignment: .leading)
+                .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .regular, design: .monospaced))
+                .foregroundColor(usesTimesheetStyle ? theme.textPrimary : theme.textSecondary)
+                .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
 
             // Paused Duration
             Text(sprint.hasPause ? sprint.pausedLabel : "—")
-                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                .foregroundColor(sprint.hasPause ? theme.neonTeal.opacity(0.8) : theme.textSecondary.opacity(0.6))
-                .frame(width: 65, alignment: .leading)
+                .font(.system(size: usesTimesheetStyle ? 12 : 10, weight: .regular, design: .monospaced))
+                .foregroundColor(sprint.hasPause ? theme.accentText : theme.textSecondary.opacity(0.6))
+                .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
 
             // Net Duration
             Text(sprint.durationLabel)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .bold, design: .monospaced))
                 .foregroundColor(theme.textPrimary)
-                .frame(width: 90, alignment: .leading)
+                .frame(minWidth: 90, maxWidth: usesTimesheetStyle ? .infinity : 90, alignment: .leading)
 
             // Tag
             if let tag = sprint.tag?.trimmingCharacters(in: .whitespacesAndNewlines), !tag.isEmpty {
                 HStack(spacing: 2) {
                     Text("#\(tag)")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                 }
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(theme.neonTeal.opacity(0.12))
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(theme.neonTeal.opacity(0.3), lineWidth: 1))
-                .frame(minWidth: 80, alignment: .leading)
+                .frame(minWidth: 80, maxWidth: usesTimesheetStyle ? .infinity : nil, alignment: .leading)
             } else {
                 Text("—")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(theme.textSecondary.opacity(0.5))
-                    .frame(minWidth: 80, alignment: .leading)
+                    .frame(minWidth: 80, maxWidth: usesTimesheetStyle ? .infinity : nil, alignment: .leading)
             }
 
             Spacer()
@@ -455,7 +459,7 @@ struct SprintLogTableView: View {
                 Button(action: { copySprint(sprint) }) {
                     Image(systemName: copiedSprintId == sprint.id ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 12))
-                        .foregroundColor(copiedSprintId == sprint.id ? Color.green : theme.textSecondary)
+                        .foregroundColor(copiedSprintId == sprint.id ? theme.successText : theme.textSecondary)
                         .frame(width: 30, height: 30)
                         .background(copiedSprintId == sprint.id ? Color.green.opacity(0.15) : theme.cardBorder.opacity(0.2))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -468,7 +472,7 @@ struct SprintLogTableView: View {
                 Button(action: { editingSprint = sprint }) {
                     Image(systemName: "pencil")
                         .font(.system(size: 10))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentIcon)
                         .frame(width: 30, height: 30)
                         .background(theme.neonTeal.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -495,9 +499,10 @@ struct SprintLogTableView: View {
             }
             .frame(width: 100, alignment: .trailing)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(isEven ? Color.clear : theme.cardBorder.opacity(0.08))
+        .padding(.horizontal, usesTimesheetStyle ? 14 : 12)
+        .padding(.vertical, usesTimesheetStyle ? 12 : 7)
+        .background((usesTimesheetStyle ? isEven : !isEven) ? theme.cardBorder.opacity(0.08) : Color.clear)
+        .monospacedDigit()
     }
 
     private func copySprint(_ sprint: Sprint) {
@@ -542,7 +547,7 @@ struct SprintLogTableView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(theme.neonTeal.opacity(0.15))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -624,7 +629,7 @@ struct SprintFormFieldsView: View {
                 HStack(spacing: 4) {
                     Text("#")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                     TextField("e.g. client, dev, meeting", text: $tagText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11, design: .rounded))
@@ -675,7 +680,7 @@ struct SprintDurationPreviewCard: View {
                             .kerning(0.6)
                         Text(EarningsCalculator.format(amount: estimatedEarnings, currencySymbol: currencySymbol))
                             .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            .foregroundColor(theme.neonTeal)
+                            .foregroundColor(theme.accentText)
                     }
                 }
             }
@@ -728,7 +733,7 @@ struct AddSprintModalView: View {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentIcon)
                     Text("Add Historical Sprint")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)
@@ -842,7 +847,7 @@ struct EditSprintModalView: View {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "pencil.circle.fill")
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentIcon)
                     Text("Edit Sprint Log")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundColor(theme.textPrimary)

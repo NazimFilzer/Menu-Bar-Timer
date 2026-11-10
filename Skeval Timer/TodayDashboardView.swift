@@ -6,6 +6,8 @@ struct TodayDashboardView: View {
     let openSettings: () -> Void
     @AppStorage("skevalTodayShowingTimeline") private var showingTimeline = true
     @State private var temporaryTimelineHours: TimelineHours?
+    @State private var contentWidth: CGFloat = 780
+    private static let twoColumnMinWidth: CGFloat = 660
 
     private var dateSelection: Binding<Date> {
         Binding(get: { vm.selectedDate }, set: { vm.selectDate($0) })
@@ -16,74 +18,103 @@ struct TodayDashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 dateNavigation
-                // Values that change every tick live in their own views, so the
-                // sprint list and timeline around them do not rebuild each second.
-                if vm.isViewingToday { Live { sprintTag } }
-                Live { metrics }
-                Live { dailyGoal }
-                if vm.isViewingToday {
-                    Live {
-                        CatchUpCardView(summary: vm.catchUpSummary(for: .day),
-                                        dailyGoalLabel: vm.goal.goalLabel, theme: theme)
-                    }
-                    FinishForecastCardView(vm: vm, theme: theme)
-                }
-                if !vm.goal.hasHourlyRate {
-                    HStack {
-                        Label("Set your hourly rate to track earnings.", systemImage: "banknote")
-                        Spacer()
-                        Button("Set hourly rate", action: openSettings)
-                    }
-                    .font(.subheadline).padding(16)
-                    .background(theme.cardBg).clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                HStack {
-                    Text("\(vm.selectedDayShortTitle)'s sprints").font(.headline)
-                    Spacer()
-                    Button(vm.isAllCopied ? "Copied" : "Copy all", systemImage: vm.isAllCopied ? "checkmark" : "doc.on.doc") {
-                        vm.copyAllDisplayedSprints()
-                    }
-                    .disabled(vm.displayedCompletedSprints.isEmpty)
-                    .help("Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints.")
-                }
-                Picker("Sprint view", selection: $showingTimeline) {
-                    Text("Timeline").tag(true)
-                    Text("List").tag(false)
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 240)
+                Live { summary }
+                historyHeader
                 if showingTimeline {
                     DailyTimelineView(vm: vm, theme: theme, temporaryHours: $temporaryTimelineHours)
                 } else {
                     SprintLogTableView(vm: vm, sprints: vm.displayedCompletedSprintsDescending.map(\.sprint),
                                        distinctTags: tags, defaultDate: vm.selectedDate,
-                                       theme: theme, title: "SPRINT HISTORY")
+                                       theme: theme, title: "", usesTimesheetStyle: true)
                 }
             }
             .padding(20)
             .foregroundStyle(theme.textPrimary)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
         .onChange(of: Calendar.current.startOfDay(for: vm.selectedDate)) {
             temporaryTimelineHours = nil
         }
     }
 
+    // MARK: Summary
+
+    @ViewBuilder private var summary: some View {
+        if contentWidth >= Self.twoColumnMinWidth {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(spacing: 12) {
+                    workTimeCard
+                    earningsCard
+                    if vm.isViewingToday { sprintTag }
+                }
+                .frame(width: 260)
+                DailyGoalCardView(vm: vm, theme: theme)
+            }
+        } else {
+            VStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) { workTimeCard; earningsCard }
+                DailyGoalCardView(vm: vm, theme: theme)
+                if vm.isViewingToday { sprintTag }
+            }
+        }
+    }
+
+    private var workTimeCard: some View {
+        MetricCardView(title: "WORK TIME", value: vm.displayedTotalShortLabel,
+                       subtitle: vm.isViewingToday ? "Includes the active sprint" : "Completed sprints",
+                       icon: "clock", theme: theme)
+    }
+
+    private var earningsCard: some View {
+        MetricCardView(title: "EARNINGS", value: vm.displayedEarningsLabel,
+                       subtitle: vm.goal.hasHourlyRate ? "\(vm.goal.hourlyRateLabel) per hour" : "",
+                       icon: "banknote", theme: theme,
+                       actionTitle: vm.goal.hasHourlyRate ? nil : "Set hourly rate",
+                       action: vm.goal.hasHourlyRate ? nil : openSettings)
+    }
+
+    private var historyHeader: some View {
+        HStack(spacing: 12) {
+            Text("\(vm.selectedDayShortTitle)'s sprints").font(.headline)
+            Spacer()
+            Picker("Sprint view", selection: $showingTimeline) {
+                Text("Timeline").tag(true)
+                Text("List").tag(false)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 200)
+            Button(vm.isAllCopied ? "Copied" : "Copy all", systemImage: vm.isAllCopied ? "checkmark" : "doc.on.doc") {
+                vm.copyAllDisplayedSprints()
+            }
+            .disabled(vm.displayedCompletedSprints.isEmpty)
+            .accessibilityHint(Self.copyAllHelp)
+            .help(Self.copyAllHelp)
+        }
+    }
+
+    private static let copyAllHelp = "Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints."
+
     private var dateNavigation: some View {
         HStack(spacing: 12) {
             Button { moveDay(-1) } label: { Image(systemName: "chevron.left") }
                 .accessibilityLabel("Previous day")
-                .help("Previous day")
+                .keyboardShortcut("[", modifiers: .command)
+                .help("Previous day, Command [")
             CalendarDatePicker(title: "Day to review", selection: dateSelection, theme: theme,
                                allowedRange: Date.distantPast...Date())
                 .font(.subheadline.weight(.medium))
             Button { moveDay(1) } label: { Image(systemName: "chevron.right") }
                 .disabled(vm.isViewingToday)
                 .accessibilityLabel("Next day")
-                .help("Next day")
+                .keyboardShortcut("]", modifiers: .command)
+                .help("Next day, Command ]")
             if !vm.isViewingToday {
                 Button("Back to today") { vm.jumpToToday() }
+                    .keyboardShortcut("t", modifiers: [.command, .option])
+                    .help("Back to today, Command Option T")
             }
             Spacer()
             Text(vm.headerDateSubtitle).font(.subheadline).foregroundStyle(theme.textSecondary)
@@ -92,57 +123,28 @@ struct TodayDashboardView: View {
     }
 
     private var sprintTag: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             Label(vm.isRunning ? "Sprint tag" : "Next sprint tag", systemImage: "tag")
+                .font(.caption.weight(.bold)).foregroundStyle(theme.textSecondary)
             TextField("Optional project or client", text: tagBinding)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel(vm.isRunning ? "Current sprint tag" : "Next sprint tag")
-                .frame(maxWidth: 260)
-            Spacer()
             if vm.isPaused {
                 Text("Paused for \(vm.currentPauseLabel)")
                     .font(.system(.subheadline, design: .monospaced))
+                    .foregroundStyle(theme.warningText)
             }
         }
-        .font(.subheadline)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
     }
 
     private var tagBinding: Binding<String> {
         Binding(get: { vm.isRunning ? vm.currentTag ?? "" : vm.pendingTag },
                 set: { if vm.isRunning { vm.setTag($0) } else { vm.pendingTag = $0 } })
-    }
-
-    private var metrics: some View {
-        HStack(spacing: 16) {
-            MetricCardView(title: "WORK TIME", value: vm.displayedTotalShortLabel,
-                           subtitle: vm.isViewingToday ? "Includes the active sprint" : "Completed sprints",
-                           icon: "clock", theme: theme)
-            MetricCardView(title: "EARNINGS", value: vm.displayedEarningsLabel,
-                           subtitle: vm.goal.hasHourlyRate ? "\(vm.goal.hourlyRateLabel) per hour" : "Set your hourly rate",
-                           icon: "banknote", theme: theme)
-            MetricCardView(title: "DAILY TARGET", value: vm.goal.goalLabel,
-                           subtitle: vm.goal.hasHourlyRate ? vm.targetEarningsLabel : "Your daily work goal",
-                           icon: "target", theme: theme)
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var dailyGoal: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(vm.displayedGoalTitle).font(.headline)
-                Spacer()
-                Text(vm.displayedProgressLabel).font(.subheadline).monospacedDigit()
-            }
-            ProgressView(value: vm.displayedProgressFraction)
-                .tint(theme.neonTeal)
-                .accessibilityLabel("Daily goal progress")
-                .accessibilityValue("\(Int(vm.displayedProgressFraction * 100)) percent")
-            Text(vm.isDisplayedGoalReached ? "Daily goal reached" : "\(TimeFormatter.format(shortDuration: max(0, vm.goal.dailyGoalSeconds - vm.displayedAccumulatedTotal))) remaining")
-                .font(.subheadline).foregroundStyle(theme.textSecondary)
-        }
-        .padding(18).background(theme.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func moveDay(_ offset: Int) {

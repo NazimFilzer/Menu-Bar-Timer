@@ -26,7 +26,7 @@ struct CalendarDatePicker: View {
                 .labelsHidden()
                 .tint(theme.accentColor)
                 .padding()
-                .environment(\.colorScheme, .light)
+                .environment(\.colorScheme, theme.isLight ? .light : .dark)
         }
     }
 }

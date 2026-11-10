@@ -24,6 +24,8 @@ class TimerViewModel {
     var selectedDayLog: DayLog = DayLog()
     var lastCopiedId: UUID? = nil
     var isAllCopied: Bool = false
+    private(set) var lastCopiedTimesheetDate: Date?
+    @ObservationIgnored private var timesheetCopyRevision = UUID()
     var logRevision: Int = 0
     private(set) var persistenceError: String?
     var pendingTag: String = ""
@@ -351,6 +353,7 @@ class TimerViewModel {
 
     func selectDate(_ date: Date) {
         selectedDate = date
+        isAllCopied = lastCopiedTimesheetDate.map { Calendar.current.isDate($0, inSameDayAs: date) } ?? false
         todayLog = store.todayLog()
         if isViewingToday {
             selectedDayLog = todayLog
@@ -364,7 +367,7 @@ class TimerViewModel {
     }
 
     var desiredPopoverHeight: CGFloat {
-        var height: CGFloat = 590
+        var height: CGFloat = 680
         if recoveryMode { height += 120 }
         if hasPendingSleepResolution { height += 90 }
         if persistenceError != nil { height += 80 }
@@ -438,7 +441,7 @@ class TimerViewModel {
         checkAndHandleDayChange()
         jumpToToday()
         lastCopiedId = nil
-        isAllCopied = false
+        clearTimesheetCopyFeedback()
         let effectiveTag = cleanTag(tag) ?? cleanTag(pendingTag)
         pendingTag = ""
         engine.clockIn(tag: effectiveTag)
@@ -486,7 +489,7 @@ class TimerViewModel {
         recoveryEndText = ""
         recoveryEndError = nil
         notifiedMilestones = []
-        isAllCopied = false
+        clearTimesheetCopyFeedback()
         refreshLogs()
     }
 
@@ -516,7 +519,7 @@ class TimerViewModel {
     func copy(sprint: Sprint) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(sprint.clipboardText, forType: .string)
-        isAllCopied = false
+        clearTimesheetCopyFeedback()
         lastCopiedId = sprint.id
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2))
@@ -586,17 +589,32 @@ class TimerViewModel {
     }
 
     func copyAllDisplayedSprints() {
-        guard !selectedDayLog.completedSprints.isEmpty else { return }
-        let text = selectedDayLog.clipboardText
+        copyDailyTimesheet(for: selectedDate)
+    }
+
+    /// Copies a day without moving the dashboard or popover history date.
+    func copyDailyTimesheet(for date: Date) {
+        let text = store.log(for: date).clipboardText
         guard !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         lastCopiedId = nil
-        isAllCopied = true
+        let day = Calendar.current.startOfDay(for: date)
+        let revision = UUID()
+        timesheetCopyRevision = revision
+        lastCopiedTimesheetDate = day
+        isAllCopied = Calendar.current.isDate(day, inSameDayAs: selectedDate)
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2))
-            self?.isAllCopied = false
+            guard self?.timesheetCopyRevision == revision else { return }
+            self?.clearTimesheetCopyFeedback()
         }
+    }
+
+    private func clearTimesheetCopyFeedback() {
+        timesheetCopyRevision = UUID()
+        lastCopiedTimesheetDate = nil
+        isAllCopied = false
     }
 
     @discardableResult
@@ -606,12 +624,21 @@ class TimerViewModel {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         lastCopiedId = nil
-        isAllCopied = false
+        clearTimesheetCopyFeedback()
         return true
     }
 
     func delete(sprint: Sprint) {
         store.delete(sprint: sprint)
+        clearTimesheetCopyFeedback()
+        refreshLogs()
+    }
+
+    func restoreDeletedSprint(_ sprint: Sprint) {
+        guard !sprint.isOpen else { return }
+        guard !store.allLogs().values.joined().contains(where: { $0.id == sprint.id }) else { return }
+        store.save(sprint: sprint)
+        clearTimesheetCopyFeedback()
         refreshLogs()
     }
 

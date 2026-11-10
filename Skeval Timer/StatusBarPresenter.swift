@@ -13,6 +13,7 @@ final class StatusBarPresenter {
         let text: String
         let state: PillState
         let themeName: String
+        let isLight: Bool
     }
     private var lastPresentation: Presentation?
 
@@ -26,7 +27,7 @@ final class StatusBarPresenter {
 
         let effectiveTheme = theme ?? ThemeManager.shared.theme
         let presentation = presentation(state: state, accumulatedTotal: accumulatedTotal,
-                                        pauseElapsed: pauseElapsed, themeName: effectiveTheme.name)
+                                        pauseElapsed: pauseElapsed, theme: effectiveTheme)
         button.setAccessibilityLabel("Skeval Timer, \(state.statusTitle.lowercased()), \(presentation.text)")
         // Only rebuild the CoreGraphics pill image when something actually changed.
         guard force || presentation != lastPresentation else { return }
@@ -36,14 +37,15 @@ final class StatusBarPresenter {
     }
 
     private func presentation(state: SprintState, accumulatedTotal: TimeInterval,
-                              pauseElapsed: TimeInterval, themeName: String) -> Presentation {
+                              pauseElapsed: TimeInterval, theme: PopoverTheme) -> Presentation {
+        let (name, isLight) = (theme.name, theme.isLight)
         if state.isPaused {
-            return Presentation(text: TimeFormatter.format(clock: pauseElapsed), state: .paused, themeName: themeName)
+            return Presentation(text: TimeFormatter.format(clock: pauseElapsed), state: .paused, themeName: name, isLight: isLight)
         }
         if state.isRunning {
-            return Presentation(text: TimeFormatter.format(clock: state.currentElapsed), state: .running, themeName: themeName)
+            return Presentation(text: TimeFormatter.format(clock: state.currentElapsed), state: .running, themeName: name, isLight: isLight)
         }
-        return Presentation(text: TimeFormatter.format(clock: accumulatedTotal), state: .idle, themeName: themeName)
+        return Presentation(text: TimeFormatter.format(clock: accumulatedTotal), state: .idle, themeName: name, isLight: isLight)
     }
 
     func makePillImage(text: String, state: PillState, theme: PopoverTheme? = nil) -> NSImage {
