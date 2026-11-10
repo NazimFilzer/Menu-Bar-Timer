@@ -238,8 +238,7 @@ Text helpers (`accentText`, `warningText`, `successText`, `dangerText`) lighten 
 ### Hierarchy
 - **Live timer** (SF Mono Medium, 19px): the compact popover sprint figure. Paused work uses `warningText`; other states use ink. Idle shows "Ready". The sprint's start day appears beside its status.
 - **Popover action** (SF Pro Rounded Semibold, 12px): sentence-case timer button labels.
-- **Goal figure** (SF Pro Rounded Semibold, 28px): the time-left or progress figure in the Today daily goal card.
-- **Metric figure** (SF Mono Bold, 24px): the main number on metric cards.
+- **Hero figure** (SF Mono Bold, 28px, `Font.dashboardHero`): the main duration on a dashboard card, such as Worked. Clock-time answers like the finish forecast use SF Pro Rounded Semibold 28px (`dashboardHeroTime`); amounts beside them use SF Mono Bold 18px in `successText` (`dashboardMoney`).
 - **Page title** (`.title2.bold()`, 17px): the dashboard page header, with a `.subheadline` subtitle under it.
 - **Body** (`.body` and `.headline`, 13px): dashboard prose, banners, and form rows.
 - **Card label** (SF Pro Rounded Bold, 12px, 0.8px tracking, uppercase): card and section headings such as "TOTAL BREAKS".
@@ -310,8 +309,13 @@ Borders are 1px hairlines in the theme's `cardBorder` colour. Accent-tinted stro
 - **Border:** 1px hairline.
 - **Internal Padding:** 18px standard, 14px metric.
 
-### Metric Card
-The ledger cell. It has an uppercase tracked card label with an accent SF Symbol on the right, a 24px mono figure, and a 12px rounded subtitle. The subtitle can be replaced by a `.link` action such as "Set hourly rate". VoiceOver reads it as one combined element.
+### Dashboard grammar
+Shared parts in `DashboardGrammar.swift`, taken from the Month page, so every dashboard tab reads alike:
+- **Card header** (`DashboardCardHeader`): accent SF Symbol on the left, 11px Rounded Bold uppercase label with 0.8px tracking in ink, optional trailing badge or actions.
+- **Fact row** (`DashboardFactRow`): a muted rounded label and a mono value on one line, with an optional detail under the value.
+- **Period navigator** (`DashboardPeriodNavigator`): round ‹ › buttons around the period label, ⌘[ ⌘], and a reset button ("Today", "This week") only when another period is shown.
+- **Progress bar** (`DashboardProgressBar`): an 8px theme capsule. Never a native `ProgressView`, which turns grey while the window is inactive.
+- **Info button** (`DashboardInfoButton`): explanations live behind an ⓘ with the same words as tooltip and VoiceOver hint, not as always-on captions.
 
 ### Inputs / Fields
 - **Style:** native `.roundedBorder` text fields in dashboard forms, and `.plain` fields inside themed containers in the popover and search. Dates use `CalendarDatePicker` on a 6px card-white field.

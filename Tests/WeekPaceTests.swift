@@ -29,6 +29,7 @@ func testWeekPace() {
     assertEqual(behind.workedSeconds, 6 * hour)
     assertEqual(behind.expectedSeconds, 16 * hour, "Monday and Tuesday are expected by today")
     assertEqual(behind.status, .behind(10 * hour), "Behind schedule is expected minus worked, not the remaining goal")
+    assertEqual(behind.statusLabel, "10h 0m behind schedule", "Week and Today share one pace label")
     assertEqual(behind.remainingSeconds, 34 * hour)
     assertEqual(behind.remainingWorkingDays, 4, "Tuesday to Friday, including today")
     assertTrue(behind.includesToday)

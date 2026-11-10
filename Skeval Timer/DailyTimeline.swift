@@ -46,6 +46,8 @@ struct TimelineSegment: Identifiable {
     let unresolvedStart: Date?
     var column = 0
     var columnCount = 1
+    /// The running sprint, active or paused. Its span grows until now.
+    var isLive: Bool { status == .active || status == .paused }
 }
 
 struct DailyTimeline {
@@ -55,9 +57,12 @@ struct DailyTimeline {
     let gaps: [DateInterval]
     let hourMarks: [Date]
 
+    /// - Parameter fitsToWork: Draw only the hours with work: an hour before the first sprint to
+    ///   two hours after now (a past day: an hour after the last sprint), at least four hours.
+    ///   `hours` then sets the outer limits. Every sprint stays visible either way.
     static func calculate(sprints: [Sprint], live: TimelineLiveSprint? = nil, date: Date,
-                          hours: TimelineHours = TimelineHours(), now: Date = Date(),
-                          calendar: Calendar = .current) -> DailyTimeline {
+                          hours: TimelineHours = TimelineHours(), fitsToWork: Bool = false,
+                          now: Date = Date(), calendar: Calendar = .current) -> DailyTimeline {
         let start = calendar.startOfDay(for: date)
         let end = calendar.date(byAdding: .day, value: 1, to: start)!
         let day = DateInterval(start: start, end: end)
@@ -71,7 +76,9 @@ struct DailyTimeline {
             return segment(sprint, number: dailyCounts[startDay]!, live: live, day: day, now: now)
         }
         .sorted { ($0.interval.start, $0.id.uuidString) < ($1.interval.start, $1.id.uuidString) }
-        let visible = visibleInterval(day: day, hours: hours, segments: segments, calendar: calendar)
+        let visible = fitsToWork
+            ? fittedInterval(day: day, hours: hours, segments: segments, now: now, calendar: calendar)
+            : visibleInterval(day: day, hours: hours, segments: segments, calendar: calendar)
         return DailyTimeline(day: day, visible: visible, segments: assignColumns(segments),
                              gaps: untrackedIntervals(segments, start: visible.start, end: min(now, visible.end)),
                              hourMarks: marks(in: visible, calendar: calendar))
@@ -110,6 +117,36 @@ struct DailyTimeline {
             end = max(end, roundedEnd)
         }
         return DateInterval(start: max(day.start, start), end: min(day.end, end))
+    }
+
+    static let fittedMinimumHours = 4
+
+    private static func fittedInterval(day: DateInterval, hours: TimelineHours, segments: [TimelineSegment],
+                                       now: Date, calendar: Calendar) -> DateInterval {
+        let limits = visibleInterval(day: day, hours: hours, segments: segments, calendar: calendar)
+        let isToday = day.contains(now)
+        var starts = segments.map(\.interval.start)
+        var ends = segments.map(\.interval.end)
+        if isToday { starts.append(now); ends.append(now) }
+        guard let first = starts.min(), let last = ends.max() else {
+            // A past day with no sprints: the first hours of the visible range.
+            let end = calendar.date(byAdding: .hour, value: fittedMinimumHours, to: limits.start) ?? limits.end
+            return DateInterval(start: limits.start, end: min(limits.end, end))
+        }
+        let firstHour = calendar.dateInterval(of: .hour, for: first)!.start
+        let lastHourInterval = calendar.dateInterval(of: .hour, for: last)!
+        let lastHour = last == lastHourInterval.start ? last : lastHourInterval.end
+        var start = calendar.date(byAdding: .hour, value: -1, to: firstHour) ?? firstHour
+        var end = calendar.date(byAdding: .hour, value: isToday ? 2 : 1, to: lastHour) ?? lastHour
+        start = max(start, limits.start)
+        end = min(end, limits.end)
+        // Keep a readable minimum: grow later first, then earlier.
+        let minimum = TimeInterval(fittedMinimumHours * 3600)
+        if end.timeIntervalSince(start) < minimum {
+            end = min(limits.end, start.addingTimeInterval(minimum))
+            start = max(limits.start, end.addingTimeInterval(-minimum))
+        }
+        return DateInterval(start: start, end: end)
     }
 
     private static func marks(in interval: DateInterval, calendar: Calendar) -> [Date] {

@@ -5,80 +5,27 @@ struct DailyTimelineView: View {
     let theme: PopoverTheme
     @Binding var temporaryHours: TimelineHours?
     @State private var selectedSprint: Sprint?
-    @State private var showingHours = false
-    @State private var showingAddSprint = false
-    @State private var focusRequest = 0
-    @State private var visibleTimelineRect = CGRect.zero
-    @State private var scrollPosition: ScrollPosition
+    /// The page scrolls to this id for "Scroll to now". The timeline has no scroll area of its own.
+    static let nowAnchor = "daily-timeline-now"
     private static let hourHeight = DailyTimelineLayout.pointsPerHour
-
-    init(vm: TimerViewModel, theme: PopoverTheme, temporaryHours: Binding<TimelineHours?>) {
-        self.vm = vm
-        self.theme = theme
-        self._temporaryHours = temporaryHours
-        let now = Date()
-        let timeline = vm.dailyTimeline(hours: temporaryHours.wrappedValue, now: now)
-        self._scrollPosition = State(initialValue: ScrollPosition(
-            y: Self.focusOffset(timeline, now: now, today: vm.isViewingToday)
-        ))
-    }
 
     private var hours: TimelineHours { temporaryHours ?? vm.goal.timelineHours }
 
     var body: some View {
         let now = Date()
-        let timeline = vm.dailyTimeline(hours: hours, now: now)
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("\(hourLabel(timeline.visible.start)) to \(hourLabel(timeline.visible.end))")
-                        .font(.subheadline).foregroundStyle(theme.textSecondary)
-                }
-                Spacer(minLength: 8)
-                Button("Add sprint", systemImage: "plus") { showingAddSprint = true }
-                Button("Hours", systemImage: "slider.horizontal.3") { showingHours.toggle() }
-                    .popover(isPresented: $showingHours) { hoursEditor }
-                if vm.isViewingToday {
-                    Button("Now") { focusRequest += 1 }
-                }
-            }
-            .controlSize(.small)
-            timelineScroll(timeline, now: now)
-            HStack(spacing: 6) {
-                Image(systemName: "info.circle")
-                Text("Gaps are untracked time. Select a sprint for details.")
-            }
-            .font(.caption).foregroundStyle(theme.textSecondary)
+        // Only the hours with work are drawn; Visible hours sets the outer limits.
+        let timeline = vm.dailyTimeline(hours: hours, fitsToWork: true, now: now)
+        GeometryReader { geometry in
+            timelineGrid(timeline, now: now, width: geometry.size.width)
         }
-        .padding(18)
-        .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme.cardBorder))
+        .frame(height: height(timeline.visible.duration) + 28)
+        .help("Gaps are untracked time. Select a sprint for details.")
         .onChange(of: Calendar.current.startOfDay(for: vm.selectedDate)) {
             selectedSprint = nil
         }
         .sheet(item: $selectedSprint) { sprint in
             TimelineSprintDetailsView(vm: vm, sprintID: sprint.id, theme: theme)
         }
-        .sheet(isPresented: $showingAddSprint) {
-            AddSprintModalView(vm: vm, theme: theme, defaultDate: vm.selectedDate,
-                               onDismiss: { showingAddSprint = false })
-        }
-    }
-
-    private func timelineScroll(_ timeline: DailyTimeline, now: Date) -> some View {
-        ScrollView(.vertical) {
-            GeometryReader { geometry in
-                timelineGrid(timeline, now: now, width: geometry.size.width)
-            }
-            .frame(height: height(timeline.visible.duration) + 28)
-        }
-        .frame(height: 400)
-        .scrollPosition($scrollPosition)
-        .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { _, rect in
-            visibleTimelineRect = rect
-        }
-        .onChange(of: timeline.day.start) { focus(timeline, now: now) }
-        .onChange(of: focusRequest) { focus(timeline, now: now) }
     }
 
     private func timelineGrid(_ timeline: DailyTimeline, now: Date, width: CGFloat) -> some View {
@@ -92,7 +39,11 @@ struct DailyTimelineView: View {
             }
             ForEach(timeline.hourMarks, id: \.self) { mark in
                 HStack(spacing: 8) {
+                    // The Now label takes this slot when the current time is within a few points of the hour.
+                    let nowCovers = now >= timeline.visible.start && now < timeline.visible.end
+                        && abs(y(now, in: timeline) + 8 - y(mark, in: timeline)) < 14
                     Text(hourLabel(mark)).font(.system(size: 11, weight: .medium))
+                        .opacity(nowCovers ? 0 : 1)
                         .help(mark.formatted(.dateTime.hour().minute().timeZone(.specificName(.long))))
                         .foregroundStyle(theme.textSecondary).frame(width: labelWidth - 8, alignment: .trailing)
                     Rectangle().fill(theme.cardBorder.opacity(0.55)).frame(height: 0.5)
@@ -113,6 +64,13 @@ struct DailyTimelineView: View {
                             y: y(segment.interval.start, in: timeline) + 8)
             }
             if now >= timeline.visible.start && now < timeline.visible.end {
+                // A laid-out (not offset) marker at the Now line, for the page's "Scroll to now".
+                VStack(spacing: 0) {
+                    Color.clear.frame(width: 1, height: y(now, in: timeline) + 8)
+                    Color.clear.frame(width: 1, height: 1).id(Self.nowAnchor)
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
                 HStack(spacing: 8) {
                     Text("Now").font(.system(size: 10, weight: .semibold))
                         .frame(width: labelWidth - 8, alignment: .trailing)
@@ -128,8 +86,8 @@ struct DailyTimelineView: View {
 
     private func untrackedBand(_ gap: DateInterval, width: CGFloat, top: CGFloat) -> some View {
         let bandHeight = max(1, height(gap.duration) - 5)
-        let visibleStart = max(0, visibleTimelineRect.minY - top)
-        let visibleEnd = min(bandHeight, visibleTimelineRect.maxY - top)
+        let visibleStart: CGFloat = 0
+        let visibleEnd = bandHeight
         let labelSpace = visibleEnd - visibleStart
         return ZStack {
             RoundedRectangle(cornerRadius: 4)
@@ -169,18 +127,17 @@ struct DailyTimelineView: View {
         let clockHour = hour % 12 == 0 ? 12 : hour % 12
         return "\(clockHour)\(hour < 12 ? "AM" : "PM")"
     }
+}
 
-    private func focus(_ timeline: DailyTimeline, now: Date) {
-        scrollPosition.scrollTo(y: Self.focusOffset(timeline, now: now, today: vm.isViewingToday))
-    }
+/// The sprint card's Visible hours popover: a temporary range for this day, or a saved default.
+struct TimelineHoursEditor: View {
+    @Bindable var vm: TimerViewModel
+    @Binding var temporaryHours: TimelineHours?
+    let theme: PopoverTheme
 
-    private static func focusOffset(_ timeline: DailyTimeline, now: Date, today: Bool) -> CGFloat {
-        let target = today ? now.addingTimeInterval(-3600)
-            : (timeline.segments.first?.interval.start ?? timeline.visible.start)
-        return max(0, target.timeIntervalSince(timeline.visible.start) / 3600 * hourHeight - 16)
-    }
+    private var hours: TimelineHours { temporaryHours ?? vm.goal.timelineHours }
 
-    private var hoursEditor: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Visible hours").font(.headline)
             Picker("Start", selection: Binding(get: { hours.startHour }, set: {
@@ -195,7 +152,7 @@ struct DailyTimelineView: View {
                     Text(hourLabel(hour)).tag(hour)
                 }
             }
-            Text("The range expands to include all sprints. A day change restores the default.")
+            Text("Today shows only the hours with work, within these limits, and always includes every sprint. A day change restores the default.")
                 .font(.caption).fixedSize(horizontal: false, vertical: true)
             Text("Saved: \(hourLabel(vm.goal.timelineHours.startHour)) to \(hourLabel(vm.goal.timelineHours.endHour))")
                 .font(.caption).foregroundStyle(theme.textSecondary)
@@ -208,5 +165,13 @@ struct DailyTimelineView: View {
                     .help("Restore the saved hours for this day.")
             }
         }.padding(18).frame(width: 300)
+    }
+
+    private func hourLabel(_ value: Int) -> String { TimelineHoursEditor.label(value) }
+
+    static func label(_ value: Int) -> String {
+        let hour = value % 24
+        let clockHour = hour % 12 == 0 ? 12 : hour % 12
+        return "\(clockHour)\(hour < 12 ? "AM" : "PM")"
     }
 }

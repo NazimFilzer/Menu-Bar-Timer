@@ -73,6 +73,19 @@ struct WeekPace: Equatable {
         return workedSeconds >= targetSeconds ? .met : .missed(targetSeconds - workedSeconds)
     }
 
+    /// The pace in words, shared by the Week page and Today's week pace badge.
+    var statusLabel: String {
+        let duration = { (seconds: TimeInterval) in TimeFormatter.format(shortDuration: seconds) }
+        return switch status {
+        case .behind(let s): "\(duration(s)) behind schedule"
+        case .ahead(let s): "\(duration(s)) ahead of schedule"
+        case .onSchedule: "On schedule"
+        case .reached: "Weekly goal reached"
+        case .missed(let s): "Missed by \(duration(s))"
+        case .met: "Weekly goal met"
+        }
+    }
+
     static func calculate(
         logs: [String: [Sprint]], weekStart: Date, settings: GoalSettings,
         state: SprintState, now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)

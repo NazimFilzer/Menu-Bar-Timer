@@ -45,11 +45,6 @@ struct CatchUpSummary: Equatable {
         }
     }
 
-    var compactLabel: String {
-        if isBehind { return "\(Self.durationLabel(remainingSeconds)) left \(period == .day ? "today" : period == .week ? "this week" : "this month")" }
-        return headline
-    }
-
     private static func durationLabel(_ seconds: TimeInterval) -> String {
         let minutes = Int(seconds) / 60
         if minutes >= 60 && minutes.isMultiple(of: 60) { return "\(minutes / 60)h" }

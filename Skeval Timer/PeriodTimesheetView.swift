@@ -6,8 +6,12 @@ struct PeriodTimesheetView: View {
     let periodTitle: String
     let defaultDate: Date
     let theme: PopoverTheme
-    /// Hide days after today from the table. Copy All still copies every day in the period.
+    /// Hide days after today from the table. Copy all still copies every day in the period.
     var hidesUpcomingDays = false
+    /// Offer a "Show empty days" filter. Copy all still copies every day, empty ones as blank rows.
+    var offersEmptyDayFilter = false
+    /// Sprints for the header's Export CSV item; nil hides the item.
+    var exportSprints: [Sprint]? = nil
 
     @State private var selectedDay: DailyBarData?
     @State private var dayToDelete: DailyBarData?
@@ -15,11 +19,17 @@ struct PeriodTimesheetView: View {
     @State private var isAddingSprint = false
     @State private var copiedScope: String?
     @State private var tableWidth: CGFloat = 0
+    @State private var showsEmptyDays = false
+    @State private var exportMessage: String?
+    @State private var exportError: String?
 
     private var visibleDays: [DailyBarData] {
-        guard hidesUpcomingDays else { return days }
+        guard hidesUpcomingDays || offersEmptyDayFilter else { return days }
         let today = Calendar.current.startOfDay(for: Date())
-        return days.filter { Calendar.current.startOfDay(for: $0.date) <= today }
+        return days.filter { day in
+            (!hidesUpcomingDays || Calendar.current.startOfDay(for: day.date) <= today)
+                && (!offersEmptyDayFilter || showsEmptyDays || !day.completedSprints.isEmpty)
+        }
     }
 
     private var hasCompletedSprints: Bool { days.contains { !$0.completedSprints.isEmpty } }
@@ -27,25 +37,23 @@ struct PeriodTimesheetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            Text(periodTitle)
-                .font(.subheadline)
-                .foregroundStyle(theme.textSecondary)
+            if let exportMessage {
+                Label(exportMessage, systemImage: "checkmark.circle.fill")
+                    .font(.dashboardCaption).foregroundStyle(theme.successText)
+            }
             ScrollView(.horizontal) {
                 table
                     .frame(width: max(tableWidth, 820))
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
-            if days.count > visibleDays.count {
-                Text("\(days.count - visibleDays.count) upcoming days are hidden.")
-                    .font(.caption)
+            if visibleDays.isEmpty {
+                Text("No sprints in \(periodTitle).")
+                    .font(.dashboardCaption).foregroundStyle(theme.textSecondary)
+            } else if days.count > visibleDays.count {
+                Text(hiddenDaysCaption)
+                    .font(.dashboardCaption)
                     .foregroundStyle(theme.textSecondary)
             }
-            Text("Copy All copies the whole period, earliest day first. Empty days paste as blank rows. Columns: Login, Logout, blank Lunch, Break in minutes.")
-                .font(.caption)
-                .foregroundStyle(theme.textSecondary)
-            Text("Completed sprints only. Break includes pauses and gaps between sprints.")
-                .font(.caption)
-                .foregroundStyle(theme.textSecondary)
         }
         .padding(18)
         .foregroundStyle(theme.textPrimary)
@@ -57,6 +65,15 @@ struct PeriodTimesheetView: View {
         }
         .onChange(of: days.last?.id) { _, _ in copiedScope = nil }
         .onChange(of: vm.logRevision) { _, _ in copiedScope = nil }
+        .task(id: exportMessage) {
+            guard exportMessage != nil else { return }
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            exportMessage = nil
+        }
+        .alert("Export failed", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
+            Button("OK", role: .cancel) { }
+        } message: { Text(exportError ?? "") }
         .task(id: copiedScope) {
             guard copiedScope != nil else { return }
             try? await Task.sleep(for: .seconds(2))
@@ -82,18 +99,54 @@ struct PeriodTimesheetView: View {
     }
 
     private var header: some View {
-        HStack {
-            Label("DAILY TIMESHEET", systemImage: "calendar")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-            Spacer()
-            Button(copiedScope == "all" ? "Copied" : "Copy All",
-                   systemImage: copiedScope == "all" ? "checkmark" : "doc.on.doc") {
-                copy(days, scope: "all")
+        DashboardCardHeader(title: "Daily timesheet", icon: "calendar", theme: theme) {
+            HStack(spacing: 8) {
+                if offersEmptyDayFilter {
+                    Toggle("Show empty days", isOn: $showsEmptyDays)
+                        .toggleStyle(.checkbox)
+                        .font(.dashboardCaption)
+                }
+                Button(copiedScope == "all" ? "Copied" : "Copy all",
+                       systemImage: copiedScope == "all" ? "checkmark" : "doc.on.doc") {
+                    copy(days, scope: "all")
+                }
+                .disabled(!hasCompletedSprints)
+                .help("Copy every calendar day in \(periodTitle), earliest first. Empty days paste as blank rows.")
+                Button("Add sprint", systemImage: "plus") { isAddingSprint = true }
+                if exportSprints != nil {
+                    Menu {
+                        Button("Export CSV…", action: export)
+                            .disabled(exportSprints?.isEmpty ?? true)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .accessibilityLabel("More timesheet actions")
+                    .help("Export CSV")
+                }
+                DashboardInfoButton(text: Self.copyHelp, theme: theme, accessibilityTitle: "About the timesheet")
             }
-            .disabled(!hasCompletedSprints)
-            .help("Copy every calendar day in \(periodTitle).")
-            Button("Add Sprint", systemImage: "plus") { isAddingSprint = true }
+            .controlSize(.small)
         }
+    }
+
+    private static let copyHelp = "Copy all copies the whole period, earliest day first. Empty days paste as blank rows. Columns: Login, Logout, blank Lunch, Break in minutes. Completed sprints only. Break includes pauses and gaps between sprints."
+
+    private var hiddenDaysCaption: String {
+        let hidden = days.count - visibleDays.count
+        let reason = offersEmptyDayFilter && !showsEmptyDays ? "empty or upcoming" : "upcoming"
+        return "\(hidden) \(reason) day\(hidden == 1 ? " is" : "s are") hidden. Copy all still includes them."
+    }
+
+    private func export() {
+        guard let sprints = exportSprints else { return }
+        CSVExporter.promptSavePanel(sprints: sprints, onComplete: { success, url in
+            if success, let name = url?.lastPathComponent {
+                exportMessage = "Exported \(sprints.count) sprint\(sprints.count == 1 ? "" : "s") to \(name)"
+            }
+        }, onFailure: { exportError = $0 })
     }
 
     private var table: some View {

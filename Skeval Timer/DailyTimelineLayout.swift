@@ -17,11 +17,11 @@ enum DailyTimelineLayout {
 
     static func blockHeight(for segment: TimelineSegment) -> CGFloat {
         let span = spanHeight(for: segment)
-        return segment.status == .active ? span : max(18, span)
+        return segment.isLive ? span : max(18, span)
     }
 
     static func usesExternalLabel(for segment: TimelineSegment) -> Bool {
-        segment.status == .active && spanHeight(for: segment) < 26
+        segment.isLive && spanHeight(for: segment) < 26
     }
 
     static func occupiedHeight(for segment: TimelineSegment) -> CGFloat {

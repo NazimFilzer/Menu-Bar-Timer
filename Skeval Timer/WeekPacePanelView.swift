@@ -194,16 +194,7 @@ struct WeekPacePanelView: View {
 
     // MARK: - Text
 
-    private var statusText: String {
-        switch pace.status {
-        case .behind(let s): "\(duration(s)) behind schedule"
-        case .ahead(let s): "\(duration(s)) ahead of schedule"
-        case .onSchedule: "On schedule"
-        case .reached: "Weekly goal reached"
-        case .missed(let s): "Missed by \(duration(s))"
-        case .met: "Weekly goal met"
-        }
-    }
+    private var statusText: String { pace.statusLabel }
 
     private var neededDetail: String {
         let left = "for the \(days(pace.remainingWorkingDays)) left"

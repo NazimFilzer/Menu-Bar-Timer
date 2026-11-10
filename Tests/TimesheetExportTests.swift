@@ -87,29 +87,25 @@ func testPeriodTimesheetExport() {
     assertEqual(monthRows[25], rows[0])
     assertEqual(monthRows[28], rows[3])
     assertEqual(monthRows[30], "\t\t\t", "Trailing empty dates remain blank")
-    let analytics = InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: monday,
-                                                            endDate: sunday, settings: settings)
-    assertEqual(analytics.days.map(\.id), week.days.map(\.id))
-    assertEqual(DailyTimesheet.clipboardText(days: analytics.days), exported,
+    let analytics = analyticsDays(store.allLogs(), from: monday, to: sunday, settings: settings)
+    assertEqual(analytics.map(\.id), week.days.map(\.id))
+    assertEqual(DailyTimesheet.clipboardText(days: analytics), exported,
                 "Analytics copies the same daily rows as Week")
-    let reversed = InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: sunday,
-                                                           endDate: monday, settings: settings)
-    assertEqual(reversed.days, analytics.days, "Reversed custom dates produce the same chronological days")
-    let monthAnalytics = InsightsAnalytics.calculatePeriodSummary(logs: store.allLogs(), startDate: october.monthStartDate,
-                                                                endDate: october.monthEndDate, settings: settings)
-    assertEqual(DailyTimesheet.clipboardText(days: monthAnalytics.days), monthRows.joined(separator: "\n"))
+    let reversed = analyticsDays(store.allLogs(), from: sunday, to: monday, settings: settings)
+    assertEqual(reversed, analytics, "Reversed custom dates produce the same chronological days")
+    let monthAnalytics = analyticsDays(store.allLogs(), from: october.monthStartDate, to: october.monthEndDate, settings: settings)
+    assertEqual(DailyTimesheet.clipboardText(days: monthAnalytics), monthRows.joined(separator: "\n"))
 
     let yearEnd = auditDate(2025, 12, 31)
     let yearStart = auditDate(2026, 1, 1)
     let yearEndSprint = Sprint(startTime: yearEnd, endTime: yearEnd.addingTimeInterval(3600), pausedDuration: 300)
-    let acrossYears = InsightsAnalytics.calculatePeriodSummary(
-        logs: [TimeFormatter.format(dateKey: yearEnd): [yearEndSprint]], startDate: yearEnd,
-        endDate: auditDate(2026, 2, 1), settings: settings)
-    assertEqual(acrossYears.days.count, 33, "Ranges longer than a month still list individual days")
-    assertEqual(acrossYears.days.first?.id, TimeFormatter.format(dateKey: yearEnd))
-    assertEqual(acrossYears.days[1].id, TimeFormatter.format(dateKey: yearStart))
-    assertEqual(acrossYears.days.last?.id, "2026-02-01")
-    let yearRows = DailyTimesheet.clipboardText(days: acrossYears.days).components(separatedBy: "\n")
+    let acrossYears = analyticsDays([TimeFormatter.format(dateKey: yearEnd): [yearEndSprint]],
+                                    from: yearEnd, to: auditDate(2026, 2, 1), settings: settings)
+    assertEqual(acrossYears.count, 33, "Ranges longer than a month still list individual days")
+    assertEqual(acrossYears.first?.id, TimeFormatter.format(dateKey: yearEnd))
+    assertEqual(acrossYears[1].id, TimeFormatter.format(dateKey: yearStart))
+    assertEqual(acrossYears.last?.id, "2026-02-01")
+    let yearRows = DailyTimesheet.clipboardText(days: acrossYears).components(separatedBy: "\n")
     assertEqual(yearRows.count, 33)
     assertEqual(yearRows[0], DayLog(sprints: [yearEndSprint]).clipboardText)
     assertTrue(yearRows.dropFirst().allSatisfy { $0 == "\t\t\t" })
@@ -133,11 +129,10 @@ func testPeriodTimesheetExport() {
         assertEqual(end.timeIntervalSince(start), Double(elapsedHours) * 3600)
         assertEqual(lines[day - 1], DayLog(sprints: [sprint]).clipboardText)
         assertEqual(lines[day - 1].components(separatedBy: "\t").last, "30")
-        let analytics = InsightsAnalytics.calculatePeriodSummary(
-            logs: [key: [sprint]], startDate: start, endDate: end.addingTimeInterval(-1),
-            settings: settings, calendar: dstCalendar)
-        assertEqual(analytics.days.count, 1, "A DST transition remains one calendar day")
-        assertEqual(DailyTimesheet.clipboardText(days: analytics.days), lines[day - 1])
+        let analytics = analyticsDays([key: [sprint]], from: start, to: end.addingTimeInterval(-1),
+                                      settings: settings, calendar: dstCalendar)
+        assertEqual(analytics.count, 1, "A DST transition remains one calendar day")
+        assertEqual(DailyTimesheet.clipboardText(days: analytics), lines[day - 1])
     }
 }
 
@@ -230,4 +225,12 @@ func testPopoverTimesheetDateAndDeleteUndo() {
     vm.restoreDeletedSprint(sprint)
     assertEqual(store.log(for: today).completedSprints.count, 1, "Repeated Undo must not duplicate a sprint")
     engine.reset()
+}
+
+/// The Analytics page's day rows for a custom range, as its timesheet card receives them.
+func analyticsDays(_ logs: [String: [Sprint]], from: Date, to: Date, settings: GoalSettings,
+                   calendar: Calendar = Calendar(identifier: .gregorian)) -> [DailyBarData] {
+    let range = AnalyticsRange.custom(from: from, to: to, calendar: calendar)
+    return AnalyticsComparison.bars(range.dates(calendar: calendar), logs: logs, today: Date(),
+                                    settings: settings, calendar: calendar)
 }

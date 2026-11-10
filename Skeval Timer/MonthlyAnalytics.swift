@@ -162,7 +162,7 @@ enum MonthlyAnalytics {
         return monthOffset < 0 ? totalDays : 0
     }
 
-    private static func calculateTagBreakdown(
+    static func calculateTagBreakdown(
         sprints: [Sprint],
         totalSeconds: TimeInterval,
         hourlyRate: Double,
