@@ -181,3 +181,53 @@ func testDailyTimesheetClipboard() {
     assertTrue(vm.copyTimesheet(days: [day]))
     assertEqual(NSPasteboard.general.string(forType: .string), "10:00:00\t11:00:00\t\t10")
 }
+
+@MainActor
+func testPopoverTimesheetDateAndDeleteUndo() {
+    let adapter = InMemoryDayLogAdapter()
+    let store = DayLogStore(storage: adapter)
+    let engine = SprintEngine(store: store, observeWorkspace: false)
+    let vm = TimerViewModel(engine: engine, store: store, goal: auditSettings())
+    let today = Calendar.current.startOfDay(for: Date())
+    let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+    let login = TimeFormatter.parseTime("10:00:00", on: today)!
+    let oldLogin = TimeFormatter.parseTime("23:00:00", on: yesterday)!
+    let oldEnd = TimeFormatter.parseTime("01:00:00", on: today)!
+    let sprint = Sprint(startTime: login, endTime: login.addingTimeInterval(3600),
+                        pausedDuration: 600, pauseCount: 1, tag: "Client")
+    let overnight = Sprint(startTime: oldLogin, endTime: oldEnd, pausedDuration: 900)
+    store.save(sprint: sprint)
+    store.save(sprint: overnight)
+    engine.clockIn(at: login.addingTimeInterval(7200))
+    vm.selectDate(yesterday)
+    let beforeTotal = vm.totalTodayElapsed
+    let beforeState = vm.state
+
+    vm.copyDailyTimesheet(for: today)
+    assertEqual(NSPasteboard.general.string(forType: .string), "10:00:00\t11:00:00\t\t10")
+    assertEqual(vm.selectedDate, yesterday, "Today's copy must not change the history date")
+    assertEqual(vm.totalTodayElapsed, beforeTotal)
+    assertEqual(vm.state, beforeState, "Copy must not change the live sprint")
+    assertEqual(vm.lastCopiedTimesheetDate, today)
+    assertFalse(vm.isAllCopied, "Yesterday must not show today's copy feedback")
+
+    vm.copyAllDisplayedSprints()
+    assertEqual(NSPasteboard.general.string(forType: .string), "23:00:00\t01:00:00\t\t15")
+    assertEqual(vm.lastCopiedTimesheetDate, yesterday, "Overnight work stays on its start day")
+    assertTrue(vm.isAllCopied)
+    vm.selectDate(today)
+    assertFalse(vm.isAllCopied, "Copy feedback follows the copied date")
+
+    vm.delete(sprint: sprint)
+    assertTrue(store.log(for: today).completedSprints.isEmpty)
+    assertEqual(vm.lastCopiedTimesheetDate, nil)
+    vm.restoreDeletedSprint(sprint)
+    assertEqual(store.log(for: today).completedSprints, [sprint], "Undo restores the same ID, pauses, and tag")
+    assertEqual(DayLogStore(storage: adapter).log(for: today).completedSprints, [sprint], "Undo persists the restored sprint")
+    assertEqual(store.log(for: yesterday).completedSprints, [overnight])
+    assertEqual(vm.selectedDate, today)
+    assertEqual(vm.state, beforeState, "Delete and Undo leave the open sprint alone")
+    vm.restoreDeletedSprint(sprint)
+    assertEqual(store.log(for: today).completedSprints.count, 1, "Repeated Undo must not duplicate a sprint")
+    engine.reset()
+}

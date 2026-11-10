@@ -42,7 +42,7 @@ struct TimelineSprintBlock: View {
                 if !usesExternalLabel { headline.fixedSize(horizontal: false, vertical: true) }
                 if height >= 68, let note = extraNote {
                     Text(note).font(.system(size: 10))
-                        .foregroundStyle(note == pausedLabel ? Color.orange : theme.textSecondary).lineLimit(1)
+                        .foregroundStyle(note == pausedLabel ? theme.warningText : theme.textSecondary).lineLimit(1)
                 }
             }
             .padding(.horizontal, height >= 44 ? 10 : 8)
@@ -101,7 +101,7 @@ struct TimelineSprintBlock: View {
             if usesRightPausedLabel {
                 Text(pausedLabel)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(theme.warningText)
                     .lineLimit(1)
                     .fixedSize()
             }

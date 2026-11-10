@@ -6,6 +6,8 @@ struct PeriodTimesheetView: View {
     let periodTitle: String
     let defaultDate: Date
     let theme: PopoverTheme
+    /// Hide days after today from the table. Copy All still copies every day in the period.
+    var hidesUpcomingDays = false
 
     @State private var selectedDay: DailyBarData?
     @State private var dayToDelete: DailyBarData?
@@ -13,6 +15,12 @@ struct PeriodTimesheetView: View {
     @State private var isAddingSprint = false
     @State private var copiedScope: String?
     @State private var tableWidth: CGFloat = 0
+
+    private var visibleDays: [DailyBarData] {
+        guard hidesUpcomingDays else { return days }
+        let today = Calendar.current.startOfDay(for: Date())
+        return days.filter { Calendar.current.startOfDay(for: $0.date) <= today }
+    }
 
     private var hasCompletedSprints: Bool { days.contains { !$0.completedSprints.isEmpty } }
 
@@ -27,6 +35,11 @@ struct PeriodTimesheetView: View {
                     .frame(width: max(tableWidth, 820))
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tableWidth = $0 }
+            if days.count > visibleDays.count {
+                Text("\(days.count - visibleDays.count) upcoming days are hidden.")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+            }
             Text("Copy All copies the whole period, earliest day first. Empty days paste as blank rows. Columns: Login, Logout, blank Lunch, Break in minutes.")
                 .font(.caption)
                 .foregroundStyle(theme.textSecondary)
@@ -90,7 +103,7 @@ struct PeriodTimesheetView: View {
                 Text("LOGIN").frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
                 Text("LOGOUT").frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
                 Text("WORK TIME").frame(minWidth: 100, maxWidth: .infinity, alignment: .trailing)
-                Text("SPRINTS").frame(minWidth: 65, maxWidth: .infinity, alignment: .trailing)
+                Text("PAUSED").frame(minWidth: 100, maxWidth: .infinity, alignment: .trailing)
                 Text("ACTIONS").frame(width: 180, alignment: .trailing)
             }
             .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -99,7 +112,7 @@ struct PeriodTimesheetView: View {
             .padding(.vertical, 12)
             .background(theme.cardBorder.opacity(0.25))
 
-            ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
+            ForEach(Array(visibleDays.enumerated()), id: \.element.id) { index, day in
                 dailyRow(day)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
@@ -125,9 +138,10 @@ struct PeriodTimesheetView: View {
                 .frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
             Text(summary == nil ? "—" : TimeFormatter.format(clock: day.totalSeconds))
                 .frame(minWidth: 100, maxWidth: .infinity, alignment: .trailing)
-            Text("\(day.completedSprints.count)")
+            Text(summary == nil ? "—" : TimeFormatter.format(shortDuration: day.completedSprints.reduce(0) { $0 + $1.pausedDuration }))
                 .foregroundStyle(theme.textSecondary)
-                .frame(minWidth: 65, maxWidth: .infinity, alignment: .trailing)
+                .frame(minWidth: 100, maxWidth: .infinity, alignment: .trailing)
+                .help("Total paused time within completed sprints. Gaps between sprints are excluded.")
             HStack(spacing: 10) {
                 Button {
                     copy([day], scope: day.id)

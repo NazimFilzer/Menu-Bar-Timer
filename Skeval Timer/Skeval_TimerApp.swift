@@ -99,7 +99,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // MARK: - Popover toggle & sizing
 
     func updatePopoverSize() {
-        popover?.contentSize = NSSize(width: 330, height: vm.desiredPopoverHeight)
+        let availableHeight = statusItem?.button?.window?.screen?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height ?? vm.desiredPopoverHeight
+        popover?.contentSize = NSSize(width: 330, height: min(vm.desiredPopoverHeight, availableHeight - 24))
     }
 
     @objc func togglePopover() {
@@ -113,6 +115,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             if popover.contentViewController == nil {
                 popover.contentViewController = PopoverHostingController(rootView: PopoverView(vm: vm))
             }
+            // Match the theme, not the macOS appearance, before the popover draws.
+            popover.appearance = ThemeManager.shared.theme.nsAppearance
             popover.show(relativeTo: btn.bounds, of: btn, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
@@ -290,7 +294,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         withObservationTracking {
             _ = vm.state
             _ = vm.todayLog.accumulatedTotal
-            _ = ThemeManager.shared.current
+            _ = ThemeManager.shared.theme // theme and Light/Dark choice
         } onChange: {
             Task { @MainActor [weak self] in
                 guard let self else { return }

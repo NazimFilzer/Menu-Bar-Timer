@@ -18,40 +18,13 @@ enum DashboardDestination: String, CaseIterable, Identifiable {
         switch self {
         case .today: return "Your timer, earnings, and daily sprint history"
         case .week: return "Weekly goals and daily work patterns"
-        case .month: return "Monthly totals and time by tag"
+        case .month: return "Calendar, pace, and time by tag"
         case .analytics: return "Trends, date ranges, and CSV reports"
         case .settings: return "Goals, hourly rate, currency, and appearance"
         }
     }
     var shortcut: KeyEquivalent {
         KeyEquivalent(Character(String(Self.allCases.firstIndex(of: self)! + 1)))
-    }
-}
-
-/// "Good morning, Name 👋" shown at the top of the Week and Month pages.
-enum DashboardGreeting {
-    static func text(now: Date = Date()) -> String {
-        let hour = Calendar.current.component(.hour, from: now)
-        let timeGreeting: String
-        switch hour {
-        case 5..<12:
-            timeGreeting = "Good morning"
-        case 12..<17:
-            timeGreeting = "Good afternoon"
-        case 17..<22:
-            timeGreeting = "Good evening"
-        default:
-            timeGreeting = "Good night"
-        }
-
-        let fullName = NSFullUserName()
-        let userName = NSUserName()
-        let displayName = !fullName.isEmpty ? fullName.components(separatedBy: " ").first ?? fullName : userName
-        if !displayName.isEmpty {
-            return "\(timeGreeting), \(displayName) 👋"
-        } else {
-            return "\(timeGreeting) 👋"
-        }
     }
 }
 
@@ -81,7 +54,7 @@ struct DashboardView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .tint(theme.neonTeal)
-        .preferredColorScheme(theme.isLight ? .light : .dark)
+        .themeAppearance(theme)
         .onAppear { vm.checkAndHandleDayChange(); vm.refreshLogs() }
     }
 
@@ -128,7 +101,7 @@ struct DashboardView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Keyboard shortcuts").font(.caption.bold())
-                Text("⌘1–5  Switch views\n⌘N  Add sprint\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
+                Text("⌘1–5  Switch views\n⌘N  Add sprint\n⌘[ ⌘]  Previous / next day or week\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
@@ -168,7 +141,7 @@ private struct DashboardToolbar: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
-                Text(vm.statusTitle.capitalized).font(.caption.bold()).foregroundStyle(theme.statusColor(for: vm.state))
+                Text(vm.statusTitle.capitalized).font(.caption.bold()).foregroundStyle(theme.statusText(for: vm.state))
                 Text(vm.currentElapsedLabel).font(.system(.body, design: .monospaced)).monospacedDigit()
             }
             .accessibilityElement(children: .combine)
@@ -199,7 +172,7 @@ private struct DashboardResolutionView: View {
     var body: some View {
         if let error = vm.persistenceError {
             Label(error, systemImage: "exclamationmark.triangle.fill")
-                .font(.callout).foregroundStyle(.orange).padding(16)
+                .font(.callout).foregroundStyle(theme.warningText).padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.orange.opacity(0.12))
         }

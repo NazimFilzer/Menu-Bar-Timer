@@ -38,7 +38,7 @@ struct TimelineSprintDetailsView: View {
     private func details(_ segment: TimelineSegment) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(segment.displayName).font(.headline)
-            Text(segment.status.rawValue).foregroundStyle(theme.accentColor)
+            Text(segment.status.rawValue).foregroundStyle(theme.accentText)
             Text("Start: \(segment.sprint.startTime.formatted(date: .abbreviated, time: .standard))")
             Text("End: \(segment.sprint.endTime?.formatted(date: .abbreviated, time: .standard) ?? "Open")")
             if let work = segment.netWork {

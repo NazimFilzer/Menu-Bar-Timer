@@ -67,7 +67,7 @@ private struct ProductivityGoalsCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("PRODUCTIVITY GOALS", systemImage: "target")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(theme.neonTeal)
+                .foregroundColor(theme.accentText)
                 .kerning(1.0)
 
             VStack(spacing: 12) {
@@ -143,7 +143,7 @@ private struct WorkScheduleView: View {
                     } label: {
                         Text(label).font(.system(size: 12, weight: .semibold, design: .rounded))
                             .frame(maxWidth: .infinity).padding(.vertical, 8)
-                            .foregroundStyle(selected ? theme.neonTeal : theme.textSecondary)
+                            .foregroundStyle(selected ? theme.accentText : theme.textSecondary)
                             .background(selected ? theme.neonTeal.opacity(0.12) : theme.bgDark,
                                         in: RoundedRectangle(cornerRadius: 6))
                     }
@@ -190,7 +190,7 @@ private struct BillingCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("BILLING & MONETARY EARNINGS", systemImage: "indianrupeesign.circle.fill")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(theme.neonTeal)
+                .foregroundColor(theme.accentText)
                 .kerning(1.0)
 
             VStack(spacing: 16) {
@@ -209,7 +209,7 @@ private struct BillingCard: View {
                     HStack(spacing: 8) {
                         Text(vm.goal.currencySymbol)
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(theme.neonTeal)
+                            .foregroundColor(theme.accentText)
 
                         TextField("0.00", value: $vm.goal.hourlyRate, format: .number)
                             .accessibilityLabel("Hourly rate")
@@ -311,7 +311,7 @@ private struct BillingCard: View {
                     Spacer()
                     Text("\(vm.goal.targetEarningsLabel) for your \(vm.goal.goalLabel) daily goal")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(theme.neonTeal)
+                        .foregroundColor(theme.accentText)
                 }
                 .padding(.top, 2)
             }
@@ -338,14 +338,25 @@ private struct ThemeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("THEME & COLOR PALETTE", systemImage: "paintpalette.fill")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(theme.neonTeal)
-                .kerning(1.0)
+            HStack {
+                Label("THEME & COLOR PALETTE", systemImage: "paintpalette.fill")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(theme.accentText)
+                    .kerning(1.0)
+                Spacer()
+                Picker("Appearance", selection: $themeManager.appearance) {
+                    ForEach(ThemeAppearance.allCases) { Text($0.displayName).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("Light or dark version of the selected theme")
+            }
 
             LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(AppTheme.allCases) { appTheme in
                     let isSelected = themeManager.current == appTheme
+                    let swatch = appTheme.theme(dark: themeManager.appearance == .dark)
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             themeManager.current = appTheme
@@ -353,10 +364,10 @@ private struct ThemeCard: View {
                     }) {
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(LinearGradient(colors: [appTheme.theme.bgDark, appTheme.theme.accentColor],
+                                .fill(LinearGradient(colors: [swatch.bgDark, swatch.accentColor],
                                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                                 .frame(width: 16, height: 16)
-                                .overlay(Circle().stroke(appTheme.theme.cardBorder, lineWidth: 1))
+                                .overlay(Circle().stroke(swatch.cardBorder, lineWidth: 1))
 
                             Text(appTheme.displayName)
                                 .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .rounded))
@@ -367,16 +378,16 @@ private struct ThemeCard: View {
                             if isSelected {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(appTheme.theme.accentColor)
+                                    .foregroundColor(swatch.accentIcon)
                             }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
-                        .background(isSelected ? appTheme.theme.cardBg : theme.cardBg)
+                        .background(isSelected ? swatch.cardBg : theme.cardBg)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(isSelected ? appTheme.theme.accentColor : theme.cardBorder, lineWidth: isSelected ? 1.5 : 1)
+                                .stroke(isSelected ? swatch.accentColor : theme.cardBorder, lineWidth: isSelected ? 1.5 : 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -401,7 +412,7 @@ private struct SystemCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("SYSTEM & INTEGRATION", systemImage: "macwindow")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(theme.neonTeal)
+                .foregroundColor(theme.accentText)
                 .kerning(1.0)
 
             VStack(spacing: 12) {
@@ -425,7 +436,7 @@ private struct SystemCard: View {
                         .tint(theme.neonTeal)
                 }
 
-                if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
+                if let loginError { Text(loginError).font(.caption).foregroundStyle(theme.warningText) }
 
                 Divider().background(theme.dividerColor)
 
@@ -488,7 +499,7 @@ private struct GoalRow: View {
 
                 Text(valueLabel)
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(theme.neonTeal)
+                    .foregroundColor(theme.accentText)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 3)
                     .background(theme.neonTeal.opacity(0.12))
