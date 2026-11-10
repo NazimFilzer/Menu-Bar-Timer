@@ -50,7 +50,7 @@ Success means the user can glance at the menu bar and know their state, start, p
 
 ## Brand Commitments
 
-- Name: **Skeval Timer**. Current version v2.2.
+- Name: **Skeval Timer**. Current version v2.3.
 - It ships user-selectable themes (`AppTheme.swift`). The visual system is not recorded here; `DESIGN.md` owns it.
 
 ## Evidence on Hand
