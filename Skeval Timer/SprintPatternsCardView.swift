@@ -1,40 +1,49 @@
 import SwiftUI
 
+/// Net sprint lengths and pauses for the selected range. Length groups with no sprints are hidden.
 struct SprintPatternsCardView: View {
     let summary: SprintPatterns
     let theme: PopoverTheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Sprint patterns").font(.headline)
-            Text("\(summary.count) completed sprints in the selected period")
-                .font(.caption).foregroundStyle(theme.textSecondary)
+        VStack(alignment: .leading, spacing: 10) {
+            DashboardCardHeader(title: "Sprint patterns", icon: "hourglass", theme: theme) {
+                DashboardInfoButton(text: "Durations exclude paused time. Pause averages use all completed sprints. A long sprint does not prove uninterrupted work.",
+                                    theme: theme, accessibilityTitle: "About sprint patterns")
+            }
             if summary.count == 0 {
-                Text("Record a completed sprint to see its duration and pause patterns.")
-                    .font(.subheadline)
+                Text("No completed sprints in this range.")
+                    .font(.dashboardCaption).foregroundStyle(theme.textSecondary)
             } else {
-                HStack(spacing: 30) {
-                    metric("Median net sprint", seconds: summary.medianSeconds)
-                    metric("Mean", seconds: summary.meanSeconds)
-                    metric("Longest", seconds: summary.longestSeconds)
+                VStack(spacing: 0) {
+                    DashboardFactRow(label: "Median sprint", value: duration(summary.medianSeconds), theme: theme)
+                    DashboardFactRow(label: "Mean", value: duration(summary.meanSeconds), theme: theme)
+                    DashboardFactRow(label: "Longest", value: duration(summary.longestSeconds), theme: theme)
                 }
-                ForEach(summary.buckets) { bucket in
-                    HStack(spacing: 12) {
+                Text("LENGTH")
+                    .font(.system(size: 9, weight: .bold, design: .rounded)).kerning(0.9)
+                    .foregroundStyle(theme.textSecondary)
+                    .padding(.top, 4)
+                ForEach(summary.buckets.filter { $0.count > 0 }) { bucket in
+                    HStack(spacing: 10) {
                         Text(bucket.label).frame(width: 90, alignment: .leading)
-                        ProgressView(value: Double(bucket.count), total: Double(summary.count))
-                            .tint(theme.neonTeal)
-                            .accessibilityLabel(bucket.label)
-                            .accessibilityValue("\(bucket.count) of \(summary.count) sprints")
-                        Text("\(bucket.count)").monospacedDigit().frame(width: 40, alignment: .trailing)
+                        DashboardProgressBar(fraction: Double(bucket.count) / Double(summary.count),
+                                             theme: theme, accessibilityTitle: bucket.label)
+                        Text("\(bucket.count)")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .frame(width: 34, alignment: .trailing)
                     }
-                    .font(.caption)
+                    .font(.dashboardCaption)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(bucket.label)
+                    .accessibilityValue("\(bucket.count) of \(summary.count) sprints")
                 }
-                Text("\(pauseRate) had a pause · Mean paused time: \(TimeFormatter.format(shortDuration: summary.meanPausedSeconds)) · \(summary.meanPauseCount.formatted(.number.precision(.fractionLength(1)))) pauses per sprint")
-                    .font(.caption).monospacedDigit()
-                Text("Durations exclude paused time. Pause averages use all completed sprints. A long sprint does not prove uninterrupted work.")
-                    .font(.caption).foregroundStyle(theme.textSecondary)
+                Divider().overlay(theme.cardBorder)
+                DashboardFactRow(label: "Sprints with a pause", value: pauseRate,
+                                 detail: pauseDetail, theme: theme)
             }
         }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .modifier(WorkInsightsCardStyle(theme: theme))
     }
 
@@ -43,10 +52,13 @@ struct SprintPatternsCardView: View {
             .formatted(.percent.precision(.fractionLength(0)))
     }
 
-    private func metric(_ title: String, seconds: TimeInterval) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(TimeFormatter.format(shortDuration: seconds)).font(.title2.weight(.semibold)).monospacedDigit()
-            Text(title).font(.caption).foregroundStyle(theme.textSecondary)
-        }
+    /// Older sprints record paused time but not how many pauses, so the count shows only when recorded.
+    private var pauseDetail: String? {
+        guard summary.pausedSprintCount > 0 else { return nil }
+        let paused = "average \(duration(summary.meanPausedSeconds)) paused"
+        guard summary.meanPauseCount > 0 else { return paused }
+        return "\(paused) · \(summary.meanPauseCount.formatted(.number.precision(.fractionLength(1)))) pauses per sprint"
     }
+
+    private func duration(_ seconds: TimeInterval) -> String { TimeFormatter.format(shortDuration: seconds) }
 }

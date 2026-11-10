@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Today page: the day navigator, the Worked card beside the finish forecast, then one sprint card
+/// that owns the timeline or list, the sprint tag, and every sprint action.
 struct TodayDashboardView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
@@ -7,36 +9,57 @@ struct TodayDashboardView: View {
     @AppStorage("skevalTodayShowingTimeline") private var showingTimeline = true
     @State private var temporaryTimelineHours: TimelineHours?
     @State private var contentWidth: CGFloat = 780
+    @State private var showingAddSprint = false
+    @State private var showingHours = false
+    @State private var exportError: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private static let twoColumnMinWidth: CGFloat = 660
 
     private var dateSelection: Binding<Date> {
         Binding(get: { vm.selectedDate }, set: { vm.selectDate($0) })
     }
-    private var tags: [String] {
-        vm.displayedCompletedSprints.distinctTags
-    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                dateNavigation
-                Live { summary }
-                historyHeader
-                if showingTimeline {
-                    DailyTimelineView(vm: vm, theme: theme, temporaryHours: $temporaryTimelineHours)
-                } else {
-                    SprintLogTableView(vm: vm, sprints: vm.displayedCompletedSprintsDescending.map(\.sprint),
-                                       distinctTags: tags, defaultDate: vm.selectedDate,
-                                       theme: theme, title: "", usesTimesheetStyle: true)
+        ScrollViewReader { page in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    dateNavigation
+                    summary
+                    sprintCard(page)
                 }
+                .padding(20)
+                .foregroundStyle(theme.textPrimary)
             }
-            .padding(20)
-            .foregroundStyle(theme.textPrimary)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
         .onChange(of: Calendar.current.startOfDay(for: vm.selectedDate)) {
             temporaryTimelineHours = nil
         }
+        .sheet(isPresented: $showingAddSprint) {
+            AddSprintModalView(vm: vm, theme: theme, defaultDate: vm.selectedDate,
+                               onDismiss: { showingAddSprint = false })
+        }
+        .alert("Export failed", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
+            Button("OK", role: .cancel) { }
+        } message: { Text(exportError ?? "") }
+    }
+
+    // MARK: Navigator
+
+    private var dateNavigation: some View {
+        DashboardPeriodNavigator(periodName: "day", canGoForward: !vm.isViewingToday,
+                                 resetTitle: vm.isViewingToday ? nil : "Today",
+                                 resetShortcut: KeyboardShortcut("t", modifiers: [.command, .option]), theme: theme,
+                                 move: moveDay, reset: { vm.jumpToToday() }) {
+            CalendarDatePicker(title: "Day to review", selection: dateSelection, theme: theme,
+                               allowedRange: Date.distantPast...Date())
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+        }
+    }
+
+    private func moveDay(_ offset: Int) {
+        guard let date = Calendar.current.date(byAdding: .day, value: offset, to: vm.selectedDate) else { return }
+        vm.selectDate(date)
     }
 
     // MARK: Summary
@@ -44,111 +67,208 @@ struct TodayDashboardView: View {
     @ViewBuilder private var summary: some View {
         if contentWidth >= Self.twoColumnMinWidth {
             HStack(alignment: .top, spacing: 16) {
-                VStack(spacing: 12) {
-                    workTimeCard
-                    earningsCard
-                    if vm.isViewingToday { sprintTag }
-                }
-                .frame(width: 260)
-                DailyGoalCardView(vm: vm, theme: theme)
+                Live { workedCard }
+                    .frame(width: 280)
+                Live { DailyGoalCardView(vm: vm, theme: theme) }
             }
+            // Both cards take the taller card's height.
+            .fixedSize(horizontal: false, vertical: true)
         } else {
-            VStack(spacing: 12) {
-                HStack(alignment: .top, spacing: 12) { workTimeCard; earningsCard }
-                DailyGoalCardView(vm: vm, theme: theme)
-                if vm.isViewingToday { sprintTag }
+            VStack(spacing: 16) {
+                Live { workedCard }
+                Live { DailyGoalCardView(vm: vm, theme: theme) }
             }
         }
     }
 
-    private var workTimeCard: some View {
-        MetricCardView(title: "WORK TIME", value: vm.displayedTotalShortLabel,
-                       subtitle: vm.isViewingToday ? "Includes the active sprint" : "Completed sprints",
-                       icon: "clock", theme: theme)
+    private var workedCard: some View {
+        let reached = vm.isDisplayedGoalReached
+        let worked = vm.displayedAccumulatedTotal
+        let goal = vm.goal.dailyGoalSeconds
+        return VStack(alignment: .leading, spacing: 12) {
+            DashboardCardHeader(title: "Worked", icon: "clock.fill", theme: theme)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(vm.displayedTotalShortLabel)
+                    .font(.dashboardHero)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text("of \(vm.goal.goalLabel) daily goal")
+                    .font(.dashboardCaption).foregroundStyle(theme.textSecondary)
+            }
+            if vm.goal.hasHourlyRate {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(vm.displayedEarningsLabel)
+                        .font(.dashboardMoney).foregroundStyle(theme.successText)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                    Text("at \(vm.goal.hourlyRateLabel)/h")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(theme.textSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            } else {
+                Button("Set hourly rate", action: openSettings)
+                    .buttonStyle(.link)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                DashboardProgressBar(fraction: vm.displayedProgressFraction, isComplete: reached,
+                                     theme: theme, accessibilityTitle: "Daily goal")
+                HStack {
+                    Text(progressCaption(worked: worked, goal: goal, reached: reached))
+                        .foregroundStyle(reached ? theme.successText : theme.textSecondary)
+                    Spacer()
+                    Text("\(vm.displayedProgressPercent)%")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(reached ? theme.successText : theme.accentText)
+                }
+                .font(.dashboardCaption)
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .modifier(WorkInsightsCardStyle(theme: theme))
     }
 
-    private var earningsCard: some View {
-        MetricCardView(title: "EARNINGS", value: vm.displayedEarningsLabel,
-                       subtitle: vm.goal.hasHourlyRate ? "\(vm.goal.hourlyRateLabel) per hour" : "",
-                       icon: "banknote", theme: theme,
-                       actionTitle: vm.goal.hasHourlyRate ? nil : "Set hourly rate",
-                       action: vm.goal.hasHourlyRate ? nil : openSettings)
+    private func progressCaption(worked: TimeInterval, goal: TimeInterval, reached: Bool) -> String {
+        if reached { return "Daily goal reached" }
+        let left = TimeFormatter.format(shortDuration: max(0, goal - worked))
+        return vm.isViewingToday ? "\(left) left" : "\(left) short"
     }
 
-    private var historyHeader: some View {
-        HStack(spacing: 12) {
-            Text("\(vm.selectedDayShortTitle)'s sprints").font(.headline)
-            Spacer()
+    // MARK: Sprints
+
+    private func sprintCard(_ page: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            DashboardCardHeader(title: vm.sprintsSectionTitle, icon: "list.bullet.rectangle", theme: theme) {
+                sprintActions(page)
+            }
+            if showingTimeline {
+                DailyTimelineView(vm: vm, theme: theme, temporaryHours: $temporaryTimelineHours)
+            } else {
+                SprintLogTableView(vm: vm, sprints: vm.displayedCompletedSprintsDescending.map(\.sprint),
+                                   distinctTags: vm.displayedCompletedSprints.distinctTags,
+                                   defaultDate: vm.selectedDate, theme: theme, title: "",
+                                   usesTimesheetStyle: true, isEmbedded: true)
+            }
+        }
+        .modifier(WorkInsightsCardStyle(theme: theme))
+    }
+
+    private func sprintActions(_ page: ScrollViewProxy) -> some View {
+        HStack(spacing: 8) {
+            if vm.isViewingToday { SprintTagChip(vm: vm, theme: theme) }
             Picker("Sprint view", selection: $showingTimeline) {
                 Text("Timeline").tag(true)
                 Text("List").tag(false)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 200)
+            .frame(width: 150)
             Button(vm.isAllCopied ? "Copied" : "Copy all", systemImage: vm.isAllCopied ? "checkmark" : "doc.on.doc") {
                 vm.copyAllDisplayedSprints()
             }
             .disabled(vm.displayedCompletedSprints.isEmpty)
             .accessibilityHint(Self.copyAllHelp)
             .help(Self.copyAllHelp)
+            Button("Add sprint", systemImage: "plus") { showingAddSprint = true }
+                .keyboardShortcut("n", modifiers: .command)
+                .help("Add a completed sprint to \(vm.selectedDayShortTitle.lowercased()), Command N")
+            moreMenu(page)
         }
+        .controlSize(.small)
+    }
+
+    private func moreMenu(_ page: ScrollViewProxy) -> some View {
+        Menu {
+            if showingTimeline {
+                Button("Visible hours…") { showingHours = true }
+                if vm.isViewingToday {
+                    Button("Scroll to now") {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) {
+                            page.scrollTo(DailyTimelineView.nowAnchor, anchor: .center)
+                        }
+                    }
+                }
+                Divider()
+            }
+            Button("Export CSV…") { exportDay() }
+                .disabled(vm.displayedCompletedSprints.isEmpty)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("More sprint actions")
+        .help("Visible hours, scroll to now, and CSV export")
+        .popover(isPresented: $showingHours, arrowEdge: .bottom) {
+            TimelineHoursEditor(vm: vm, temporaryHours: $temporaryTimelineHours, theme: theme)
+        }
+    }
+
+    private func exportDay() {
+        let day = TimeFormatter.format(dateKey: vm.selectedDate, calendar: .current)
+        CSVExporter.promptSavePanel(sprints: vm.displayedCompletedSprints,
+                                    suggestedName: "skeval-sprints-\(day).csv",
+                                    onFailure: { exportError = $0 })
     }
 
     private static let copyAllHelp = "Copy this day's Login, Logout, blank Lunch, and Break (whole minutes) as one spreadsheet row. Break includes pauses and gaps between completed sprints."
+}
 
-    private var dateNavigation: some View {
-        HStack(spacing: 12) {
-            Button { moveDay(-1) } label: { Image(systemName: "chevron.left") }
-                .accessibilityLabel("Previous day")
-                .keyboardShortcut("[", modifiers: .command)
-                .help("Previous day, Command [")
-            CalendarDatePicker(title: "Day to review", selection: dateSelection, theme: theme,
-                               allowedRange: Date.distantPast...Date())
-                .font(.subheadline.weight(.medium))
-            Button { moveDay(1) } label: { Image(systemName: "chevron.right") }
-                .disabled(vm.isViewingToday)
-                .accessibilityLabel("Next day")
-                .keyboardShortcut("]", modifiers: .command)
-                .help("Next day, Command ]")
-            if !vm.isViewingToday {
-                Button("Back to today") { vm.jumpToToday() }
-                    .keyboardShortcut("t", modifiers: [.command, .option])
-                    .help("Back to today, Command Option T")
+/// The running or next sprint's tag, as a chip in the sprint card header. Click to edit it.
+private struct SprintTagChip: View {
+    @Bindable var vm: TimerViewModel
+    let theme: PopoverTheme
+    @State private var editing = false
+
+    private var tag: String {
+        (vm.isRunning ? vm.currentTag ?? "" : vm.pendingTag).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    private var subject: String { vm.isRunning ? "Sprint tag" : "Next sprint tag" }
+
+    var body: some View {
+        Button { editing = true } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "tag.fill").font(.system(size: 9, weight: .bold))
+                Text(tag.isEmpty ? (vm.isRunning ? "Tag sprint" : "Tag next sprint") : "#\(tag)")
+                    .lineLimit(1)
             }
-            Spacer()
-            Text(vm.headerDateSubtitle).font(.subheadline).foregroundStyle(theme.textSecondary)
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundStyle(tag.isEmpty ? theme.textSecondary : theme.accentText)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(tag.isEmpty ? Color.clear : theme.accentColor.opacity(0.14), in: Capsule())
+            .overlay(Capsule().stroke(tag.isEmpty ? theme.cardBorder : theme.accentColor.opacity(0.35),
+                                      style: StrokeStyle(lineWidth: 1, dash: tag.isEmpty ? [3, 2] : [])))
+            .frame(maxWidth: 180)
+            .fixedSize()
         }
-        .controlSize(.large)
+        .buttonStyle(.plain)
+        .help(vm.isRunning ? "Tag the running sprint with a project or client" : "Tag the next sprint you clock in")
+        .accessibilityLabel(tag.isEmpty ? subject : "\(subject), \(tag)")
+        .accessibilityHint("Edit the tag")
+        .popover(isPresented: $editing, arrowEdge: .bottom) { editor }
     }
 
-    private var sprintTag: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(vm.isRunning ? "Sprint tag" : "Next sprint tag", systemImage: "tag")
-                .font(.caption.weight(.bold)).foregroundStyle(theme.textSecondary)
-            TextField("Optional project or client", text: tagBinding)
+    private var editor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(subject).font(.headline)
+            TextField("Optional project or client", text: binding)
                 .textFieldStyle(.roundedBorder)
+                .frame(width: 240)
+                .onSubmit { editing = false }
                 .accessibilityLabel(vm.isRunning ? "Current sprint tag" : "Next sprint tag")
-            if vm.isPaused {
-                Text("Paused for \(vm.currentPauseLabel)")
-                    .font(.system(.subheadline, design: .monospaced))
-                    .foregroundStyle(theme.warningText)
+            HStack {
+                Button("Clear") { binding.wrappedValue = "" }
+                    .disabled(tag.isEmpty)
+                Spacer()
+                Button("Done") { editing = false }
+                    .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
+        .padding(16)
     }
 
-    private var tagBinding: Binding<String> {
+    private var binding: Binding<String> {
         Binding(get: { vm.isRunning ? vm.currentTag ?? "" : vm.pendingTag },
                 set: { if vm.isRunning { vm.setTag($0) } else { vm.pendingTag = $0 } })
-    }
-
-    private func moveDay(_ offset: Int) {
-        guard let date = Calendar.current.date(byAdding: .day, value: offset, to: vm.selectedDate) else { return }
-        vm.selectDate(date)
     }
 }

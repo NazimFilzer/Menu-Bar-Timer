@@ -1366,8 +1366,8 @@ func testMonthOverMonthComparison() {
     assertEqual(summaryEmpty.monthOverMonth.percentageChange, 0.0)
 }
 
-func testInsightsPeriodSummaryAndDateRangeFiltering() {
-    print("Running Insights Period Summary & Date Range Filtering tests...")
+func testAnalyticsCustomRangeFiltering() {
+    print("Running Analytics custom range filtering tests...")
     let suiteName = "test_skeval_insights_\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -1383,84 +1383,27 @@ func testInsightsPeriodSummaryAndDateRangeFiltering() {
     let d3 = cal.date(from: DateComponents(year: 2026, month: 9, day: 5, hour: 14))!  // In range
     let d4 = cal.date(from: DateComponents(year: 2026, month: 9, day: 25, hour: 12))! // After range
 
-    let s1 = Sprint(startTime: d1, endTime: d1.addingTimeInterval(7200), pausedDuration: 0, tag: "#old")
-    let s2 = Sprint(startTime: d2, endTime: d2.addingTimeInterval(14400), pausedDuration: 0, tag: "#core") // 4h
-    let s3 = Sprint(startTime: d3, endTime: d3.addingTimeInterval(7200), pausedDuration: 0, tag: "#fix")  // 2h
-    let s4 = Sprint(startTime: d4, endTime: d4.addingTimeInterval(7200), pausedDuration: 0, tag: "#future")
-
     let logs: [String: [Sprint]] = [
-        "2026-08-15": [s1],
-        "2026-09-01": [s2],
-        "2026-09-05": [s3],
-        "2026-09-25": [s4]
+        "2026-08-15": [Sprint(startTime: d1, endTime: d1.addingTimeInterval(7200), pausedDuration: 0, tag: "#old")],
+        "2026-09-01": [Sprint(startTime: d2, endTime: d2.addingTimeInterval(14400), pausedDuration: 0, tag: "#core")],
+        "2026-09-05": [Sprint(startTime: d3, endTime: d3.addingTimeInterval(7200), pausedDuration: 0, tag: "#fix")],
+        "2026-09-25": [Sprint(startTime: d4, endTime: d4.addingTimeInterval(7200), pausedDuration: 0, tag: "#future")]
     ]
 
-    let rangeStart = cal.date(from: DateComponents(year: 2026, month: 9, day: 1))!
-    let rangeEnd = cal.date(from: DateComponents(year: 2026, month: 9, day: 10))!
+    let range = AnalyticsRange.custom(from: cal.date(from: DateComponents(year: 2026, month: 9, day: 1))!,
+                                      to: cal.date(from: DateComponents(year: 2026, month: 9, day: 10))!, calendar: cal)
+    let today = cal.date(from: DateComponents(year: 2026, month: 11, day: 10))!
+    let days = AnalyticsComparison.bars(range.dates(calendar: cal), logs: logs, today: today, settings: settings, calendar: cal)
+    let totals = AnalyticsTotals.calculate(days: days, settings: settings, today: today, calendar: cal)
 
-    let period = InsightsAnalytics.calculatePeriodSummary(
-        logs: logs,
-        startDate: rangeStart,
-        endDate: rangeEnd,
-        settings: settings,
-        calendar: cal
-    )
-
-    assertEqual(period.sprints.count, 2)
-    assertEqual(period.totalSeconds, 21600.0)
-    assertEqual(period.totalHours, 6.0)
-    assertEqual(period.formattedTotalHours, "6h 0m")
-    assertEqual(period.totalEarnings, 3000.0)
-    assertEqual(period.formattedTotalEarnings, "$3,000")
-    assertEqual(period.activeDaysCount, 2)
-    assertEqual(period.totalDaysCount, 10)
-    assertEqual(period.dailyAverageHours, 3.0)
-    assertEqual(period.formattedDailyAverage, "3h 0m")
-    assertEqual(period.distinctTags, ["#core", "#fix"])
-
-    assertTrue(!period.trendPoints.isEmpty)
-    assertEqual(period.trendPoints.count, 10, "Daily resolution for 10-day period")
-}
-
-func testAnnualContributionHeatmap() {
-    print("Running Annual Contribution Heatmap tests...")
-    let suiteName = "test_skeval_heatmap_\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suiteName)!
-    defer { defaults.removePersistentDomain(forName: suiteName) }
-    let settings = GoalSettings(userDefaults: defaults)
-    settings.hourlyRate = 1000.0
-
-    var cal = Calendar(identifier: .gregorian)
-    cal.firstWeekday = 2
-
-    // Intensity level mapping
-    assertEqual(InsightsAnalytics.intensityLevel(forSeconds: 0), 0)
-    assertEqual(InsightsAnalytics.intensityLevel(forSeconds: 1800), 1)  // 30m
-    assertEqual(InsightsAnalytics.intensityLevel(forSeconds: 10800), 2) // 3h
-    assertEqual(InsightsAnalytics.intensityLevel(forSeconds: 21600), 3) // 6h
-    assertEqual(InsightsAnalytics.intensityLevel(forSeconds: 32400), 4) // 9h
-
-    let d1 = cal.date(from: DateComponents(year: 2026, month: 1, day: 5, hour: 10))! // 2h
-    let d2 = cal.date(from: DateComponents(year: 2026, month: 6, day: 15, hour: 10))! // 6h
-    let s1 = Sprint(startTime: d1, endTime: d1.addingTimeInterval(7200), pausedDuration: 0)
-    let s2 = Sprint(startTime: d2, endTime: d2.addingTimeInterval(21600), pausedDuration: 0)
-
-    let logs: [String: [Sprint]] = [
-        "2026-01-05": [s1],
-        "2026-06-15": [s2]
-    ]
-
-    let matrix = InsightsAnalytics.generateAnnualHeatmap(logs: logs, year: 2026, settings: settings, calendar: cal)
-    assertEqual(matrix.year, 2026)
-    assertTrue(matrix.columns.count >= 52 && matrix.columns.count <= 53)
-    for col in matrix.columns {
-        assertEqual(col.count, 7, "Each week column has 7 days")
-    }
-    assertEqual(matrix.totalActiveDays, 2)
-    assertEqual(matrix.totalYearSeconds, 28800.0)
-    assertEqual(matrix.totalYearHours, 8.0)
-    assertEqual(matrix.totalYearEarnings, 8000.0)
-    assertTrue(matrix.monthHeaders.count >= 12, "Should have month headers for the year")
+    assertEqual(days.count, 10)
+    assertEqual(totals.sprintCount, 2, "Sprints outside the range are excluded")
+    assertEqual(totals.workedSeconds, 21600.0)
+    assertEqual(totals.earnings, 3000.0)
+    assertEqual(EarningsCalculator.format(amount: totals.earnings, currencySymbol: settings.currencySymbol), "$3,000")
+    assertEqual(totals.daysWithWork, 2)
+    assertEqual(days.flatMap(\.completedSprints).distinctTags, ["#core", "#fix"])
+    assertEqual(range.previousName, "previous 10 days")
 }
 
 func testRFC4180CSVExport() {
@@ -1808,7 +1751,7 @@ func testPastDaysHistory() {
     assertEqual(vm.displayedCompletedSprints.count, 1)
     assertEqual(vm.displayedAccumulatedTotal, 3600.0)
     assertEqual(vm.displayedEarnings, 500.0)
-    assertEqual(vm.displayedGoalTitle, "Daily Target")
+    assertEqual(vm.displayedGoalTitle, "Daily Goal")
 
     // Test menu item title
     let yestMenuItem = vm.menuItemTitle(for: yesterday)
@@ -1822,7 +1765,7 @@ func testPastDaysHistory() {
     assertEqual(vm.displayedCompletedSprints.count, 2)
     assertEqual(vm.displayedAccumulatedTotal, 14400.0) // 4h
     assertEqual(vm.displayedEarnings, 2000.0) // 4h * 500
-    assertEqual(vm.displayedGoalTitle, "Yesterday's Target")
+    assertEqual(vm.displayedGoalTitle, "Yesterday's Goal")
     assertEqual(vm.displayedTotalShortLabel, "4h 0m")
 
     // Copy All summarizes the selected day into one four-column timesheet row.
@@ -1848,7 +1791,7 @@ func testPastDaysHistory() {
     assertEqual(vm.displayedCompletedSprints.count, 1)
     assertEqual(vm.displayedAccumulatedTotal, 3600.0)
     assertEqual(vm.displayedEarnings, 500.0)
-    assertEqual(vm.displayedGoalTitle, "Daily Target")
+    assertEqual(vm.displayedGoalTitle, "Daily Goal")
 }
 
 @MainActor
@@ -2156,8 +2099,8 @@ struct TestMain {
         testMonthlyAnalytics()
         testTagBreakdownAndAttribution()
         testMonthOverMonthComparison()
-        testInsightsPeriodSummaryAndDateRangeFiltering()
-        testAnnualContributionHeatmap()
+        testAnalyticsReport()
+        testAnalyticsCustomRangeFiltering()
         testRFC4180CSVExport()
         testTagFilterMatching()
         testAppVersion()
@@ -2166,6 +2109,7 @@ struct TestMain {
         testCatchUpAnalytics()
         testFinishForecast()
         testDailyTimeline()
+        testDailyTimelineFitsToWork()
         testDailyTimelineDST()
         testPeriodPaceForecast()
         testWeekPace()

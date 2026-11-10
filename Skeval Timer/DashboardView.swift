@@ -19,7 +19,7 @@ enum DashboardDestination: String, CaseIterable, Identifiable {
         case .today: return "Your timer, earnings, and daily sprint history"
         case .week: return "Weekly goals and daily work patterns"
         case .month: return "Calendar, pace, and time by tag"
-        case .analytics: return "Trends, date ranges, and CSV reports"
+        case .analytics: return "Any range against the one before, trends, and CSV"
         case .settings: return "Goals, hourly rate, currency, and appearance"
         }
     }
@@ -101,7 +101,7 @@ struct DashboardView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Keyboard shortcuts").font(.caption.bold())
-                Text("⌘1–5  Switch views\n⌘N  Add sprint\n⌘[ ⌘]  Previous / next day or week\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
+                Text("⌘1–5  Switch views\n⌘N  Add sprint\n⌘[ ⌘]  Previous / next period\n⌘⌥⇧C  Clock in / out\n⌘⌥⇧P  Pause / resume")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineSpacing(4)
@@ -121,7 +121,7 @@ struct DashboardView: View {
         case .month:
             ScrollView { MonthlyDashboardView(vm: vm, theme: theme).padding(20) }
         case .analytics:
-            AnalyticsDashboardView(vm: vm, theme: theme)
+            AnalyticsDashboardView(vm: vm, theme: theme) { destinationKey = DashboardDestination.settings.rawValue }
         case .settings:
             DashboardSettingsView(vm: vm, theme: theme)
         }

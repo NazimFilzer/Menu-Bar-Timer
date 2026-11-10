@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Analytics tab on the shared dashboard grammar</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only (generated, Mar–Nov 2026). No persistence.
+  Question: how should Analytics do both jobs (range report + long-term trend), re-ordered so the range and
+  its answer come first, using the shared grammar (DashboardGrammar.swift), with the heatmap only for Year/All?
+  Follows .impeccable/critique/2026-11-10T12-57-00Z__skeval-timer-analyticsdashboardview-swift.md
+  ?variant=  A Report stack · B Side column · C Compare first · R Current (reference)
+  ?range=    week · month · year · all      ?offset= 0, -1, -2 …     ?theme= light · dark
+  Keys: ← → variant · 1–4 range · [ ] previous/next period · D theme
+  Every variant: native segmented range + ‹ › period navigator (⌘[ ⌘]), Custom behind a button, one summary
+  card, bars with the daily goal line and days off, heatmap only for Year/All, zero rows hidden, Export in ⋯.
+-->
+<style>
+:root{--bg:#FFFAE6;--card:#FFFFFF;--border:#E8E0BA;--accent:#E0B24C;--accent-wash:#E0B24C29;--accent-text:#876B2E;--accent-icon:#B48F3D;
+ --ink:#38301C;--muted:#807552;--warn:#995900;--warn-wash:#FF950020;--good:#22774D;--good-wash:#2E9E6622;--track:#E8E0BA80;--off:#80755212;
+ --bar:#E0B24Caa;--prev:#80755233;--font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;--round:"SF Pro Rounded",ui-rounded,-apple-system,sans-serif;--mono:"SF Mono",ui-monospace,Menlo,monospace}
+body.dark{--bg:#1F1C14;--card:#29291F;--border:#4A4532;--accent-text:#E8C66F;--accent-icon:#E0B24C;--ink:#F0ECE0;--muted:#C4BCA4;--warn:#FFB45C;--good:#6FD39A;--good-wash:#2E9E6633;--track:#4A453280;--off:#FFFFFF0d;--bar:#E0B24Cbb;--prev:#FFFFFF22}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:13px;background:#cfc8b4;color:var(--ink);padding:22px 0 110px;display:flex;justify-content:center}
+body.dark{background:#0d0c09}
+.win{width:1140px;display:flex;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0004;overflow:hidden}
+.side{width:195px;background:var(--card);border-right:1px solid var(--border);padding:22px 10px;flex:none}
+.side h2{font-size:17px;padding:0 8px 18px}.side .it{padding:9px 10px;border-radius:8px;font-size:14px;color:var(--muted)}.side .it.on{background:var(--accent-wash);color:var(--ink);font-weight:600}
+.main{flex:1;min-width:0}
+.tb{display:flex;align-items:center;gap:14px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border)}.tb h1{font-size:17px}
+.sp{flex:1}.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;gap:12px;align-items:center}.row>*{min-width:0}.col{display:flex;flex-direction:column}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.ch{display:flex;align-items:center;gap:6px;min-height:22px}.ch .ic{color:var(--accent-icon);font-size:12px;width:14px;text-align:center}
+.ch .t{white-space:nowrap;font:700 11px var(--round);letter-spacing:.8px;text-transform:uppercase}.ch .acts{margin-left:auto;display:flex;gap:6px;align-items:center}
+.hero{font:700 28px var(--mono);letter-spacing:-.3px}.money{font:700 18px var(--mono);color:var(--good)}.cap{font:500 12px var(--round);color:var(--muted)}
+.sec{font:700 9px var(--round);letter-spacing:.9px;text-transform:uppercase;color:var(--muted);margin:4px 0 4px}
+.fr{display:flex;align-items:baseline;gap:8px;padding:4px 0}.fr .l{font:500 12px var(--round);color:var(--muted)}.fr .v{margin-left:auto;font:700 13px var(--mono);text-align:right}.fr .d{display:block;font:500 10.5px var(--round);color:var(--muted)}
+.hr{height:1px;background:var(--border);margin:10px 0}
+.bar{height:8px;border-radius:4px;background:var(--track);overflow:hidden}.bar i{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.pill{display:inline-flex;gap:4px;align-items:center;font:600 11px var(--round);padding:3px 9px;border-radius:99px;white-space:nowrap}
+.pill.g{background:var(--good-wash);color:var(--good)}.pill.w{background:var(--warn-wash);color:var(--warn)}.pill.n{background:var(--accent-wash);color:var(--accent-text)}
+button{font:inherit;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted)}button[disabled]{opacity:.35;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;background:var(--card)}.seg span{padding:4px 14px;font-size:12.5px;cursor:pointer}.seg span.on{background:var(--accent);color:#000;font-weight:600}
+.nav{display:flex;align-items:center;gap:8px}.chev{width:26px;height:26px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.lab{font:600 13px var(--mono);padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card)}
+.kbd{font:500 10.5px var(--round);color:var(--muted)}
+/* bars */
+.chart{position:relative;display:flex;align-items:flex-end;gap:3px;border-bottom:1px solid var(--border);margin-left:34px}
+.chart .c{flex:1;height:100%;position:relative;display:flex;align-items:flex-end;justify-content:center;border-radius:3px}
+.chart .c.off{background:var(--off)}
+.chart .c b{display:block;width:100%;border-radius:3px 3px 1px 1px;background:var(--bar);position:relative;z-index:1}
+.chart .c b.met{background:var(--good)}
+.chart .c i{position:absolute;bottom:0;left:18%;right:18%;border-radius:2px;background:var(--prev)}
+.chart .c.fut::after{content:"";position:absolute;bottom:0;left:30%;right:30%;height:2px;background:var(--border)}
+.chart .goal{position:absolute;left:0;right:0;border-top:1.5px dashed var(--accent-text);opacity:.7;z-index:2;pointer-events:none}
+.chart .goal span{position:absolute;right:0;top:-17px;font:600 10px var(--round);color:var(--accent-text);background:var(--card);padding:0 4px}
+.chart .ax{position:absolute;left:-34px;width:28px;text-align:right;font:500 10px var(--mono);color:var(--muted);transform:translateY(50%)}
+.chart .gl{position:absolute;left:0;right:0;border-top:1px solid var(--track)}
+.xl{display:flex;gap:3px;margin:5px 0 0 34px}.xl span{flex:1;min-width:0;text-align:left;font:600 9.5px var(--mono);color:var(--muted);white-space:nowrap;overflow:visible}
+.legend{display:flex;gap:14px;font:500 11px var(--round);color:var(--muted);margin-top:10px;flex-wrap:wrap}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* heatmap */
+.hm{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:3px}
+.hm s{display:block;aspect-ratio:1;border-radius:3px;background:var(--track)}
+.hm s.l1{background:#E0B24C40}.hm s.l2{background:#E0B24C80}.hm s.l3{background:#E0B24Ccc}.hm s.met{background:var(--good)}.hm s.offd{background:transparent;border:1px dashed var(--border)}.hm s.fut{opacity:.35}.hm s.none{visibility:hidden}
+.hmm{display:grid;grid-auto-flow:column;gap:3px;margin-bottom:4px;font:600 10px var(--round);color:var(--muted)}
+/* tables */
+table{width:100%;border-collapse:collapse}th{font:700 10px var(--round);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--track);font-size:12px}td.m{font:600 12px var(--mono)}tr.empty td{color:var(--muted)}
+.bk{display:grid;grid-template-columns:90px 1fr 34px;gap:10px;align-items:center;font:500 12px var(--round);padding:3px 0}
+.tg{display:grid;grid-template-columns:1fr 70px 46px 90px;gap:8px;align-items:center;font-size:12px;padding:4px 0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.info{display:inline-flex;width:17px;height:17px;border-radius:50%;border:1px solid var(--border);align-items:center;justify-content:center;font:700 10px var(--round);color:var(--muted);cursor:help}
+.cmp{display:grid;grid-template-columns:120px 1fr 1fr 90px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--track)}
+.cmp .b{height:10px;border-radius:5px;background:var(--track);position:relative;overflow:hidden}.cmp .b i{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
+.note{font-size:12px;color:#4a4020;background:#fff3c4;border:1px dashed #d8b84a;border-radius:8px;padding:10px 12px;line-height:1.5}
+body.dark .note{background:#3a331c;color:#efe3b8;border-color:#7a6a2a}
+/* reference look */
+.ref-seg{display:inline-flex;gap:3px;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--card)}.ref-seg span{padding:5px 10px;font:500 11px var(--round);color:var(--muted);border-radius:6px}.ref-seg span.on{background:#E0B24C33;color:var(--accent-text);font-weight:700}
+.glow{box-shadow:0 2px 6px #E0B24C66}
+#sw{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:99px;padding:8px 12px;display:flex;gap:6px;align-items:center;font-size:12px;box-shadow:0 6px 24px #0006;z-index:20;white-space:nowrap}
+#sw button{background:#333;color:#fff;border:0;border-radius:99px;padding:4px 9px;font-size:11.5px}#sw button.on{background:#fff;color:#111}#sw .sep{width:1px;height:18px;background:#555}
+</style>
+</head>
+<body>
+<div class="win" id="win"></div>
+<div id="sw"></div>
+<script>
+// ---------- Sample data (generated, in memory only) ----------
+const RATE=1500, DG=8, WG=40, TODAY=new Date(2026,10,10);
+const DAY=864e5, iso=d=>`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+const LOG={}; // key -> {h, sprints:[{net,paused,tag}], login, logout}
+const OFF=new Set(['2026-4-3','2026-5-1','2026-8-14','2026-8-17','2026-8-18','2026-10-2','2026-10-23']);
+for(let d=new Date(2026,2,2);d<=TODAY;d=new Date(d.getTime()+DAY)){
+ const k=iso(d),dow=d.getDay(),work=dow>0&&dow<6&&!OFF.has(k);
+ let h=0; if(work){h=Math.max(0,Math.min(10,7.4+(rnd()-.45)*3.2)); if(rnd()<.05)h=0} else if(rnd()<.08) h=2+rnd()*2;
+ if(d.getTime()===TODAY.getTime()) h=2;
+ if(h>0){const n=1+Math.floor(rnd()*3),sp=[];let left=h*60;for(let i=0;i<n;i++){const net=i===n-1?left:Math.round(left*(.35+rnd()*.3));left-=net;sp.push({net,paused:rnd()<.6?Math.round(5+rnd()*20):0,tag:rnd()<.75?'Development':'Client'})}
+  LOG[k]={h,sprints:sp,login:7+Math.floor(rnd()*2)}}
+}
+const isWork=d=>{const dow=d.getDay();return dow>0&&dow<6&&!OFF.has(iso(d))};
+const fd=m=>{m=Math.max(0,Math.round(m));return m<60?`${m}m`:`${Math.floor(m/60)}h ${m%60}m`};
+const fh=h=>fd(h*60);
+const money=h=>'₹'+Math.round(h*RATE).toLocaleString('en-IN');
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],DW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fdate=d=>`${DW[d.getDay()]}, ${MN[d.getMonth()]} ${d.getDate()}`;
+// ---------- Ranges ----------
+function rangeFor(kind,off){
+ if(kind==='week'){const mon=new Date(TODAY.getTime()-((TODAY.getDay()+6)%7)*DAY+off*7*DAY);return {a:mon,b:new Date(mon.getTime()+6*DAY),label:`${MN[mon.getMonth()]} ${mon.getDate()} – ${MN[new Date(mon.getTime()+6*DAY).getMonth()]} ${new Date(mon.getTime()+6*DAY).getDate()}, ${mon.getFullYear()}`,unit:'day',prevName:'previous week'}}
+ if(kind==='month'){const a=new Date(TODAY.getFullYear(),TODAY.getMonth()+off,1),b=new Date(a.getFullYear(),a.getMonth()+1,0);return {a,b,label:`${['January','February','March','April','May','June','July','August','September','October','November','December'][a.getMonth()]} ${a.getFullYear()}`,unit:'day',prevName:'previous month'}}
+ if(kind==='year'){const y=TODAY.getFullYear()+off;return {a:new Date(y,0,1),b:new Date(y,11,31),label:`${y}`,unit:'week',prevName:`${y-1}`}}
+ return {a:new Date(2026,2,2),b:TODAY,label:'All time · since Mar 2, 2026',unit:'week',prevName:null,all:true};
+}
+function stats(r){
+ const days=[];for(let d=new Date(r.a);d<=r.b;d=new Date(d.getTime()+DAY)){const k=iso(d),l=LOG[k];days.push({d,k,h:l?l.h:0,l,work:isWork(d),fut:d>TODAY,today:d.getTime()===TODAY.getTime()})}
+ const past=days.filter(x=>!x.fut),worked=past.reduce((a,x)=>a+x.h,0),active=past.filter(x=>x.h>0).length;
+ const sched=past.filter(x=>x.work&&!x.today),met=sched.filter(x=>x.h>=DG).length;
+ const sprints=past.flatMap(x=>x.l?x.l.sprints:[]);
+ const expected=past.filter(x=>x.work).length*DG;
+ return {days,past,worked,active,sched,met,sprints,expected,avg:active?worked/active:0};
+}
+// ---------- Shared grammar ----------
+const CH=(t,ic,acts='')=>`<div class="ch"><span class="ic">${ic}</span><span class="t">${t}</span>${acts?`<span class="acts">${acts}</span>`:''}</div>`;
+const FR=(l,v,o={})=>`<div class="fr"><span class="l">${l}</span><span class="v" style="${o.c?`color:${o.c};`:''}${o.em?'font-size:16px':''}">${v}${o.d?`<span class="d">${o.d}</span>`:''}</span></div>`;
+const I=t=>`<span class="info" title="${t}">i</span>`;
+function rangeBar(r){
+ const cur=Q.get('offset')==='0'||!Q.get('offset'), K=Q_RANGE;
+ return `<div class="row"><span class="seg">${[['week','Week'],['month','Month'],['year','Year'],['all','All']].map(([k,n])=>`<span class="${K===k?'on':''}" onclick="setRange('${k}')">${n}</span>`).join('')}</span>
+ ${r.all?'':`<div class="nav"><button class="chev" onclick="move(-1)" title="Previous, Command [">‹</button><span class="lab">${r.label}</span><button class="chev" ${cur?'disabled':''} onclick="move(1)" title="Next, Command ]">›</button>${cur?'':`<button onclick="setQ('offset','0')">${K==='week'?'This week':K==='month'?'This month':'This year'}</button>`}<span class="kbd">⌘[ ⌘]</span></div>`}
+ ${r.all?`<span class="lab" style="border-color:transparent;background:transparent">${r.label}</span>`:''}
+ <span class="sp"></span><button title="Choose any start and end date">▦ Custom range…</button></div>`;
+}
+function prevStats(r){
+ if(!r.prevName) return null; const o=+(Q.get('offset')||0)-1; const pr=rangeFor(Q_RANGE,o);
+ // compare the same number of elapsed days when the current period is still running
+ const s=stats(pr); const s0=stats(pr); if(!s0.worked) return null; if(r.b>=TODAY){const n=Math.floor((TODAY-r.a)/DAY)+1; const cut=s.past.slice(0,n); return {...s,worked:cut.reduce((a,x)=>a+x.h,0),active:cut.filter(x=>x.h>0).length,sprints:cut.flatMap(x=>x.l?x.l.sprints:[]),partial:true,met:cut.filter(x=>x.work&&x.h>=DG).length,sched:cut.filter(x=>x.work)}}
+ return s.worked>0?s:null;
+}
+function delta(cur,prev,fmt){if(prev==null) return '';const d=cur-prev; if(Math.abs(d)<1/60) return `<span class="pill n">same as before</span>`;
+ return `<span class="pill ${d>0?'g':'w'}">${d>0?'↑':'↓'} ${fmt(Math.abs(d))}</span>`}
+function summary(r,s,p,wide=true){
+ const goal=r.all?null:(Q_RANGE==='week'?WG:Q_RANGE==='month'?160:1920);
+ const facts=`${FR('Daily average',fh(s.avg),{d:`over ${s.active} days with work`})}
+  ${FR('Daily goal met',`${s.met} of ${s.sched.length}`,{d:'finished scheduled workdays'})}
+  ${FR('Sprints',`${s.sprints.length}`)}`;
+ const hero=`<div class="hero">${fh(s.worked)}</div><div class="cap">${goal?`of ${goal}h ${Q_RANGE==='week'?'weekly':Q_RANGE==='month'?'monthly':'yearly'} goal`:`over ${s.past.length} days`}</div>
+  <div class="row" style="gap:6px;align-items:baseline;margin-top:8px"><span class="money">${money(s.worked)}</span><span class="cap" style="font-size:11px">at ₹1,500/h</span></div>
+  ${goal?`<div class="bar" style="margin-top:12px"><i style="width:${Math.min(100,s.worked/goal*100)}%"></i></div>`:''}
+  ${p?`<div class="row" style="margin-top:10px;gap:6px">${delta(s.worked,p.worked,fh)}<span class="cap">vs ${p.partial?'the same days of ':''}${/^\d/.test(r.prevName)?'':'the '}${r.prevName}</span></div>`:''}`;
+ return wide?`<div class="card">${CH('Worked','◷')}<div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:12px"><div>${hero}</div><div>${facts}</div></div></div>`
+  :`<div class="card">${CH('Worked','◷')}<div style="margin-top:12px">${hero}</div><div class="hr"></div>${facts}</div>`;
+}
+function bars(r,s,p,{h=180,showPrev=false}={}){
+ let items,goal,unitLabel;
+ if(r.unit==='day'){items=s.days.map(x=>({h:x.h,off:!x.work,fut:x.fut,met:x.h>=DG&&x.work,lab:r.days<=7?DW[x.d.getDay()]:x.d.getDate(),tip:`${fdate(x.d)}: ${x.fut?'upcoming':x.h?fh(x.h):x.work?'no work':'day off'}`}));goal=DG;unitLabel='daily goal'}
+ else{items=[];let wk=null;for(const x of s.days){const mon=new Date(x.d.getTime()-((x.d.getDay()+6)%7)*DAY);const k=iso(mon);if(!wk||wk.k!==k){wk={k,mon,h:0,fut:true,lab:(x.d.getDate()<=7&&(items.length===0||x.d.getMonth()!==items[items.length-1].m))?MN[x.d.getMonth()]:'',m:x.d.getMonth()};items.push(wk)}wk.h+=x.h;if(!x.fut)wk.fut=false}
+  items=items.map(w=>({...w,met:w.h>=WG,tip:`Week of ${MN[w.mon.getMonth()]} ${w.mon.getDate()}: ${w.fut?'upcoming':fh(w.h)}`}));goal=WG;unitLabel='weekly goal'}
+ if(r.unit==='day') items.forEach((x,i)=>{x.lab=items.length<=7?DW[s.days[i].d.getDay()]:(s.days[i].d.getDate()%5===1||items.length<=7?s.days[i].d.getDate():'')});
+ const prevH=showPrev&&p&&r.unit==='day'?p.days.map(x=>x.h):[];
+ const max=Math.max(goal*1.25,...items.map(x=>x.h),...prevH);
+ const ticks=[0,goal/2,goal].map(t=>`<div class="gl" style="bottom:${t/max*100}%"></div><span class="ax" style="bottom:${t/max*100}%">${Math.round(t)}h</span>`).join('');
+ return `<div class="chart" style="height:${h}px">${ticks}<div class="goal" style="bottom:${goal/max*100}%"><span>${goal}h ${unitLabel}</span></div>
+  ${items.map((x,i)=>`<div class="c ${x.off?'off':''} ${x.fut?'fut':''}" title="${x.tip}">${prevH[i]?`<i style="height:${prevH[i]/max*100}%"></i>`:''}${x.h?`<b class="${x.met?'met':''}" style="height:${x.h/max*100}%"></b>`:''}</div>`).join('')}</div>
+  <div class="xl">${items.map(x=>`<span>${x.lab}</span>`).join('')}</div>
+  <div class="legend"><span><i style="background:var(--good)"></i>Met ${unitLabel}</span><span><i style="background:var(--bar)"></i>Below goal</span>${r.unit==='day'?'<span><i style="background:var(--off)"></i>Day off</span>':''}${prevH.length?`<span><i style="background:var(--prev)"></i>${r.prevName}</span>`:''}<span>▁ Upcoming</span></div>`;
+}
+function heatmap(r,s){
+ if(r.unit!=='week') return '';
+ const a=new Date(r.a.getTime()-((r.a.getDay()+6)%7)*DAY);const cells=[];
+ for(let d=a;d<=r.b;d=new Date(d.getTime()+DAY)){const inR=d>=r.a,l=LOG[iso(d)],h=l?l.h:0,w=isWork(d),fut=d>TODAY;
+  let c=!inR?'none':fut?'fut':!w&&!h?'offd':h>=DG&&w?'met':h===0?'':h<3?'l1':h<6?'l2':'l3';cells.push(`<s class="${c}" title="${fdate(d)}: ${fut?'upcoming':h?fh(h):w?'no work':'day off'}"></s>`)}
+ const cols=Math.ceil(cells.length/7);const heads=[];for(let i=0;i<cols;i++){const d=new Date(a.getTime()+i*7*DAY);heads.push(d.getDate()<=7?MN[d.getMonth()]:'')}
+ return `<div class="card">${CH('Every day','▦',`<span class="cap">${s.met} of ${s.sched.length} workdays met ${DG}h</span>`)}
+  <div style="margin-top:14px"><div class="hmm" style="grid-template-columns:repeat(${cols},1fr)">${heads.map(x=>`<span>${x}</span>`).join('')}</div>
+  <div class="hm" style="grid-template-columns:repeat(${cols},1fr)">${cells.join('')}</div></div>
+  <div class="legend"><span><i style="background:var(--good)"></i>Met ${DG}h</span><span><i style="background:#E0B24C40"></i><i style="background:#E0B24C80"></i><i style="background:#E0B24Ccc"></i>Below goal, by hours</span><span><i style="border:1px dashed var(--border)"></i>Day off</span><span><i style="background:var(--track)"></i>Workday, no work</span></div></div>`;
+}
+function patterns(s,compact=false){
+ const sp=s.sprints;if(!sp.length) return `<div class="card">${CH('Sprint patterns','⧗')}<div class="cap" style="margin-top:10px">No completed sprints in this range.</div></div>`;
+ const nets=sp.map(x=>x.net).sort((a,b)=>a-b),med=nets[Math.floor(nets.length/2)],mean=nets.reduce((a,b)=>a+b,0)/nets.length,longest=nets[nets.length-1];
+ const B=[['Under 30m',0,30],['30m to 1h',30,60],['1h to 2h',60,120],['2h to 4h',120,240],['4h or more',240,1e9]].map(([l,a,b])=>[l,sp.filter(x=>x.net>=a&&x.net<b).length]).filter(x=>x[1]>0);
+ const paused=sp.filter(x=>x.paused>0);
+ return `<div class="card">${CH('Sprint patterns','⧗',I('Durations exclude paused time. A long sprint does not prove uninterrupted work.'))}
+  <div style="margin-top:10px">${FR('Median sprint',fd(med))}${FR('Longest',fd(longest))}${compact?'':FR('Mean',fd(mean))}</div>
+  <div class="sec" style="margin-top:8px">Length</div>${B.map(([l,n])=>`<div class="bk"><span>${l}</span><div class="bar" style="height:6px"><i style="width:${n/sp.length*100}%"></i></div><span style="font:600 11px var(--mono);text-align:right">${n}</span></div>`).join('')}
+  <div class="hr"></div>${FR('Sprints with a pause',`${Math.round(paused.length/sp.length*100)}%`,{d:paused.length?`average ${fd(paused.reduce((a,x)=>a+x.paused,0)/paused.length)} paused`:null})}</div>`;
+}
+function tags(s){const t={};s.sprints.forEach(x=>t[x.tag]=(t[x.tag]||0)+x.net);const tot=Object.values(t).reduce((a,b)=>a+b,0);const c={Development:'#876B2E',Client:'#4B6B92'};
+ return `<div class="card">${CH('Time by tag','#')}<div style="margin-top:10px">${Object.entries(t).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="tg"><span><span class="dot" style="background:${c[k]}"></span>${k}</span><span style="font:600 12px var(--mono);text-align:right">${fd(v)}</span><span class="cap" style="text-align:right">${Math.round(v/tot*100)}%</span><span style="font:600 12px var(--mono);text-align:right;color:var(--good)">${money(v/60)}</span></div>`).join('')||'<div class="cap">No tagged sprints.</div>'}</div></div>`}
+function sheet(r,s){
+ const hide=Q.get('empty')!=='show';
+ if(r.unit==='week'){const m={};s.past.forEach(x=>{const k=x.d.getFullYear()*12+x.d.getMonth();m[k]=m[k]||{d:x.d,h:0,met:0,sched:0};m[k].h+=x.h;if(x.work&&!x.today){m[k].sched++;if(x.h>=DG)m[k].met++}});
+  return `<div class="card">${CH('Monthly totals','▤','<button>⧉ Copy all</button><button class="ghost" title="Export CSV">⋯</button>')}<table style="margin-top:12px"><tr><th>Month</th><th>Worked</th><th>Earned</th><th>Daily goal met</th></tr>${Object.values(m).reverse().map(x=>`<tr><td><b>${MN[x.d.getMonth()]} ${x.d.getFullYear()}</b></td><td class="m">${fh(x.h)}</td><td class="m" style="color:var(--good)">${money(x.h)}</td><td class="m">${x.met} of ${x.sched}</td></tr>`).join('')}</table>
+  <div class="cap" style="margin-top:8px">Open a month in the Month tab for its daily timesheet.</div></div>`}
+ const rows=s.past.slice().reverse().filter(x=>!hide||x.h>0);
+ return `<div class="card">${CH('Daily timesheet','▤',`<label class="cap" style="display:flex;gap:5px;align-items:center"><input type="checkbox" ${hide?'':'checked'} onchange="setQ('empty',this.checked?'show':'hide')">Show empty days</label><button>⧉ Copy all</button><button>＋ Add sprint</button><button class="ghost" title="Export CSV…">⋯</button>`)}
+  <table style="margin-top:12px"><tr><th>Date</th><th>Login</th><th>Logout</th><th>Work time</th><th>Break</th><th style="text-align:right">${I('Copy all copies every day in the range, earliest first; empty days paste blank. Columns: Login, Logout, blank Lunch, Break in minutes. Completed sprints only.')}</th></tr>
+  ${rows.map(x=>x.h?`<tr><td><b>${fdate(x.d)}</b>${x.today?' <span class="pill n">Today</span>':''}</td><td class="m">0${x.l.login}:00</td><td class="m">${x.today?'running':String(x.l.login+Math.ceil(x.h)).padStart(2,'0')+':10'}</td><td class="m">${fh(x.h)}</td><td class="m">${x.l.sprints.reduce((a,y)=>a+y.paused,0)}m</td><td style="text-align:right"><button class="ghost">⧉</button><button class="ghost">⋯</button></td></tr>`
+   :`<tr class="empty"><td>${fdate(x.d)}</td><td colspan="4">${x.work?'No work':'Day off'}</td><td></td></tr>`).join('')}</table></div>`;
+}
+const toolbar=`<div class="tb"><h1>Analytics</h1><span class="sp"></span><span class="cap" style="font-family:var(--mono)">Idle · 00:00:00</span><button style="background:var(--accent);border-color:var(--accent);color:#000;font-weight:600">▶ Clock in</button></div>`;
+const note=t=>`<div class="note"><b>Prototype note:</b> ${t}</div>`;
+// ---------- Variants ----------
+const V={
+A:{name:'Report stack',render:(r,s,p)=>`${toolbar}<div class="pg">${rangeBar(r)}
+ ${summary(r,s,p)}
+ <div class="card">${CH(r.unit==='day'?'Hours by day':'Hours by week','▮▮')}<div style="margin-top:16px">${bars(r,s,p)}</div></div>
+ ${heatmap(r,s)}
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">${patterns(s)}${tags(s)}</div>
+ ${sheet(r,s)}
+ ${note('One column, read top to bottom: the range, its answer (Worked, Earned, compared with the previous period, goal days), the shape (bars with the goal line), the year grid only for Year/All, then the details. Week/Month end in a daily timesheet; Year/All end in monthly totals instead of 300 rows.')}</div>`},
+B:{name:'Side column',render:(r,s,p)=>`${toolbar}<div class="pg">${rangeBar(r)}
+ <div style="display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start">
+  <div class="col" style="gap:18px"><div class="card">${CH(r.unit==='day'?'Hours by day':'Hours by week','▮▮')}<div style="margin-top:16px">${bars(r,s,p,{h:240})}</div></div>${heatmap(r,s)}</div>
+  <div class="col" style="gap:18px">${summary(r,s,p,false)}${patterns(s,true)}${tags(s)}</div>
+ </div>
+ ${sheet(r,s)}
+ ${note('Month’s skeleton: the picture (bars, and the year grid for Year/All) is the big card on the left; a 300pt column holds the totals, patterns and tags. Matches Month exactly, so the two tabs read alike. The chart is the first thing you see.')}</div>`},
+C:{name:'Compare first',render:(r,s,p)=>{
+ const rows=[['Worked',s.worked,p&&p.worked,fh],['Earned',s.worked,p&&p.worked,h=>money(h)],['Days with work',s.active,p&&p.active,x=>`${x}`],['Daily goal met',s.met,p&&p.met,x=>`${x}`],['Sprints',s.sprints.length,p&&p.sprints.length,x=>`${x}`]];
+ const mx=(a,b)=>Math.max(a||0,b||0,1);
+ return `${toolbar}<div class="pg">${rangeBar(r)}
+ <div class="card">${CH(p?`${r.label} vs ${r.prevName}`:'Totals','⇄',p&&p.partial?'<span class="cap">Previous period cut to the same number of days</span>':'')}
+  <div style="display:grid;grid-template-columns:200px 1fr;gap:26px;margin-top:12px;align-items:start">
+   <div><div class="hero">${fh(s.worked)}</div><div class="cap">worked</div><div style="margin-top:8px" class="money">${money(s.worked)}</div><div style="margin-top:10px">${p?delta(s.worked,p.worked,fh):''}</div></div>
+   <div>${p?`<div class="cmp" style="padding-top:0"><span></span><span class="sec">This period</span><span class="sec">${r.prevName}</span><span></span></div>`:''}${rows.map(([l,a,b,f])=>`<div class="cmp"><span class="cap">${l}</span><span style="display:flex;gap:8px;align-items:center"><span class="b" style="flex:1"><i style="width:${a/mx(a,b)*100}%;background:var(--accent)"></i></span><b style="font:700 12px var(--mono);width:74px;text-align:right">${f(a)}</b></span>${p?`<span style="display:flex;gap:8px;align-items:center"><span class="b" style="flex:1"><i style="width:${(b||0)/mx(a,b)*100}%;background:var(--prev)"></i></span><span style="font:600 12px var(--mono);width:74px;text-align:right;color:var(--muted)">${f(b||0)}</span></span>`:'<span></span>'}<span style="text-align:right">${p?delta(a,b,f):''}</span></div>`).join('')}</div>
+  </div></div>
+ <div class="card">${CH(r.unit==='day'?'Hours by day':'Hours by week','▮▮')}<div style="margin-top:16px">${bars(r,s,p,{showPrev:true})}</div></div>
+ ${heatmap(r,s)}
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">${patterns(s)}${tags(s)}</div>
+ ${sheet(r,s)}
+ ${note('Leads with the question a range report is for: how does this period compare with the last one? Every total sits beside its previous value; the bars draw the previous period behind this one (day ranges). A running period is compared with the same number of days of the previous one.')}</div>`}},
+R:{name:'Current (reference)',render:(r,s)=>`${toolbar}<div class="pg">
+ <div class="row"><span class="ref-seg">${['Last 7 Days','Last 30 Days','This Month','This Year','All Time','Custom'].map((x,i)=>`<span class="${i===1?'on':''}">${x}</span>`).join('')}</span><span class="sp"></span><button class="glow" style="background:var(--accent);border-color:var(--accent);color:#000;font-weight:700">⇩ Export to CSV</button></div>
+ <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">${[['TOTAL LOGGED',fh(s.worked),`${s.active} active days / ${s.days.length} days`],['TOTAL EARNINGS',money(s.worked),'Rate: ₹1,500/hr'],['DAILY AVERAGE',fh(s.avg),'Per active working day'],['COMPLETED SPRINTS',s.sprints.length,'2 distinct tags used']].map(([t,v,c])=>`<div class="card" style="padding:14px;border-radius:10px"><div style="font:700 10px var(--round);letter-spacing:.8px;color:var(--muted)">${t}</div><div style="font:700 20px var(--mono);margin:6px 0">${v}</div><div class="cap" style="font-size:10px">${c}</div></div>`).join('')}</div>
+ <div class="card"><div style="font:700 12px var(--round);letter-spacing:.8px">⟋ PRODUCTIVITY TREND LINE</div><div class="cap" style="margin:60px 0;text-align:center">(area chart with gradient + glow, no axis, no goal line; fill bug on Last 7 Days)</div><div class="cap">› Trend data</div></div>
+ <div class="card"><b style="font-size:15px">Sprint patterns</b><div class="cap" style="margin-top:6px">6 length rows (5 at 0) · “100% had a pause · 0.0 pauses per sprint”</div></div>
+ <div class="card"><div style="font:700 12px var(--round);letter-spacing:.8px">▦ ANNUAL ACTIVITY HEATMAP <span class="pill n">year switcher of its own</span></div><div class="cap" style="margin:24px 0">(52-week grid at ~70% width, shown for every range)</div></div>
+ <div class="card">${CH('Daily timesheet','▤','<button>Copy All</button><button>+ Add Sprint</button>')}<div class="cap" style="margin-top:8px">All 30 days, empty days with Details / copy / delete, two notes always on screen.</div></div>
+ ${note('The current Analytics tab, condensed, for comparison.')}</div>`},
+};
+// ---------- Switcher ----------
+const Q=new URLSearchParams(location.search); const keys=Object.keys(V), RANGES=['week','month','year','all'];
+let vk=keys.includes(Q.get('variant'))?Q.get('variant'):'A'; let Q_RANGE=RANGES.includes(Q.get('range'))?Q.get('range'):'month';
+function setQ(k,v){Q.set(k,v);draw()}
+function setRange(k){Q_RANGE=k;Q.set('offset','0');draw()}
+function move(n){const o=Math.min(0,+(Q.get('offset')||0)+n);Q.set('offset',String(o));draw()}
+function draw(){
+ document.body.classList.toggle('dark',Q.get('theme')==='dark');
+ const r=rangeFor(Q_RANGE,+(Q.get('offset')||0)); r.days=Math.round((r.b-r.a)/DAY)+1;
+ const s=stats(r), p=prevStats(r);
+ document.getElementById('win').innerHTML=`<div class="side"><h2>Skeval Timer</h2>${['◷ Today','▦ Week','▦ Month','⟋ Analytics','⚙ Settings'].map((x,i)=>`<div class="it ${i===3?'on':''}">${x}</div>`).join('')}</div><div class="main">${V[vk].render(r,s,p)}</div>`;
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> ${V[vk].name}</span><button id="nx">→</button><span class="sep"></span>${RANGES.map((k,i)=>`<button class="${k===Q_RANGE?'on':''}" data-r="${k}">${i+1} ${k[0].toUpperCase()+k.slice(1)}</button>`).join('')}<span class="sep"></span><button id="th">${Q.get('theme')==='dark'?'☾ Dark':'☀ Light'} (D)</button>`;
+ Q.set('variant',vk);Q.set('range',Q_RANGE);try{history.replaceState(null,'','?'+Q)}catch(e){}
+ document.getElementById('pv').onclick=()=>step(-1);document.getElementById('nx').onclick=()=>step(1);
+ document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>setRange(b.dataset.r));document.getElementById('th').onclick=toggleTheme;
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+function toggleTheme(){Q.set('theme',Q.get('theme')==='dark'?'light':'dark');draw()}
+addEventListener('keydown',e=>{if(e.target.closest('input,textarea'))return;if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);
+ const n=+e.key;if(n>=1&&n<=4)setRange(RANGES[n-1]);if(e.key==='[')move(-1);if(e.key===']')move(1);if(e.key==='d'||e.key==='D')toggleTheme()});
+draw();
+</script>
+</body>
+</html>

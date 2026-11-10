@@ -231,7 +231,7 @@ class TimerViewModel {
         )
     }
 
-    func dailyTimeline(hours: TimelineHours? = nil, now: Date = Date(),
+    func dailyTimeline(hours: TimelineHours? = nil, fitsToWork: Bool = false, now: Date = Date(),
                        calendar: Calendar = .current) -> DailyTimeline {
         _ = logRevision
         _ = timelineRevision
@@ -246,7 +246,7 @@ class TimerViewModel {
         }
         return DailyTimeline.calculate(sprints: sprints, live: live,
                                        date: selectedDate, hours: hours ?? goal.timelineHours,
-                                       now: now, calendar: calendar)
+                                       fitsToWork: fitsToWork, now: now, calendar: calendar)
     }
 
     /// Reads the engine directly (not observed), so the timeline does not re-render every tick.
@@ -312,10 +312,6 @@ class TimerViewModel {
         } else {
             return TimeFormatter.format(shortDayTitle: selectedDate)
         }
-    }
-
-    var headerDateSubtitle: String {
-        TimeFormatter.format(relativeHeaderDate: selectedDate)
     }
 
     var sprintsSectionTitle: String {
@@ -421,11 +417,11 @@ class TimerViewModel {
     var displayedGoalTitle: String {
         let cal = Calendar.current
         if cal.isDateInToday(selectedDate) {
-            return "Daily Target"
+            return "Daily Goal"
         } else if cal.isDateInYesterday(selectedDate) {
-            return "Yesterday's Target"
+            return "Yesterday's Goal"
         } else {
-            return "\(TimeFormatter.format(shortDayTitle: selectedDate)) Target"
+            return "\(TimeFormatter.format(shortDayTitle: selectedDate)) Goal"
         }
     }
 

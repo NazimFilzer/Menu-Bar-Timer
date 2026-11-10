@@ -26,6 +26,8 @@ struct SprintLogTableView: View {
     let title: String
     let theme: PopoverTheme
     var usesTimesheetStyle = false
+    /// Inside another card that owns the title and actions: no header, search, or card frame.
+    var isEmbedded = false
 
     init(vm: TimerViewModel, summary: WeeklySummary, theme: PopoverTheme, title: String = "SPRINT LOGS & HISTORY") {
         self.vm = vm
@@ -45,7 +47,8 @@ struct SprintLogTableView: View {
         self.title = title
     }
 
-    init(vm: TimerViewModel, sprints: [Sprint], distinctTags: [String], defaultDate: Date, theme: PopoverTheme, title: String, usesTimesheetStyle: Bool = false) {
+    init(vm: TimerViewModel, sprints: [Sprint], distinctTags: [String], defaultDate: Date, theme: PopoverTheme, title: String, usesTimesheetStyle: Bool = false,
+         isEmbedded: Bool = false) {
         self.vm = vm
         self.allSprints = sprints
         self.distinctTags = distinctTags
@@ -53,6 +56,7 @@ struct SprintLogTableView: View {
         self.theme = theme
         self.title = title
         self.usesTimesheetStyle = usesTimesheetStyle
+        self.isEmbedded = isEmbedded
     }
 
     @State private var searchQuery: String = ""
@@ -91,12 +95,14 @@ struct SprintLogTableView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            // Header: Title, Count Badge & Add Sprint Button
-            headerRow
-            if let exportMessage { Text(exportMessage).font(.caption).foregroundStyle(theme.accentText) }
+            if !isEmbedded {
+                // Header: Title, Count Badge & Add Sprint Button
+                headerRow
+                if let exportMessage { Text(exportMessage).font(.caption).foregroundStyle(theme.accentText) }
 
-            // Search & Tag Filter Bar
-            filterBar
+                // Search & Tag Filter Bar
+                filterBar
+            }
 
             // Sprints Data Table or Empty State
             if filteredSprints.isEmpty {
@@ -105,15 +111,15 @@ struct SprintLogTableView: View {
                 tableSurface
             }
         }
-        .padding(18)
+        .padding(isEmbedded ? 0 : 18)
         .alert("Export failed", isPresented: $isExportErrorPresented) {
             Button("OK", role: .cancel) { }
         } message: { Text(exportError) }
-        .background(theme.cardBg)
+        .background(isEmbedded ? Color.clear : theme.cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(theme.cardBorder, lineWidth: 1)
+                .stroke(isEmbedded ? Color.clear : theme.cardBorder, lineWidth: 1)
         )
         // Add Sprint Modal Sheet
         .sheet(isPresented: $isAddModalPresented) {
@@ -358,8 +364,11 @@ struct SprintLogTableView: View {
         VStack(spacing: 0) {
             // Header Row
             HStack(spacing: usesTimesheetStyle ? 16 : 8) {
-                Text("DATE")
-                    .frame(minWidth: 95, maxWidth: usesTimesheetStyle ? .infinity : 95, alignment: .leading)
+                // A single-day list already names its day in the card title.
+                if !isEmbedded {
+                    Text("DATE")
+                        .frame(minWidth: 95, maxWidth: usesTimesheetStyle ? .infinity : 95, alignment: .leading)
+                }
                 Text("START")
                     .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
                 Text("END")
@@ -402,10 +411,12 @@ struct SprintLogTableView: View {
     private func sprintRowView(sprint: Sprint, isEven: Bool) -> some View {
         HStack(spacing: usesTimesheetStyle ? 16 : 8) {
             // Date
-            Text(Self.tableDateFormatter.string(from: sprint.startTime))
-                .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .medium, design: .rounded))
-                .foregroundColor(theme.textPrimary)
-                .frame(minWidth: 95, maxWidth: usesTimesheetStyle ? .infinity : 95, alignment: .leading)
+            if !isEmbedded {
+                Text(Self.tableDateFormatter.string(from: sprint.startTime))
+                    .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .medium, design: .rounded))
+                    .foregroundColor(theme.textPrimary)
+                    .frame(minWidth: 95, maxWidth: usesTimesheetStyle ? .infinity : 95, alignment: .leading)
+            }
 
             // Start Time
             Text(sprint.startLabel)

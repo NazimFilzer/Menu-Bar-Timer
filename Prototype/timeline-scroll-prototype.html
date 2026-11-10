@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PROTOTYPE (throwaway) — Today timeline: inner scroll vs no scroll</title>
+<!--
+  PROTOTYPE. Throwaway. Sample data only. No persistence.
+  Question: should Today's timeline keep its own scroll box, or draw without one, and if so which hours?
+  Real geometry: 64pt per hour (DailyTimelineLayout.pointsPerHour), 780pt-tall window, Visible hours 6 AM–12 AM.
+  ?variant=  S Inner scroll (current) · F Full Visible hours · A Auto-fit
+  ?state=    morning · afternoon · evening · past
+  Keys: ← → variant · 1–4 state. Scroll the window like the app.
+-->
+<style>
+:root{--bg:#FFFAE6;--card:#FFFFFF;--border:#E8E0BA;--accent:#E0B24C;--accent-wash:#E0B24C29;--accent-text:#876B2E;--accent-icon:#B48F3D;
+ --ink:#38301C;--muted:#807552;--warn:#995900;--warn-wash:#FF950020;--good:#22774D;--track:#E8E0BA80;--gap:#80755208;
+ --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;--round:"SF Pro Rounded",ui-rounded,-apple-system,sans-serif;--mono:"SF Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:13px;background:#cfc8b4;color:var(--ink);padding:18px 0 100px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.explain{width:1140px;font:500 13px/1.5 var(--round);color:#3a3320;background:#fff3c4;border:1px dashed #d8b84a;border-radius:8px;padding:10px 14px}
+.win{width:1140px;height:780px;display:flex;background:var(--bg);border-radius:12px;box-shadow:0 10px 40px #0004;overflow:hidden}
+.side{width:195px;background:var(--card);border-right:1px solid var(--border);padding:22px 10px;flex:none}
+.side h2{font-size:17px;padding:0 8px 18px}.side .it{padding:9px 10px;border-radius:8px;font-size:14px;color:var(--muted)}.side .it.on{background:var(--accent-wash);color:var(--ink);font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tb{display:flex;align-items:center;gap:14px;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border);flex:none}
+.tb h1{font-size:17px}.sp{flex:1}.state{text-align:right}.state b{font-size:11px;display:block;color:var(--accent-text)}.state span{font-family:var(--mono)}
+.scroll{flex:1;overflow-y:auto;position:relative}
+.pg{padding:20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.ch{display:flex;align-items:center;gap:6px}.ch .ic{color:var(--accent-icon);font-size:12px}.ch .t{font:700 11px var(--round);letter-spacing:.8px;text-transform:uppercase;white-space:nowrap}
+.ch .acts{margin-left:auto;display:flex;gap:6px;align-items:center}
+button{font:inherit;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--ink);white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}.seg span{padding:2px 10px;font-size:12px}.seg span.on{background:var(--accent);font-weight:600}
+.hero{font:700 28px var(--mono)}.cap{font:500 12px var(--round);color:var(--muted)}
+.bar{height:8px;border-radius:4px;background:var(--track);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.top{display:grid;grid-template-columns:280px 1fr;gap:16px}
+.box{position:relative;margin-top:14px}
+.box.inner{height:400px;overflow-y:auto;border-radius:6px}
+.tl{position:relative;margin-left:55px}
+.tl .h{position:absolute;left:-55px;width:47px;text-align:right;font:500 11px var(--round);color:var(--muted);transform:translateY(-7px)}
+.tl .ln{position:absolute;left:0;right:0;border-top:.5px solid var(--border)}
+.tl .fut{position:absolute;left:0;right:0;background:#8075520a}
+.tl .gap{position:absolute;left:8px;right:10px;border-radius:4px;background:var(--gap);display:flex;align-items:center;justify-content:center;gap:8px;font:500 11px var(--round);color:var(--muted)}
+.tl .sb{position:absolute;left:8px;right:10px;border-radius:7px;background:#E0B24C12;border-left:3px solid #E0B24Ccc;padding:6px 10px;display:flex;gap:6px;align-items:flex-start;font-size:12px;overflow:hidden}
+.tl .sb.live{background:#B48F3D14;border-left-color:var(--accent-icon)}
+.tl .sb .d{margin-left:auto;font:500 10px var(--mono);color:var(--muted)}
+.st{font:700 9px var(--round);padding:1px 6px;border-radius:99px;background:#B48F3D20;color:var(--accent-text)}
+.tl .now{position:absolute;left:-55px;right:0;display:flex;align-items:center;gap:8px;color:var(--accent-icon);z-index:2}
+.tl .now b{width:47px;text-align:right;font:600 10px var(--round)}.tl .now i{flex:1;height:1.5px;background:currentColor}
+.meta{position:sticky;top:0;z-index:9;align-self:flex-end;margin:8px 10px -38px 0;font:600 11px var(--round);background:#111;color:#fff;padding:5px 10px;border-radius:99px;opacity:.85}
+#sw{white-space:nowrap;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:99px;padding:8px 12px;display:flex;gap:6px;align-items:center;font-size:12px;box-shadow:0 6px 24px #0006;z-index:20}
+#sw button{background:#333;color:#fff;border:0;border-radius:99px}#sw button.on{background:#fff;color:#111}#sw .sep{width:1px;height:18px;background:#555}
+</style>
+</head>
+<body>
+<div class="explain" id="ex"></div>
+<div class="win" id="win"></div>
+<div id="sw"></div>
+<script>
+const PPH=64, VIS=[6,24];
+const M=(h,m=0)=>h*60+m;
+const STATES={
+ morning:{label:'Morning (9:40 AM)',now:M(9,40),done:[],live:M(9,0)},
+ afternoon:{label:'Afternoon (5:52 PM)',now:M(17,52),done:[[M(7),M(9,10),10]],live:M(17,10)},
+ evening:{label:'Evening (9:15 PM)',now:M(21,15),done:[[M(7),M(9,10),10],[M(9,30),M(13),15],[M(13,45),M(16,40),0],[M(17,10),M(19,30),5]],live:M(20,0)},
+ past:{label:'Past day (Mon)',now:null,done:[[M(7),M(11,10),10],[M(12),M(16,30),0]],live:null},
+};
+const fd=m=>{m=Math.max(0,Math.round(m));return m<60?`${m}m`:`${Math.floor(m/60)}h ${m%60}m`};
+const clock=m=>{const h=Math.floor(m/60)%24,mm=Math.round(m%60);return `${h%12||12}:${String(mm).padStart(2,'0')} ${h<12?'AM':'PM'}`};
+const hl=h=>`${(h%12)||12}${h<12||h===24?'AM':'PM'}`;
+function range(s,v){
+ const starts=[...s.done.map(x=>x[0]),...(s.live!=null?[s.live]:[])], ends=[...s.done.map(x=>x[1]),...(s.now!=null?[s.now]:[])];
+ if(v!=='A') return [VIS[0],VIS[1]];
+ const first=starts.length?Math.min(...starts):s.now, last=Math.max(...ends);
+ let a=Math.max(VIS[0],Math.floor(first/60)-1), b=Math.min(VIS[1],Math.ceil(last/60)+(s.now!=null?2:1));
+ if(b-a<4) b=Math.min(VIS[1],a+4);
+ return [a,b];
+}
+function timeline(s,[a,b]){
+ const y=m=>(m-a*60)/60*PPH, H=(b-a)*PPH; let h='';
+ for(let k=a;k<=b;k++){const near=s.now!=null&&Math.abs(y(k*60)-y(s.now))<14;
+  h+=`<div class="ln" style="top:${y(k*60)+8}px"></div>${near?'':`<div class="h" style="top:${y(k*60)+8}px">${hl(k)}</div>`}`}
+ if(s.now!=null) h+=`<div class="fut" style="top:${y(s.now)}px;height:${H-y(s.now)}px"></div>`;
+ const segs=s.done.map((x,i)=>({a:x[0],b:x[1],p:x[2],n:i+1}));
+ if(s.live!=null) segs.push({a:s.live,b:s.now,p:0,n:segs.length+1,live:true});
+ const lo=a*60, hiTrack=s.now??b*60; let cur=lo;
+ for(const g of [...segs].sort((p,q)=>p.a-q.a)){ if(g.a-cur>=20) h+=gap(cur,g.a,y); cur=Math.max(cur,g.b); }
+ if(s.now!=null&&s.now-cur>=20) h+=gap(cur,s.now,y);
+ for(const g of segs){const ht=Math.max(18,y(g.b)-y(g.a)-5);
+  h+=`<div class="sb ${g.live?'live':''}" style="top:${y(g.a)+8}px;height:${ht}px"><b>Sprint ${g.n}</b>${g.live?'<span class="st">● Active</span>':''}<span class="cap" style="font-size:10px">${clock(g.a)} to ${g.live?'now':clock(g.b)}</span><span class="d">${fd(g.b-g.a-g.p)}${g.p?` · ${g.p}m paused`:''}</span></div>`}
+ if(s.now!=null) h+=`<div class="now" style="top:${y(s.now)+8}px"><b>Now</b><i></i></div>`;
+ return {html:`<div class="tl" style="height:${H+28}px">${h}</div>`,H:H+28,y};
+}
+function gap(p,q,y){return `<div class="gap" style="top:${y(p)+8}px;height:${Math.max(1,y(q)-y(p)-5)}px">${q-p>=40?`<b>${fd(q-p)} untracked</b><span>${clock(p)} to ${clock(q)}</span>`:''}</div>`}
+const V={
+ S:{name:'Inner scroll (current)',ex:'<b>S · Inner scroll (current).</b> The timeline is a 400pt box with its own scroll inside the page. Visible hours (6 AM–12 AM) decides the range; the box opens scrolled to about an hour before now. Two scroll areas: scroll inside the box for hours, scroll the page for everything else. Try scrolling with the pointer over the timeline, then off it.'},
+ F:{name:'Full Visible hours',ex:'<b>F · Full Visible hours, no inner scroll.</b> The whole 6 AM–12 AM range is drawn at once (18h × 64pt ≈ 1,150pt), so there is one scroll: the page. The page would open scrolled so “now” is in view. Simple, but long, and most of it is empty early hours or future.'},
+ A:{name:'Auto-fit',ex:'<b>A · Auto-fit, no inner scroll.</b> Only the part of the day with work is drawn: an hour before the first sprint to two hours after now (past day: last sprint + 1h), never outside Visible hours, at least 4 hours. One scroll: the page. Short in the morning, grows through the day; the Hours editor still sets the outer limits. Compare Morning vs Evening.'},
+};
+const Q=new URLSearchParams(location.search); const keys=Object.keys(V), states=Object.keys(STATES);
+let vk=keys.includes(Q.get('variant'))?Q.get('variant'):'S', sk=states.includes(Q.get('state'))?Q.get('state'):'afternoon';
+function draw(){
+ const s=STATES[sk], r=range(s,vk), t=timeline(s,r);
+ const worked=s.done.reduce((a,x)=>a+x[1]-x[0]-x[2],0)+(s.live!=null?s.now-s.live:0);
+ document.getElementById('ex').innerHTML=V[vk].ex+` <span class="cap">Range drawn: ${hl(r[0])}–${hl(r[1])} · timeline height ${vk==='S'?'400pt box (content '+Math.round(t.H)+'pt)':Math.round(t.H)+'pt'}</span>`;
+ document.getElementById('win').innerHTML=`<div class="side"><h2>Skeval Timer</h2><div class="it on">◷ Today</div><div class="it">▦ Week</div><div class="it">▦ Month</div><div class="it">⟋ Analytics</div><div class="it">⚙ Settings</div></div>
+ <div class="main"><div class="tb"><h1>Today</h1><span class="sp"></span><div class="state"><b>${s.now!=null?'Active':'Idle'}</b><span>00:42:00</span></div><button style="background:#C15047;color:#fff;border:0;padding:6px 12px">■ Clock out</button></div>
+ <div class="scroll" id="page"><div class="pg">
+  <div class="row cap">‹ &nbsp;<b style="font:600 13px var(--mono);color:var(--ink)">${sk==='past'?'Nov 9, 2026':'Nov 10, 2026'}</b>&nbsp; ›</div>
+  <div class="top"><div class="card"><div class="ch"><span class="ic">◷</span><span class="t">Worked</span></div><div class="hero" style="margin-top:10px">${fd(worked)}</div><div class="cap">of 8h daily goal</div><div class="bar" style="margin-top:12px"><i style="width:${Math.min(100,worked/4.8)}%"></i></div></div>
+   <div class="card"><div class="ch"><span class="ic">◎</span><span class="t">${sk==='past'?'Result':'When can I finish?'}</span></div><div style="margin-top:12px;font:600 28px var(--round);color:var(--accent-text)">${sk==='past'?'':worked>=480?'✓ Daily goal reached':'Around '+clock((s.now??0)+480-worked)}</div></div></div>
+  <div class="card"><div class="ch"><span class="ic">▤</span><span class="t">${sk==='past'?"Monday's sprints":"Today's sprints"}</span><span class="acts"><span class="seg"><span class="on">Timeline</span><span>List</span></span><button>⧉ Copy all</button><button>＋ Add sprint</button><button>⋯</button></span></div>
+   <div class="box ${vk==='S'?'inner':''}" id="box">${t.html}</div></div>
+ </div></div></div>`;
+ const box=document.getElementById('box'), page=document.getElementById('page');
+ const target=s.now!=null?t.y(s.now-60):t.y((s.done[0]||[r[0]*60])[0]);
+ if(vk==='S'){box.scrollTop=Math.max(0,target-16)}
+ else{page.scrollTop=Math.max(0,box.offsetTop+target-300)}
+ document.getElementById('sw').innerHTML=`<button id="pv">←</button><span><b>${vk}</b> ${V[vk].name}</span><button id="nx">→</button><span class="sep"></span>${states.map((x,i)=>`<button class="${x===sk?'on':''}" data-s="${x}">${i+1} ${STATES[x].label}</button>`).join('')}`;
+ Q.set('variant',vk);Q.set('state',sk);try{history.replaceState(null,'','?'+Q)}catch(e){}
+ document.getElementById('pv').onclick=()=>step(-1);document.getElementById('nx').onclick=()=>step(1);
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sk=b.dataset.s;draw()});
+}
+function step(n){vk=keys[(keys.indexOf(vk)+n+keys.length)%keys.length];draw()}
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);const n=+e.key;if(n>=1&&n<=4){sk=states[n-1];draw()}});
+draw();
+</script>
+</body>
+</html>

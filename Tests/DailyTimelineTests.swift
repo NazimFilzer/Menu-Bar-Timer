@@ -135,6 +135,18 @@ func testDailyTimelineVisualColumns() {
         assertTimelineBlocksDoNotOverlap(currentLayout)
     }
 
+    // A short paused sprint puts its label below the Now line, like an active one, so the line never crosses it.
+    let pausedLive = TimelineLiveSprint(sprint: Sprint(startTime: date(15, 50)), status: .paused,
+                                        netWork: 40, paused: 60, unresolvedStart: nil)
+    let pausedTimeline = DailyTimeline.calculate(sprints: [], live: pausedLive, date: day,
+                                                now: date(15, 52), calendar: calendar)
+    let pausedSegment = pausedTimeline.segments[0]
+    assertTrue(pausedSegment.isLive, "A paused current sprint is live")
+    assertTrue(DailyTimelineLayout.usesExternalLabel(for: pausedSegment), "A short paused sprint labels outside its span")
+    assertEqual(DailyTimelineLayout.blockHeight(for: pausedSegment), DailyTimelineLayout.spanHeight(for: pausedSegment),
+                "A paused sprint's block ends at now, not at a minimum height that crosses the Now line")
+    assertTrue(!timeline.segments.contains(where: \.isLive), "Completed sprints are never live")
+
     // An imported overlapping sprint can sit behind the active sprint's external label.
     let live = TimelineLiveSprint(sprint: Sprint(startTime: date(10, 0)), status: .active,
                                   netWork: 60, paused: 0, unresolvedStart: nil)
@@ -291,4 +303,52 @@ func testTimelineRefreshesPerMinuteNotPerTick() {
     assertEqual(vm.dailyTimeline().segments.last?.status, .paused, "The timeline reads live status from the engine")
     engine.resume()
     engine.clockOut()
+}
+
+func testDailyTimelineFitsToWork() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+    let day = auditDate(2026, 11, 10, hour: 0, calendar: calendar)
+    func date(_ hour: Int, _ minute: Int = 0) -> Date { day.addingTimeInterval(Double(hour * 60 + minute) * 60) }
+    func fit(_ sprints: [Sprint], live: TimelineLiveSprint? = nil, now: Date,
+             hours: TimelineHours = TimelineHours()) -> DateInterval {
+        DailyTimeline.calculate(sprints: sprints, live: live, date: day, hours: hours, fitsToWork: true,
+                                now: now, calendar: calendar).visible
+    }
+    let morning = TimelineLiveSprint(sprint: Sprint(startTime: date(9)), status: .active, netWork: 40 * 60,
+                                     paused: 0, unresolvedStart: nil)
+    let early = fit([], live: morning, now: date(9, 40))
+    assertEqual(early.start, date(8), "An hour before the first sprint")
+    assertEqual(early.end, date(12), "Two hours after now, rounded to the hour")
+
+    let done = Sprint(startTime: date(7), endTime: date(9, 10), pausedDuration: 600)
+    let afternoon = fit([done], now: date(17, 52))
+    assertEqual(afternoon.start, date(6))
+    assertEqual(afternoon.end, date(20), "Now 5:52 PM rounds up to 6 PM, plus two hours")
+
+    let late = fit([done], now: date(23, 10))
+    assertEqual(late.end, date(24), "Never past the end of Visible hours")
+
+    let narrow = fit([done], now: date(17, 52), hours: TimelineHours(startHour: 8, endHour: 18))
+    assertEqual(narrow.start, date(7), "Visible hours limit the range but every sprint stays visible")
+    assertEqual(narrow.end, date(18))
+
+    let pastDay = calendar.date(byAdding: .day, value: -1, to: day)!
+    let past = DailyTimeline.calculate(sprints: [Sprint(startTime: pastDay.addingTimeInterval(7 * 3600),
+                                                        endTime: pastDay.addingTimeInterval(11 * 3600 + 600))],
+                                       date: pastDay, fitsToWork: true, now: date(12), calendar: calendar).visible
+    assertEqual(past.start, pastDay.addingTimeInterval(6 * 3600))
+    assertEqual(past.end, pastDay.addingTimeInterval(13 * 3600), "A past day ends an hour after its last sprint")
+
+    let empty = DailyTimeline.calculate(sprints: [], date: pastDay, fitsToWork: true, now: date(12),
+                                        calendar: calendar).visible
+    assertEqual(empty.duration, Double(DailyTimeline.fittedMinimumHours * 3600), "An empty past day shows four hours")
+    assertEqual(empty.start, pastDay.addingTimeInterval(6 * 3600))
+
+    let fresh = fit([], now: date(6, 20))
+    assertEqual(fresh.start, date(6), "Before any work today, the range starts at Visible hours")
+    assertEqual(fresh.duration, 4 * 3600, "At least four hours")
+
+    let unfitted = DailyTimeline.calculate(sprints: [done], date: day, now: date(17, 52), calendar: calendar).visible
+    assertEqual(unfitted.end, date(24), "Without fitting, the full Visible hours are drawn")
 }

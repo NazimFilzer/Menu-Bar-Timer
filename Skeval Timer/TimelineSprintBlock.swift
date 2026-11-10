@@ -11,13 +11,16 @@ struct TimelineSprintBlock: View {
 
     private var title: String { segment.displayName }
     private var duration: String {
-        segment.netWork.map { TimeFormatter.format(shortDuration: $0) } ?? "Unresolved"
+        guard let work = segment.netWork else { return "Unresolved" }
+        // The timeline redraws once a minute, so a running sprint shows whole minutes, never stale seconds.
+        guard segment.isLive else { return TimeFormatter.format(shortDuration: work) }
+        return work < 60 ? "<1m" : TimeFormatter.format(hoursAndMinutes: work)
     }
     private var accent: Color {
         switch segment.status {
         case .sleep, .recovery: return .orange
         case .paused: return theme.textSecondary
-        case .active: return .green
+        case .active: return theme.accentIcon
         case .completed: return theme.accentColor
         }
     }
@@ -27,6 +30,16 @@ struct TimelineSprintBlock: View {
         case .paused: return "Paused"
         case .sleep, .recovery: return "Unresolved"
         case .completed: return ""
+        }
+    }
+
+    /// Readable text for the status badge. The fill colour alone is too light on a card in some themes.
+    private var badgeText: Color {
+        switch segment.status {
+        case .active: return theme.accentText
+        case .paused: return theme.textSecondary
+        case .sleep, .recovery: return theme.warningText
+        case .completed: return theme.accentText
         }
     }
 
@@ -115,7 +128,7 @@ struct TimelineSprintBlock: View {
             }
             Text(status).font(.system(size: 9, weight: .semibold))
         }
-        .foregroundStyle(accent)
+        .foregroundStyle(badgeText)
         .padding(.horizontal, 6).padding(.vertical, 2)
         .background(accent.opacity(0.12), in: Capsule())
     }
