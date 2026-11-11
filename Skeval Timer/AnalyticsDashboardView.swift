@@ -58,7 +58,8 @@ struct AnalyticsDashboardView: View {
                 }
                 if byWeek {
                     AnalyticsMonthlyTotalsCard(days: days.filter { calendar.startOfDay(for: $0.date) <= calendar.startOfDay(for: today) },
-                                               settings: vm.goal, exportSprints: sprints, theme: theme)
+                                               settings: vm.goal, exportSprints: sprints,
+                                               profileName: vm.activeProfileName, theme: theme)
                 } else {
                     PeriodTimesheetView(vm: vm, days: days, periodTitle: range.label,
                                         defaultDate: min(range.end, today), theme: theme,

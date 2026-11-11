@@ -195,6 +195,7 @@ struct SprintLogTableView: View {
                     CSVExporter.promptSavePanel(
                         sprints: filteredSprints,
                         suggestedName: "skeval-sprints-export.csv",
+                        profileName: vm.activeProfileName,
                         onComplete: { success, url in
                             if success, let url { exportMessage = "Exported to \(url.lastPathComponent)" }
                         },

@@ -2125,6 +2125,10 @@ struct TestMain {
         testProfileLibraryAddRenameDeleteOnDisk()
         testProfileSettingsStaySeparate()
         testUnreadableRegistryIsRebuiltFromFolders()
+        testUnreadableSettingsFileIsKept()
+        testInterruptedMigrationFinishesOnNextLaunch()
+        testMissingRegistryIsRebuiltNotRemigrated()
+        testDifferingLegacyHistoryIsKeptWithWarning()
         await MainActor.run {
             testThemeAppearanceChoice()
             testDeleteDaySprints()

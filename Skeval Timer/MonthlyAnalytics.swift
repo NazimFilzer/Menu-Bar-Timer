@@ -71,7 +71,7 @@ enum MonthlyAnalytics {
         logs: [String: [Sprint]],
         monthOffset: Int = 0,
         referenceDate: Date = Date(),
-        settings: GoalSettings = .shared,
+        settings: GoalSettings,
         calendar: Calendar? = nil
     ) -> MonthlySummary {
         var cal = calendar ?? Calendar(identifier: .gregorian)

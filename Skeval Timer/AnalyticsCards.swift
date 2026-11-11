@@ -541,6 +541,7 @@ struct AnalyticsMonthlyTotalsCard: View {
     let days: [DailyBarData]
     let settings: GoalSettings
     let exportSprints: [Sprint]
+    let profileName: String?
     let theme: PopoverTheme
     @State private var exportMessage: String?
     @State private var exportError: String?
@@ -628,7 +629,7 @@ struct AnalyticsMonthlyTotalsCard: View {
 
     private func export() {
         let sprints = exportSprints
-        CSVExporter.promptSavePanel(sprints: sprints, onComplete: { success, url in
+        CSVExporter.promptSavePanel(sprints: sprints, profileName: profileName, onComplete: { success, url in
             if success, let name = url?.lastPathComponent {
                 exportMessage = "Exported \(sprints.count) sprint\(sprints.count == 1 ? "" : "s") to \(name)"
             }

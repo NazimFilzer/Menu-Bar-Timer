@@ -15,6 +15,7 @@ enum ProfileError: Error, Equatable, LocalizedError {
     case lastProfile
     case profileInUse
     case unknownProfile
+    case profilesUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -24,6 +25,7 @@ enum ProfileError: Error, Equatable, LocalizedError {
         case .lastProfile: return "The last profile cannot be deleted."
         case .profileInUse: return "Clock out before deleting the active profile."
         case .unknownProfile: return "This profile no longer exists."
+        case .profilesUnavailable: return "Profiles are not available here."
         }
     }
 }
@@ -36,9 +38,15 @@ struct ProfileRegistry: Codable, Equatable {
 
     private(set) var profiles: [Profile]
     private(set) var activeID: UUID
+    /// The profile that receives pre-profile history, until that history is safely moved in.
+    private(set) var legacyImportTarget: UUID?
 
     static func initial(name: String, id: UUID = UUID()) -> ProfileRegistry {
         ProfileRegistry(profiles: [Profile(id: id, name: name, colorIndex: 0)], activeID: id)
+    }
+
+    mutating func setLegacyImportTarget(_ id: UUID?) {
+        legacyImportTarget = id.flatMap { profile(id: $0)?.id }
     }
 
     var active: Profile { profiles.first { $0.id == activeID } ?? profiles[0] }
@@ -92,31 +100,46 @@ struct ProfileHistorySummary: Equatable {
 
 // MARK: - Library
 
-/// Owns the profile registry and hands out each profile's storage.
+/// Owns the profile registry and hands out each profile's storage. Use from the main thread.
 @Observable
 final class ProfileLibrary {
     static let shared = ProfileLibrary(storage: DiskProfileStorage.live(), legacyDefaults: .standard)
 
     @ObservationIgnored private let storage: ProfileStorage
     private(set) var registry: ProfileRegistry
+    /// Set when pre-profile history could not be moved into its profile. Shown with storage errors.
+    private(set) var migrationWarning: String?
 
-    /// Loads the registry, or moves the original history and settings into a "Skeval" profile on first launch.
+    /// Loads the registry, or creates a "Skeval" profile for the original history and settings on first launch.
     init(storage: ProfileStorage, legacyDefaults: UserDefaults? = nil) {
         self.storage = storage
         if let existing = storage.loadRegistry() {
             registry = existing
-            return
+        } else {
+            var first = ProfileRegistry.initial(name: ProfileRegistry.firstProfileName)
+            first.setLegacyImportTarget(first.activeID)
+            if let legacyDefaults {
+                Self.copySettings(from: legacyDefaults, to: storage.settingsStore(for: first.activeID))
+            }
+            // Written before any history moves, so a crash part-way resumes below on the next launch.
+            storage.saveRegistry(first)
+            registry = first
         }
-        let first = ProfileRegistry.initial(name: ProfileRegistry.firstProfileName)
-        let imported = storage.importLegacyData(into: first.activeID)
-        if let legacyDefaults {
-            Self.copySettings(from: legacyDefaults, to: storage.settingsStore(for: first.activeID))
+        moveLegacyHistoryIfNeeded()
+    }
+
+    /// Moves pre-profile history into its profile. Runs every launch until it succeeds, so an
+    /// interrupted or failed first launch finishes later instead of leaving the profile empty.
+    private func moveLegacyHistoryIfNeeded() {
+        guard let target = registry.legacyImportTarget else { return }
+        switch storage.importLegacyData(into: target) {
+        case .done:
+            var updated = registry
+            updated.setLegacyImportTarget(nil)
+            commit(updated)
+        case .failed(let message):
+            migrationWarning = message
         }
-        // The registry marks the migration as done, so it is written before the original moves.
-        // If the copy failed, the original stays where it is instead of moving to Backups.
-        storage.saveRegistry(first)
-        if imported { storage.finishLegacyImport() }
-        registry = first
     }
 
     var profiles: [Profile] { registry.profiles }
@@ -184,14 +207,27 @@ protocol ProfileStorage: AnyObject {
     /// Returns the same instance for the same id.
     func dayLogStorage(for id: UUID) -> DayLogStorage
     func settingsStore(for id: UUID) -> SettingsValueStore
-    /// Copies pre-profile history into the given profile. The original stays until `finishLegacyImport`.
-    /// Returns false when existing history could not be copied.
-    func importLegacyData(into id: UUID) -> Bool
-    func finishLegacyImport()
+    /// Moves pre-profile history into the given profile, keeping the original in Backups.
+    /// Never overwrites history the profile already has.
+    func importLegacyData(into id: UUID) -> LegacyImportResult
     func archive(_ profile: Profile)
 }
 
+enum LegacyImportResult: Equatable {
+    case done
+    case failed(String)
+}
+
+/// Makes user text safe inside a file name by replacing `/`, `:`, and `\\` with dashes.
+enum FileNameComponent {
+    static func safe(_ name: String) -> String {
+        String(name.map { "/:\\".contains($0) ? "-" : $0 })
+    }
+}
+
 /// `SkevalTimer/profiles.json` plus `SkevalTimer/Profiles/<id>/{logs.json, settings.json}`.
+/// Main thread only, like `ProfileLibrary`: the adapter caches are not locked.
+/// The `DiskDayLogAdapter`s it hands out lock themselves.
 final class DiskProfileStorage: ProfileStorage {
     private let root: URL
     private let fileManager = FileManager.default
@@ -220,17 +256,19 @@ final class DiskProfileStorage: ProfileStorage {
     }
 
     func loadRegistry() -> ProfileRegistry? {
-        guard let data = try? Data(contentsOf: registryURL) else { return nil }
-        if let registry = try? JSONDecoder().decode(ProfileRegistry.self, from: data), !registry.profiles.isEmpty {
-            return registry
+        if let data = try? Data(contentsOf: registryURL) {
+            if let registry = try? JSONDecoder().decode(ProfileRegistry.self, from: data), !registry.profiles.isEmpty {
+                return registry
+            }
+            moveToBackups(registryURL, name: "profiles-unreadable")
         }
-        // Keep the unreadable registry and rebuild it from the profile folders.
-        moveToBackups(registryURL, name: "profiles-unreadable")
+        // Missing or unreadable: rebuild from the profile folders rather than starting an empty migration.
         let ids = ((try? fileManager.contentsOfDirectory(atPath: root.appendingPathComponent("Profiles").path)) ?? [])
             .compactMap(UUID.init(uuidString:)).sorted { $0.uuidString < $1.uuidString }
         guard let first = ids.first else { return nil }
-        var rebuilt = ProfileRegistry.initial(name: "Profile 1", id: first)
+        var rebuilt = ProfileRegistry.initial(name: ProfileRegistry.firstProfileName, id: first)
         for (offset, id) in ids.dropFirst().enumerated() { _ = try? rebuilt.add(name: "Profile \(offset + 2)", id: id) }
+        if fileManager.fileExists(atPath: legacyLogsURL.path) { rebuilt.setLegacyImportTarget(first) }
         saveRegistry(rebuilt)
         return rebuilt
     }
@@ -258,30 +296,35 @@ final class DiskProfileStorage: ProfileStorage {
         return file
     }
 
-    func importLegacyData(into id: UUID) -> Bool {
+    func importLegacyData(into id: UUID) -> LegacyImportResult {
+        guard fileManager.fileExists(atPath: legacyLogsURL.path) else { return .done }
         let directory = folder(for: id)
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        guard fileManager.fileExists(atPath: legacyLogsURL.path) else { return true }
-        // Raw bytes: an unreadable file must still arrive intact.
         let destination = directory.appendingPathComponent("logs.json")
-        try? fileManager.removeItem(at: destination)
-        do {
-            try fileManager.copyItem(at: legacyLogsURL, to: destination)
-            return true
-        } catch {
-            NSLog("Skeval Timer could not copy %@ into the first profile: %@", legacyLogsURL.path, error.localizedDescription)
-            return false
+        if fileManager.fileExists(atPath: destination.path) {
+            // Already copied by an interrupted launch: finish by backing up the original.
+            guard fileManager.contentsEqual(atPath: destination.path, andPath: legacyLogsURL.path) else {
+                return .failed("Earlier history at \(legacyLogsURL.path) was not moved into this profile because the profile already has its own history. Both files are kept.")
+            }
+        } else {
+            // Raw bytes, so an unreadable file still arrives intact; renamed into place so a crash never leaves half a copy.
+            let partial = directory.appendingPathComponent("logs.json.partial")
+            try? fileManager.removeItem(at: partial)
+            do {
+                try fileManager.copyItem(at: legacyLogsURL, to: partial)
+                try fileManager.moveItem(at: partial, to: destination)
+            } catch {
+                return .failed("Earlier history could not be moved into this profile (\(error.localizedDescription)). It is still at \(legacyLogsURL.path); the app retries on the next launch.")
+            }
         }
-    }
-
-    func finishLegacyImport() {
         moveToBackups(legacyLogsURL, name: "logs-before-profiles", pathExtension: "json")
+        return .done
     }
 
     func archive(_ profile: Profile) {
         dayLogAdapters[profile.id] = nil
         settingsFiles[profile.id] = nil
-        let safeName = CSVExporter.safeFileComponent(profile.name)
+        let safeName = FileNameComponent.safe(profile.name)
         moveToBackups(folder(for: profile.id), name: "profile-\(safeName)")
     }
 
@@ -291,12 +334,14 @@ final class DiskProfileStorage: ProfileStorage {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        var target = backupsURL.appendingPathComponent("\(name)-\(formatter.string(from: Date()))")
-        if let pathExtension { target.appendPathExtension(pathExtension) }
-        while fileManager.fileExists(atPath: target.path) {
-            target = target.deletingPathExtension().appendingPathExtension("1")
-            if let pathExtension { target.appendPathExtension(pathExtension) }
+        let base = "\(name)-\(formatter.string(from: Date()))"
+        func candidate(_ attempt: Int) -> URL {
+            let stem = attempt == 0 ? base : "\(base)-\(attempt)"
+            return backupsURL.appendingPathComponent(pathExtension.map { "\(stem).\($0)" } ?? stem)
         }
+        var attempt = 0
+        while fileManager.fileExists(atPath: candidate(attempt).path) { attempt += 1 }
+        let target = candidate(attempt)
         try? fileManager.moveItem(at: url, to: target)
     }
 }
@@ -307,6 +352,7 @@ final class InMemoryProfileStorage: ProfileStorage {
     private var dayLogs: [UUID: InMemoryDayLogAdapter] = [:]
     private var settings: [UUID: InMemorySettingsStore] = [:]
     private let legacyLogs: [String: [Sprint]]
+    private var legacyImported = false
     private(set) var archived: [Profile] = []
 
     init(legacyLogs: [String: [Sprint]] = [:]) {
@@ -330,12 +376,13 @@ final class InMemoryProfileStorage: ProfileStorage {
         return store
     }
 
-    func importLegacyData(into id: UUID) -> Bool {
-        dayLogs[id] = InMemoryDayLogAdapter(initialLogs: legacyLogs)
-        return true
+    func importLegacyData(into id: UUID) -> LegacyImportResult {
+        if !legacyImported {
+            dayLogs[id] = InMemoryDayLogAdapter(initialLogs: legacyLogs)
+            legacyImported = true
+        }
+        return .done
     }
-
-    func finishLegacyImport() {}
 
     func archive(_ profile: Profile) {
         archived.append(profile)
@@ -367,8 +414,16 @@ final class JSONSettingsFile: SettingsValueStore {
 
     init(url: URL) {
         self.url = url
-        let data = try? Data(contentsOf: url)
-        values = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        guard let data = try? Data(contentsOf: url) else { values = [:]; return }
+        if let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            values = decoded
+            return
+        }
+        // Keep an unreadable file beside the new one instead of overwriting it on the next change.
+        values = [:]
+        let kept = url.deletingLastPathComponent()
+            .appendingPathComponent("settings-unreadable-\(Int(Date().timeIntervalSince1970)).json")
+        try? FileManager.default.moveItem(at: url, to: kept)
     }
 
     func object(forKey key: String) -> Any? { values[key] }

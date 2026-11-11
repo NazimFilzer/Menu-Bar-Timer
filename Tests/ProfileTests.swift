@@ -339,3 +339,75 @@ func testRecoverySprintBlocksProfileSwitch() {
     assertEqual(vm.profileSwitchAvailability, vm.isRunning ? .needsClockOut : .allowed,
                 "Resolving recovery lifts the block")
 }
+
+func testUnreadableSettingsFileIsKept() {
+    let root = temporaryProfileRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let url = root.appendingPathComponent("settings.json")
+    try! Data("{broken".utf8).write(to: url)
+    let settings = GoalSettings(store: JSONSettingsFile(url: url))
+    assertEqual(settings.dailyGoalHours, 8, "Unreadable settings fall back to defaults")
+    settings.dailyGoalHours = 6
+    let files = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+    assertEqual(files.filter { $0.hasPrefix("settings-unreadable-") }.count, 1, "The unreadable file is kept aside")
+    assertEqual(GoalSettings(store: JSONSettingsFile(url: url)).dailyGoalHours, 6, "New changes save normally")
+}
+
+private func writeRegistry(_ registry: ProfileRegistry, to root: URL) {
+    try! JSONEncoder().encode(registry).write(to: root.appendingPathComponent("profiles.json"))
+}
+
+func testInterruptedMigrationFinishesOnNextLaunch() {
+    let root = temporaryProfileRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let legacy = ["2026-11-02": [completedSprint(day: 2, hours: 3)]]
+    try! encodedLogs(legacy).write(to: root.appendingPathComponent("logs.json"))
+    // State after a crash between writing the registry and copying the history.
+    var registry = ProfileRegistry.initial(name: "Skeval")
+    registry.setLegacyImportTarget(registry.activeID)
+    writeRegistry(registry, to: root)
+
+    let library = ProfileLibrary(storage: DiskProfileStorage(root: root), legacyDefaults: profileTestDefaults())
+    assertEqual(library.active.id, registry.activeID, "The interrupted registry is kept")
+    assertEqual(DayLogStore(storage: library.dayLogStorage(for: library.active.id)).allLogs(), legacy,
+                "The next launch finishes copying the history")
+    assertTrue(library.migrationWarning == nil)
+    assertTrue(library.registry.legacyImportTarget == nil, "A finished migration is not retried")
+    assertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("logs.json").path),
+                "The original moves to Backups once copied")
+}
+
+func testMissingRegistryIsRebuiltNotRemigrated() {
+    let root = temporaryProfileRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let legacy = ["2026-11-02": [completedSprint(day: 2, hours: 3)]]
+    try! encodedLogs(legacy).write(to: root.appendingPathComponent("logs.json"))
+    let first = ProfileLibrary(storage: DiskProfileStorage(root: root), legacyDefaults: profileTestDefaults())
+    try! FileManager.default.removeItem(at: root.appendingPathComponent("profiles.json"))
+
+    let reopened = ProfileLibrary(storage: DiskProfileStorage(root: root), legacyDefaults: profileTestDefaults())
+    assertEqual(reopened.profiles.map(\.id), [first.active.id], "A missing registry is rebuilt from the folders")
+    assertEqual(reopened.active.name, "Skeval")
+    assertEqual(DayLogStore(storage: reopened.dayLogStorage(for: reopened.active.id)).allLogs(), legacy,
+                "The rebuilt profile still shows the history")
+}
+
+func testDifferingLegacyHistoryIsKeptWithWarning() {
+    let root = temporaryProfileRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = ProfileLibrary(storage: DiskProfileStorage(root: root), legacyDefaults: profileTestDefaults())
+    let id = library.active.id
+    DayLogStore(storage: library.dayLogStorage(for: id)).save(sprint: completedSprint(day: 5, hours: 1))
+    let legacy = ["2026-11-02": [completedSprint(day: 2, hours: 3)]]
+    try! encodedLogs(legacy).write(to: root.appendingPathComponent("logs.json"))
+    var registry = library.registry
+    registry.setLegacyImportTarget(id)
+    writeRegistry(registry, to: root)
+
+    let reopened = ProfileLibrary(storage: DiskProfileStorage(root: root), legacyDefaults: profileTestDefaults())
+    assertTrue(reopened.migrationWarning != nil, "Differing histories are reported")
+    assertEqual(Array(DayLogStore(storage: reopened.dayLogStorage(for: id)).allLogs().keys), ["2026-11-05"],
+                "The profile's own history is never overwritten")
+    assertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("logs.json").path),
+               "The earlier history stays in place")
+}

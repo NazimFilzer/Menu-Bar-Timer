@@ -3,7 +3,12 @@ import SwiftUI
 // Preview host only — not used at runtime.
 #if DEBUG && canImport(PreviewsMacros)
 #Preview {
-    PopoverView(vm: TimerViewModel())
+    // In memory: the canvas must never open, migrate, or write the live profiles.
+    let profiles = ProfileLibrary(storage: InMemoryProfileStorage())
+    let store = DayLogStore(storage: profiles.dayLogStorage(for: profiles.active.id))
+    PopoverView(vm: TimerViewModel(engine: SprintEngine(store: store, observeWorkspace: false), store: store,
+                                   goal: GoalSettings(store: profiles.settingsStore(for: profiles.active.id)),
+                                   profiles: profiles))
 }
 
 #Preview("Week · Sample Data") {

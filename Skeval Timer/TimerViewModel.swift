@@ -110,7 +110,7 @@ class TimerViewModel {
         self.engine = effectiveEngine
 
         self.todayLog = effectiveStore.todayLog()
-        self.persistenceError = effectiveStore.storageError
+        self.persistenceError = effectiveStore.storageError ?? self.profiles?.migrationWarning
         self.selectedDayLog = self.todayLog
         self.pendingSleepInterval = effectiveEngine.pendingSleepInterval
         self.state = effectiveEngine.state
@@ -169,22 +169,30 @@ class TimerViewModel {
 
     @discardableResult
     func addProfile(name: String, startFromDefaults: Bool) throws -> Profile {
-        guard let profiles else { throw ProfileError.unknownProfile }
+        guard let profiles else { throw ProfileError.profilesUnavailable }
         return try profiles.add(name: name, copyingSettingsFrom: startFromDefaults ? nil : profiles.active.id)
     }
 
     func renameProfile(id: UUID, to name: String) throws {
-        guard let profiles else { throw ProfileError.unknownProfile }
+        guard let profiles else { throw ProfileError.profilesUnavailable }
         try profiles.rename(id: id, to: name)
+    }
+
+    /// Why a profile cannot be deleted right now, or nil when it can.
+    func profileDeleteBlocker(for id: UUID) -> ProfileError? {
+        guard let profiles else { return .profilesUnavailable }
+        guard profiles.profiles.contains(where: { $0.id == id }) else { return .unknownProfile }
+        guard profiles.profiles.count > 1 else { return .lastProfile }
+        if id == profiles.active.id && profileSwitchAvailability != .allowed { return .profileInUse }
+        return nil
     }
 
     /// Deletes a profile, switching away first when it is the active one. Its data moves to Backups.
     func deleteProfile(id: UUID) throws {
-        guard let profiles else { throw ProfileError.unknownProfile }
-        guard profiles.profiles.count > 1 else { throw ProfileError.lastProfile }
+        if let blocker = profileDeleteBlocker(for: id) { throw blocker }
+        guard let profiles else { throw ProfileError.profilesUnavailable }
         if id == profiles.active.id {
-            guard profileSwitchAvailability == .allowed,
-                  let other = profiles.profiles.first(where: { $0.id != id }),
+            guard let other = profiles.profiles.first(where: { $0.id != id }),
                   switchProfile(to: other.id) else { throw ProfileError.profileInUse }
         }
         try profiles.remove(id: id)
@@ -562,7 +570,7 @@ class TimerViewModel {
     func refreshLogs() {
         todayLog = store.todayLog()
         selectedDayLog = store.log(for: selectedDate)
-        persistenceError = store.storageError
+        persistenceError = store.storageError ?? profiles?.migrationWarning
         logRevision += 1
     }
 

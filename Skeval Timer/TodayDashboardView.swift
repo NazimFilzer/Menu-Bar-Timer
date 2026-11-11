@@ -208,6 +208,7 @@ struct TodayDashboardView: View {
         let day = TimeFormatter.format(dateKey: vm.selectedDate, calendar: .current)
         CSVExporter.promptSavePanel(sprints: vm.displayedCompletedSprints,
                                     suggestedName: "skeval-sprints-\(day).csv",
+                                    profileName: vm.activeProfileName,
                                     onFailure: { exportError = $0 })
     }
 

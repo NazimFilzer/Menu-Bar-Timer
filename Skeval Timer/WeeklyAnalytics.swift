@@ -54,7 +54,7 @@ enum WeeklyAnalytics {
         logs: [String: [Sprint]],
         weekOffset: Int = 0,
         referenceDate: Date = Date(),
-        settings: GoalSettings = .shared,
+        settings: GoalSettings,
         calendar: Calendar? = nil
     ) -> WeeklySummary {
         var cal = calendar ?? Calendar(identifier: .gregorian)

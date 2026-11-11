@@ -142,7 +142,7 @@ struct PeriodTimesheetView: View {
 
     private func export() {
         guard let sprints = exportSprints else { return }
-        CSVExporter.promptSavePanel(sprints: sprints, onComplete: { success, url in
+        CSVExporter.promptSavePanel(sprints: sprints, profileName: vm.activeProfileName, onComplete: { success, url in
             if success, let name = url?.lastPathComponent {
                 exportMessage = "Exported \(sprints.count) sprint\(sprints.count == 1 ? "" : "s") to \(name)"
             }

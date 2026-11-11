@@ -101,7 +101,7 @@ struct ProfileSwitcher: View {
             .accessibilityLabel("Profile \(active.name)")
             .confirmationDialog(
                 pendingSwitch.map { "Clock out of \(active.name) and switch to \($0.name)?" } ?? "",
-                isPresented: Binding(get: { pendingSwitch != nil }, set: { if !$0 { pendingSwitch = nil } }),
+                isPresented: isPresent($pendingSwitch),
                 presenting: pendingSwitch
             ) { target in
                 Button("Clock Out & Switch") {
@@ -136,7 +136,8 @@ struct ProfilesSettingsCard: View {
     @State private var renamingID: UUID?
     @State private var renameText = ""
     @State private var renameError: String?
-    @State private var pendingDelete: Profile?
+    /// The profile awaiting delete confirmation, with its history summary loaded once on tap.
+    @State private var pendingDelete: PendingProfileDelete?
     @State private var deleteError: String?
 
     var body: some View {
@@ -153,7 +154,7 @@ struct ProfilesSettingsCard: View {
                         .foregroundColor(theme.textSecondary)
 
                     ForEach(profiles.profiles) { profile in
-                        row(profile, isActive: profile.id == profiles.active.id, isOnly: profiles.profiles.count == 1)
+                        row(profile, isActive: profile.id == profiles.active.id)
                         Divider().background(theme.dividerColor)
                     }
 
@@ -166,20 +167,21 @@ struct ProfilesSettingsCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1))
             }
             .confirmationDialog(
-                pendingDelete.map { "Delete \($0.name)?" } ?? "",
-                isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                pendingDelete.map { "Delete \($0.profile.name)?" } ?? "",
+                isPresented: isPresent($pendingDelete),
                 presenting: pendingDelete
-            ) { profile in
-                Button("Delete Profile", role: .destructive) { delete(profile) }
+            ) { pending in
+                Button("Delete Profile", role: .destructive) { delete(pending.profile) }
                 Button("Cancel", role: .cancel) { pendingDelete = nil }
-            } message: { profile in
-                Text(deleteMessage(for: profile, in: profiles))
+            } message: { pending in
+                Text(pending.message)
             }
         }
     }
 
     @ViewBuilder
-    private func row(_ profile: Profile, isActive: Bool, isOnly: Bool) -> some View {
+    private func row(_ profile: Profile, isActive: Bool) -> some View {
+        let deleteBlocker = vm.profileDeleteBlocker(for: profile.id)
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
                 ProfileDot(profile: profile, size: 11)
@@ -208,12 +210,12 @@ struct ProfilesSettingsCard: View {
                     }
                     Button("Delete", role: .destructive) {
                         deleteError = nil
-                        pendingDelete = profile
+                        if let summary = vm.profiles?.historySummary(for: profile.id) {
+                            pendingDelete = PendingProfileDelete(profile: profile, summary: summary)
+                        }
                     }
-                    .disabled(isOnly || (isActive && vm.profileSwitchAvailability != .allowed))
-                    .help(isOnly ? "The last profile cannot be deleted"
-                          : isActive && vm.profileSwitchAvailability != .allowed ? "Clock out before deleting the active profile"
-                          : "Delete \(profile.name)")
+                    .disabled(deleteBlocker != nil)
+                    .help(deleteBlocker?.localizedDescription ?? "Delete \(profile.name)")
                 }
             }
             if renamingID == profile.id, let renameError {
@@ -273,10 +275,20 @@ struct ProfilesSettingsCard: View {
         pendingDelete = nil
     }
 
-    private func deleteMessage(for profile: Profile, in profiles: ProfileLibrary) -> String {
-        let summary = profiles.historySummary(for: profile.id)
+}
+
+private struct PendingProfileDelete {
+    let profile: Profile
+    let summary: ProfileHistorySummary
+
+    var message: String {
         let hours = TimeFormatter.format(shortDuration: summary.workedSeconds)
         let days = "\(summary.days) day\(summary.days == 1 ? "" : "s")"
         return "This removes \(hours) of work across \(days), plus this profile's settings. A backup is kept in the app's Backups folder."
     }
+}
+
+/// A presentation binding that is true while `item` holds a value and clears it on dismiss.
+private func isPresent<Item>(_ item: Binding<Item?>) -> Binding<Bool> {
+    Binding(get: { item.wrappedValue != nil }, set: { if !$0 { item.wrappedValue = nil } })
 }

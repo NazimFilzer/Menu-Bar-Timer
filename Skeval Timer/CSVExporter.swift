@@ -72,15 +72,10 @@ enum CSVExporter {
         }
     }
 
-    /// Replaces characters that are unsafe in file names (`/`, `:`, `\\`) with dashes.
-    static func safeFileComponent(_ name: String) -> String {
-        String(name.map { "/:\\".contains($0) ? "-" : $0 })
-    }
-
     /// Puts the profile name after the `skeval-` prefix, so exports from different profiles stay apart.
     static func fileName(_ name: String, profileName: String?) -> String {
         guard let profileName, !profileName.isEmpty else { return name }
-        let safe = safeFileComponent(profileName)
+        let safe = FileNameComponent.safe(profileName)
         guard name.hasPrefix("skeval-") else { return "\(safe)-\(name)" }
         return "skeval-\(safe)-" + name.dropFirst("skeval-".count)
     }
@@ -99,8 +94,7 @@ enum CSVExporter {
         let todayStr = dateFormatter.string(from: Date())
         lock.unlock()
 
-        let defaultName = fileName(suggestedName ?? "skeval-sprints-\(todayStr).csv",
-                                   profileName: profileName ?? AppDelegate.shared?.vm.activeProfileName)
+        let defaultName = fileName(suggestedName ?? "skeval-sprints-\(todayStr).csv", profileName: profileName)
         panel.nameFieldStringValue = defaultName
         panel.title = "Export Sprints to CSV"
         panel.message = "Choose a destination to save your sprint data in RFC-4180 CSV format."
