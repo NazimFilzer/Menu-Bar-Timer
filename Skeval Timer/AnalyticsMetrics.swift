@@ -1,5 +1,13 @@
 import Foundation
 
+/// The running sprint's net work, credited to the day it started.
+/// Period totals add it to that day so every page matches Today; sprint lists, timesheets,
+/// and CSV stay on completed sprints.
+struct LiveWork: Equatable {
+    let day: Date
+    let seconds: TimeInterval
+}
+
 /// Shared calendar and arithmetic rules for daily, weekly, monthly, and period reports.
 enum AnalyticsMetrics {
     private static var formatters: [String: DateFormatter] = [:]
@@ -28,10 +36,11 @@ enum AnalyticsMetrics {
     }
 
     static func day(_ date: Date, logs: [String: [Sprint]], referenceDate: Date,
-                    settings: GoalSettings, calendar: Calendar) -> DailyBarData {
+                    settings: GoalSettings, calendar: Calendar, live: LiveWork? = nil) -> DailyBarData {
         let key = TimeFormatter.format(dateKey: date, calendar: calendar)
         let log = DayLog(sprints: logs[key] ?? [])
-        let duration = log.accumulatedTotal
+        let liveSeconds = live.map { calendar.isDate($0.day, inSameDayAs: date) && $0.seconds.isFinite ? max(0, $0.seconds) : 0 } ?? 0
+        let duration = log.accumulatedTotal + liveSeconds
         let earnings = EarningsCalculator.calculate(durationInSeconds: duration, hourlyRate: settings.hourlyRate)
         return DailyBarData(
             id: key, date: date,

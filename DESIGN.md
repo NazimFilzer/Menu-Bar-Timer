@@ -313,7 +313,8 @@ Borders are 1px hairlines in the theme's `cardBorder` colour. Accent-tinted stro
 Shared parts in `DashboardGrammar.swift`, taken from the Month page, so every dashboard tab reads alike:
 - **Card header** (`DashboardCardHeader`): accent SF Symbol on the left, 11px Rounded Bold uppercase label with 0.8px tracking in ink, optional trailing badge or actions.
 - **Fact row** (`DashboardFactRow`): a muted rounded label and a mono value on one line, with an optional detail under the value.
-- **Period navigator** (`DashboardPeriodNavigator`): round ‹ › buttons around the period label, ⌘[ ⌘], and a reset button ("Today", "This week") only when another period is shown.
+- **Period navigator** (`DashboardPeriodNavigator` with `DashboardPeriodLabel`): round ‹ › buttons around the period chip, above the first card on every page, ⌘[ ⌘], and a sentence-case reset button ("Today", "This week", "This month") only when another period is shown.
+- **On-screen times** use `h:mm AM` and durations like `2h 0m` (`Sprint.startDisplayLabel`, `durationDisplayLabel`). Seconds appear only in sprint details, timesheet tables, the clipboard, and CSV, which mirror the employer sheet.
 - **Progress bar** (`DashboardProgressBar`): an 8px theme capsule. Never a native `ProgressView`, which turns grey while the window is inactive.
 - **Info button** (`DashboardInfoButton`): explanations live behind an ⓘ with the same words as tooltip and VoiceOver hint, not as always-on captions.
 
@@ -323,10 +324,21 @@ Shared parts in `DashboardGrammar.swift`, taken from the Month page, so every da
 
 ### Navigation
 - **Sidebar:** a `.sidebar` list with 14px rows, Semibold when selected. The selected row gets a 16% accent wash at 8px corners. Cmd+1–5 switches pages.
-- **Header bar:** the page title and subtitle on the left; the state word (Caption Bold in its status colour) and the live elapsed time (body mono) on the right.
+- **Header bar:** the page title and subtitle on the left; the state word (Caption Bold in its status colour) and the live elapsed time (body mono) on the right. Pause and Clock out sit beside it as native prominent buttons tinted by state: orange tint (Resume: solid orange) and the theme `dangerFill` red. Only Clock in carries the accent.
 
 ### Status Pill (signature)
 The menu bar extra. It's a Capsule drawn in AppKit with 11px Bold monospaced-digit text. It's filled with the accent while active and with the paused colour while paused. The text colour is chosen per theme for legibility.
+
+### Theme art (3D, scope B)
+Clay objects rendered per palette by `scripts/render-app-art.sh` (SceneKit, headless) into `Assets.xcassets/Art3D`, named `art-<object>-<theme>-<light|dark>`, and drawn with `ThemeArtView`. They appear in two places only:
+- **Page headers:** sun (Today), flag (Week), calendar (Month), bars (Analytics), at 46pt beside the title. Settings stays plain.
+- **Moments with nothing else to read:** the stopwatch in the idle popover timer, the trophy when the daily goal is reached, and the mug in empty sprint lists.
+Art never sits beside a running figure, inside a chart, or in a card header. It is decorative and hidden from VoiceOver. After adding or changing a theme, rerun the script; `testThemeArtCoverage` fails until every palette has every object.
+
+### Day ribbon and earnings trend
+- **Day ribbon** (popover, under today's progress): today's sprints as accent blocks on a fitted window of whole hours, the current pause in orange, a dashed accent block out to the finish forecast, and an ink "now" mark. Past pauses are not drawn, because sprints store only their total paused time. It redraws once a minute.
+- **Earnings so far** (Analytics, after Totals, only with an hourly rate): cumulative earnings in `successText` with a 10% area, and the previous period as a dashed muted line at the current rate. No ghost line when the previous period earned nothing.
+- **Menu bar ring** (Settings › System, off by default): replaces the pill's dot with a 10pt ring of today's daily-goal progress in the pill's text colour.
 
 ## Do's and Don'ts
 

@@ -22,6 +22,8 @@ class GoalSettings {
     static var profileKeys: [String] { Key.allCases.map(\.rawValue) }
 
     @ObservationIgnored private var store: SettingsValueStore
+    /// App-wide preferences that live beside the profile settings.
+    @ObservationIgnored private let appDefaults: UserDefaults
     @ObservationIgnored private var isLoading = false
 
     private func persist(_ value: Any, forKey key: Key) {
@@ -85,13 +87,21 @@ class GoalSettings {
         didSet { persist(currencySymbol, forKey: .currencySymbol) }
     }
 
-    convenience init(userDefaults: UserDefaults) {
-        self.init(store: userDefaults)
+    /// Draws today's daily-goal progress as a ring in the menu bar pill. Off by default.
+    /// A display choice like the theme, so it is app-wide rather than per profile.
+    var showsMenuBarProgress = false {
+        didSet { appDefaults.set(showsMenuBarProgress, forKey: "skevalMenuBarProgressRing") }
     }
 
-    init(store: SettingsValueStore) {
+    convenience init(userDefaults: UserDefaults) {
+        self.init(store: userDefaults, appDefaults: userDefaults)
+    }
+
+    init(store: SettingsValueStore, appDefaults: UserDefaults = .standard) {
         self.store = store
+        self.appDefaults = appDefaults
         load()
+        showsMenuBarProgress = appDefaults.bool(forKey: "skevalMenuBarProgressRing")
     }
 
     /// Shows another profile's settings in place. Switches the backing store first,

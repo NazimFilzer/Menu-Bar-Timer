@@ -65,7 +65,7 @@ struct PopoverView: View {
                 vm.reset()
             }
         } message: { sprint in
-            Text("This removes the sprint started at \(sprint.startLabel). Its work will not count toward your total or earnings.")
+            Text("This removes the sprint started at \(sprint.startDisplayLabel). Its work will not count toward your total or earnings.")
         }
         .alert("Quit Skeval Timer?", isPresented: $isConfirmingQuit) {
             Button("Keep open", role: .cancel) { }
@@ -199,6 +199,13 @@ private struct PopoverTimerStripView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .trailing) {
+                    // Only while idle: art never sits beside a running figure.
+                    if vm.currentSprint == nil {
+                        ThemeArtView(art: .stopwatch, theme: theme, size: 64)
+                            .padding(.vertical, -10)
+                    }
+                }
             }
             HStack(spacing: 8) {
                 if vm.isRunning {

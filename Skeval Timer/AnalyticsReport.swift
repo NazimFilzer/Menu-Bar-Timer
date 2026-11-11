@@ -161,10 +161,11 @@ struct AnalyticsComparison: Equatable {
     /// like the Month page. On the previous side, the day matching today counts as unfinished,
     /// so both sides judge the same number of finished days against the daily goal.
     static func calculate(range: AnalyticsRange, logs: [String: [Sprint]], earliest: Date?, today: Date,
-                          settings: GoalSettings, calendar: Calendar) -> AnalyticsComparison {
+                          settings: GoalSettings, calendar: Calendar, live: LiveWork? = nil) -> AnalyticsComparison {
         let day = calendar.startOfDay(for: today)
         let dates = range.dates(calendar: calendar)
-        let current = AnalyticsTotals.calculate(days: bars(dates, logs: logs, today: day, settings: settings, calendar: calendar),
+        let current = AnalyticsTotals.calculate(days: bars(dates, logs: logs, today: day, settings: settings,
+                                                           calendar: calendar, live: live),
                                                 settings: settings, today: day, calendar: calendar)
         let previousDates = range.previousDates(calendar: calendar)
         guard let previousEnd = previousDates.last, let earliest,
@@ -183,8 +184,9 @@ struct AnalyticsComparison: Equatable {
     }
 
     static func bars(_ dates: [Date], logs: [String: [Sprint]], today: Date, settings: GoalSettings,
-                     calendar: Calendar) -> [DailyBarData] {
-        dates.map { AnalyticsMetrics.day($0, logs: logs, referenceDate: today, settings: settings, calendar: calendar) }
+                     calendar: Calendar, live: LiveWork? = nil) -> [DailyBarData] {
+        dates.map { AnalyticsMetrics.day($0, logs: logs, referenceDate: today, settings: settings, calendar: calendar,
+                                         live: live) }
     }
 }
 

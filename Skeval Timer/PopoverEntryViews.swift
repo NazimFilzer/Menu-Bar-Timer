@@ -9,12 +9,12 @@ struct RecoveryBannerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
-                Label("Unfinished sprint from \(vm.currentSprint?.startLabel ?? "")",
+                Label("Unfinished sprint from \(vm.currentSprint?.startDisplayLabel ?? "")",
                       systemImage: "exclamationmark.circle.fill")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(theme.warningText)
                 if let sprint = vm.currentSprint, sprint.hasPause {
-                    Text("(\(sprint.pausedLabel) paused)")
+                    Text("(\(sprint.pausedDisplayLabel) paused)")
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .foregroundColor(theme.textSecondary)
                 }

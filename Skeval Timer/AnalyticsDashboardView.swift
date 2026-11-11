@@ -28,10 +28,13 @@ struct AnalyticsDashboardView: View {
         let today = Date()
         let earliest = logs.values.flatMap { $0 }.filter { !$0.isOpen }.map(\.startTime).min()
         let range = customRange ?? AnalyticsRange.make(kind, offset: offset, today: today, earliest: earliest, calendar: calendar)
+        // The running sprint counts toward its start day, like Today and Week. It changes at most
+        // once a minute, so this page stays off the 1-second tick.
+        let live = vm.reportLiveWork
         let days = AnalyticsComparison.bars(range.dates(calendar: calendar), logs: logs, today: today,
-                                            settings: vm.goal, calendar: calendar)
+                                            settings: vm.goal, calendar: calendar, live: live)
         let comparison = AnalyticsComparison.calculate(range: range, logs: logs, earliest: earliest, today: today,
-                                                       settings: vm.goal, calendar: calendar)
+                                                       settings: vm.goal, calendar: calendar, live: live)
         let byWeek = range.drawsWeeks(calendar: calendar)
         // Previous bars cover the same days the comparison card compares.
         let previousDays = comparison.previous == nil || byWeek ? nil
@@ -39,14 +42,26 @@ struct AnalyticsDashboardView: View {
                                        logs: logs, today: today, settings: vm.goal, calendar: calendar)
         let bars = AnalyticsBar.make(days: days, previousDays: previousDays, byWeek: byWeek, settings: vm.goal,
                                      today: today, calendar: calendar)
+        // The ghost line covers the whole previous period, at the current hourly rate.
+        let previousPeriod = range.previousDates(calendar: calendar)
+        let earningsTrend = EarningsTrend.make(
+            days: days,
+            previousDays: previousPeriod.isEmpty ? nil
+                : AnalyticsComparison.bars(previousPeriod, logs: logs, today: today, settings: vm.goal, calendar: calendar),
+            today: today, calendar: calendar)
         let sprints = days.flatMap(\.completedSprints)
-        let worked = days.reduce(0) { $0 + $1.totalSeconds }
+        // Tag shares and sprint patterns use completed sprints only.
+        let worked = DayLog(sprints: sprints).accumulatedTotal
 
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 rangeBar(range)
                 AnalyticsComparisonCard(range: range, comparison: comparison, goal: vm.goal, theme: theme,
                                         openSettings: openSettings)
+                if vm.goal.hasHourlyRate {
+                    AnalyticsEarningsTrendCard(trend: earningsTrend, periodLabel: range.label, previousName: range.previousName,
+                                               currencySymbol: vm.goal.currencySymbol, theme: theme)
+                }
                 AnalyticsHoursChart(bars: bars, byWeek: byWeek, previousName: range.previousName, theme: theme)
                 if byWeek {
                     AnalyticsEveryDayCard(days: days, totals: comparison.current, settings: vm.goal, theme: theme)
@@ -115,12 +130,7 @@ struct AnalyticsDashboardView: View {
     }
 
     private func rangeLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-            .lineLimit(1)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
+        DashboardPeriodLabel(text: text, theme: theme)
     }
 
     private var customEditor: some View {

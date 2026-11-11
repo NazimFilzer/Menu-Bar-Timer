@@ -141,6 +141,12 @@ private struct DashboardToolbar: View {
 
     var body: some View {
         HStack(spacing: 16) {
+            if let art = destination.art {
+                // Sized so the header stays the same height as on Settings.
+                ThemeArtView(art: art, theme: theme, size: 46)
+                    .padding(.vertical, -6)
+                    .padding(.trailing, -6)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text(destination.title).font(.title2.bold()).foregroundStyle(theme.textPrimary)
                 Text(destination.subtitle).font(.subheadline).foregroundStyle(theme.textSecondary)
@@ -152,16 +158,28 @@ private struct DashboardToolbar: View {
             }
             .accessibilityElement(children: .combine)
             if vm.isRunning {
-                Button(vm.isPaused ? "Resume" : "Pause", systemImage: vm.isPaused ? "play.fill" : "pause.fill") {
+                Button {
                     if vm.isPaused { vm.resumeTimer() } else { vm.pause() }
+                } label: {
+                    // Prominent buttons draw white labels; set the colour on the label itself.
+                    Label(vm.isPaused ? "Resume" : "Pause", systemImage: vm.isPaused ? "play.fill" : "pause.fill")
+                        .foregroundStyle(vm.isPaused ? Color.black : theme.warningText)
                 }
+                // Pause and Resume use the fixed orange family, never the theme accent.
+                .buttonStyle(.borderedProminent)
+                .tint(vm.isPaused ? Color.orange : Color.orange.opacity(0.18))
                 .disabled(vm.hasPendingSleepResolution)
                 .help("Pause or resume, Command Option Shift P")
             }
-            Button(vm.isRunning ? "Clock out" : "Clock in", systemImage: vm.isRunning ? "stop.fill" : "play.fill") {
+            Button {
                 if vm.isRunning { vm.clockOut() } else { vm.clockIn() }
+            } label: {
+                Label(vm.isRunning ? "Clock out" : "Clock in", systemImage: vm.isRunning ? "stop.fill" : "play.fill")
+                    .foregroundStyle(vm.isRunning ? Color.white : theme.actionButtonForeground)
             }
             .buttonStyle(.borderedProminent)
+            // Stopping uses the theme's contrast-safe red; only Clock in carries the accent.
+            .tint(vm.isRunning ? theme.dangerFill : theme.accentColor)
             .disabled(vm.recoveryMode || vm.hasPendingSleepResolution)
             .help("Clock in or out, Command Option Shift C")
         }

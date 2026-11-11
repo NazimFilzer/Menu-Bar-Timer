@@ -16,9 +16,13 @@ struct PopoverSprintHistoryView: View {
                 datePicker
             }
             if vm.displayedCompletedSprints.isEmpty {
-                Text("No completed sprints for this day. Add a sprint you already finished, or clock in to start.")
-                    .font(.system(size: 12, design: .rounded)).foregroundStyle(theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true).padding(.vertical, 8)
+                HStack(spacing: 10) {
+                    ThemeArtView(art: .mug, theme: theme, size: 52)
+                    Text("No completed sprints for this day. Add a sprint you already finished, or clock in to start.")
+                        .font(.system(size: 12, design: .rounded)).foregroundStyle(theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 4)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(vm.displayedCompletedSprintsDescending.prefix(2)), id: \.sprint.id) { item in
@@ -66,7 +70,7 @@ struct PopoverSprintHistoryView: View {
                 deletedSprint = sprint
             }
         } message: { sprint in
-            Text("This removes the \(sprint.startLabel) to \(sprint.endLabel) sprint from \(TimeFormatter.format(shortDayTitle: sprint.startTime)). It contains \(sprint.durationLabel) of net work.")
+            Text("This removes the \(sprint.startDisplayLabel) to \(sprint.endDisplayLabel) sprint from \(TimeFormatter.format(shortDayTitle: sprint.startTime)). It contains \(sprint.durationDisplayLabel) of net work.")
         }
         .popover(item: $detailSprint) { sprint in
             sprintDetails(sprint)
@@ -96,7 +100,7 @@ struct PopoverSprintHistoryView: View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text("\(sprint.startLabel) – \(sprint.endLabel)")
+                    Text("\(sprint.startDisplayLabel) – \(sprint.endDisplayLabel)")
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     if let tag = sprint.tag {
                         Text(tag)
@@ -107,7 +111,7 @@ struct PopoverSprintHistoryView: View {
                             .lineLimit(1)
                     }
                 }
-                Text(sprint.hasPause ? "\(sprint.durationLabel) net · \(sprint.pausedLabel) paused" : "\(sprint.durationLabel) net")
+                Text(sprint.hasPause ? "\(sprint.durationDisplayLabel) net · \(sprint.pausedDisplayLabel) paused" : "\(sprint.durationDisplayLabel) net")
                     .font(.system(size: 11, design: .rounded)).foregroundStyle(theme.textSecondary)
                 if vm.lastCopiedId == sprint.id {
                     Text("Copied sprint times").font(.caption).foregroundStyle(theme.successText)
@@ -127,7 +131,7 @@ struct PopoverSprintHistoryView: View {
                 PopoverMoreIcon(theme: theme)
             }
             .popoverMenuStyle()
-            .accessibilityLabel("Actions for sprint starting \(sprint.startLabel)")
+            .accessibilityLabel("Actions for sprint starting \(sprint.startDisplayLabel)")
         }
         .padding(.vertical, 10)
     }

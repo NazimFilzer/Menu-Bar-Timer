@@ -42,7 +42,7 @@ Success means the user can glance at the menu bar and know their state, start, p
 ## Capabilities and Constraints
 
 - Domain terms are defined in `CONTEXT.md` (Sprint, Day Log, Recovery Sprint, Catch-up target, Finish-time forecast, Upcoming breaks, Eye-break reminder, and so on). UI copy must use that vocabulary.
-- Sprints belong to the day they started, even when they cross midnight. Weekly, monthly, and report totals use completed sprints; daily totals also include the active sprint.
+- Sprints belong to the day they started, even when they cross midnight. Every on-screen period total includes the active sprint's net work on its start day; timesheet rows, Copy All, and CSV use completed sprints only.
 - Schedule-aware pacing (catch-up card, finish-time forecast, weekly pace) is a core capability, but the user did not name it as a differentiator.
 - Eye-break reminders (20-20-20 rule) use macOS notifications, are off by default, and only fire while a sprint is actively ticking.
 - Technical constraints: Apple frameworks only, with no third-party dependencies. Hidden SwiftUI content must not stay mounted. Values that change every tick go in `Live { … }` so only that piece re-renders (see AGENTS.md).

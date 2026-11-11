@@ -97,6 +97,12 @@ enum TimeFormatter {
             : String(format: "%d:%02d", m, s)
     }
 
+    /// A clock time for reading on screen, such as "8:30 AM". Clipboard, CSV, and text fields
+    /// keep `format(time:)`, which the employer sheet and the time parser expect.
+    static func format(displayTime: Date) -> String {
+        displayTime.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)).minute(.twoDigits))
+    }
+
     static func format(time: Date) -> String {
         formatterLock.lock()
         defer { formatterLock.unlock() }

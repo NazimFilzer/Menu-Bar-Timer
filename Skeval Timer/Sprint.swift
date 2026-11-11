@@ -86,6 +86,11 @@ struct Sprint: Identifiable, Codable, Equatable {
     }
 
     var startLabel: String { TimeFormatter.format(time: startTime) }
+    // On-screen labels, matching Today's timeline ("8:30 AM", "2h 0m"). Copy and CSV keep the labels above.
+    var startDisplayLabel: String { TimeFormatter.format(displayTime: startTime) }
+    var endDisplayLabel: String { endTime.map { TimeFormatter.format(displayTime: $0) } ?? "now" }
+    var durationDisplayLabel: String { duration.map { TimeFormatter.format(shortDuration: $0) } ?? "in progress" }
+    var pausedDisplayLabel: String { TimeFormatter.format(shortDuration: pausedDuration) }
     var endLabel: String { endTime.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
     var pauseStartedLabel: String { pauseStartedAt.map { TimeFormatter.format(time: $0) } ?? "--:--:--" }
 

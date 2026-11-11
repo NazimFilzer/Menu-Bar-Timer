@@ -31,26 +31,11 @@ struct WeeklyDashboardView: View {
     // MARK: - Week navigator
 
     private func periodBar(summary: WeeklySummary) -> some View {
-        HStack(spacing: 8) {
-            Button { weekOffset -= 1 } label: { Image(systemName: "chevron.left") }
-                .keyboardShortcut("[", modifiers: .command)
-                .help("Previous week, Command [")
-                .accessibilityLabel("Previous week")
-            Text(summary.weekRangeLabel)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(theme.textPrimary)
-                .frame(minWidth: 170)
-            Button { if weekOffset < 0 { weekOffset += 1 } } label: { Image(systemName: "chevron.right") }
-                .keyboardShortcut("]", modifiers: .command)
-                .disabled(weekOffset >= 0)
-                .help("Next week, Command ]")
-                .accessibilityLabel("Next week")
-            if weekOffset != 0 {
-                Button("This Week") { weekOffset = 0 }
-            }
-            Spacer()
+        DashboardPeriodNavigator(periodName: "week", canGoForward: weekOffset < 0,
+                                 resetTitle: weekOffset == 0 ? nil : "This week", theme: theme,
+                                 move: { weekOffset = min(0, weekOffset + $0) }, reset: { weekOffset = 0 }) {
+            DashboardPeriodLabel(text: summary.weekRangeLabel, theme: theme)
         }
-        .controlSize(.regular)
     }
 
     // MARK: - Totals + pace
@@ -88,7 +73,8 @@ struct WeeklyDashboardView: View {
         VStack(alignment: .leading, spacing: 4) {
             label(title)
             Text(value)
-                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .font(.dashboardHero)
+                .lineLimit(1).minimumScaleFactor(0.7)
                 .foregroundStyle(theme.textPrimary)
             Text(detail)
                 .font(.system(size: 11.5, weight: .medium, design: .rounded))
@@ -102,7 +88,8 @@ struct WeeklyDashboardView: View {
         Text(text)
             .font(.system(size: 11, weight: .bold, design: .rounded))
             .kerning(0.8)
-            .foregroundStyle(theme.textSecondary)
+            .foregroundStyle(theme.textPrimary)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func money(_ seconds: TimeInterval) -> String {

@@ -294,6 +294,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         withObservationTracking {
             _ = vm.state
             _ = vm.todayLog.accumulatedTotal
+            _ = vm.goal.showsMenuBarProgress
+            _ = vm.goal.dailyGoalHours
             _ = ThemeManager.shared.theme // theme and Light/Dark choice
         } onChange: {
             Task { @MainActor [weak self] in
@@ -323,6 +325,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             accumulatedTotal: vm.todayLog.accumulatedTotal,
             pauseElapsed: vm.currentPauseElapsed,
             theme: ThemeManager.shared.theme,
+            goalProgress: vm.goal.showsMenuBarProgress && vm.goal.dailyGoalSeconds > 0
+                ? vm.totalTodayElapsed / vm.goal.dailyGoalSeconds : nil,
             force: force
         )
     }

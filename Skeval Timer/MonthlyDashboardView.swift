@@ -5,6 +5,7 @@ struct MonthlyDashboardView: View {
     @Bindable var vm: TimerViewModel
     let theme: PopoverTheme
     @State private var monthOffset: Int = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var monthlySummary: MonthlySummary {
         _ = vm.logRevision
@@ -12,14 +13,22 @@ struct MonthlyDashboardView: View {
             logs: vm.store.allLogs(),
             monthOffset: monthOffset,
             referenceDate: Date(),
-            settings: vm.goal
+            settings: vm.goal,
+            // Changes at most once a minute, so the page follows the running sprint without the tick.
+            live: vm.reportLiveWork
         )
     }
 
     var body: some View {
         let summary = monthlySummary
         let calendar = MonthCalendar.make(days: summary.days, settings: vm.goal)
-        VStack(spacing: 18) {
+        VStack(alignment: .leading, spacing: 18) {
+            DashboardPeriodNavigator(periodName: "month", canGoForward: monthOffset < 0,
+                                     resetTitle: monthOffset == 0 ? nil : "This month", theme: theme,
+                                     move: { moveMonth(to: min(0, monthOffset + $0)) },
+                                     reset: { moveMonth(to: 0) }) {
+                DashboardPeriodLabel(text: summary.monthTitle, theme: theme)
+            }
             // Side by side when there is room; stacked in a narrow window.
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 18) {
@@ -45,8 +54,12 @@ struct MonthlyDashboardView: View {
         }
     }
 
+    private func moveMonth(to newOffset: Int) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { monthOffset = newOffset }
+    }
+
     private func calendarCard(summary: MonthlySummary, calendar: MonthCalendar) -> some View {
-        MonthCalendarCardView(vm: vm, summary: summary, calendar: calendar, theme: theme, offset: $monthOffset)
+        MonthCalendarCardView(vm: vm, summary: summary, calendar: calendar, theme: theme)
     }
 
     private func sideColumn(summary: MonthlySummary, calendar: MonthCalendar) -> some View {
@@ -69,65 +82,9 @@ struct MonthlyDashboardView: View {
 
 // MARK: - Shared card pieces
 
-private struct MonthCardTitle: View {
-    let title: String
-    let icon: String
-    let theme: PopoverTheme
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(theme.accentIcon)
-            Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(theme.textPrimary)
-                .kerning(0.8)
-        }
-        .accessibilityAddTraits(.isHeader)
-    }
-}
-
 private extension View {
-    func monthCard(_ theme: PopoverTheme, padding: CGFloat = 18) -> some View {
-        self.padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(theme.cardBg)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme.cardBorder, lineWidth: 1))
-    }
-}
-
-/// A label and value on one line, used for the structured pace and result rows.
-private struct MonthFactRow: View {
-    let label: String
-    let value: String
-    var valueColor: Color? = nil
-    var emphasized = false
-    var detail: String? = nil
-    var detailColor: Color? = nil
-    let theme: PopoverTheme
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(label)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(theme.textSecondary)
-                Spacer(minLength: 8)
-                Text(value)
-                    .font(.system(size: emphasized ? 16 : 13, weight: .bold, design: .monospaced))
-                    .foregroundColor(valueColor ?? theme.textPrimary)
-            }
-            if let detail {
-                Text(detail)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .foregroundColor(detailColor ?? theme.textSecondary)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
+    func monthCard(_ theme: PopoverTheme) -> some View {
+        modifier(WorkInsightsCardStyle(theme: theme))
     }
 }
 
@@ -172,8 +129,6 @@ private struct MonthCalendarCardView: View {
     let summary: MonthlySummary
     let calendar: MonthCalendar
     let theme: PopoverTheme
-    @Binding var offset: Int
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let cellHeight: CGFloat = 64
 
@@ -207,57 +162,10 @@ private struct MonthCalendarCardView: View {
         .monthCard(theme)
     }
 
-    // MARK: Header and month navigation
+    // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .center) {
-            MonthCardTitle(title: summary.monthTitle.uppercased(), icon: "calendar", theme: theme)
-            if summary.isCurrentMonth {
-                Text("CURRENT")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(theme.accentColor.opacity(0.18))
-                    .foregroundColor(theme.accentText)
-                    .clipShape(Capsule())
-            }
-            Spacer()
-            HStack(spacing: 6) {
-                if offset != 0 {
-                    Button { move(to: 0) } label: {
-                        Text("Current Month")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(theme.accentColor.opacity(0.15))
-                            .foregroundColor(theme.accentText)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-                navButton("chevron.left", label: "Previous month", enabled: true) { move(to: offset - 1) }
-                navButton("chevron.right", label: "Next month", enabled: offset < 0) { move(to: offset + 1) }
-            }
-        }
-    }
-
-    private func navButton(_ icon: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .padding(6)
-                .background(theme.cardBg.opacity(0.8))
-                .foregroundColor(enabled ? theme.textPrimary : theme.textSecondary.opacity(0.4))
-                .clipShape(Circle())
-                .overlay(Circle().stroke(theme.cardBorder, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .accessibilityLabel(label)
-    }
-
-    private func move(to newOffset: Int) {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { offset = newOffset }
+        DashboardCardHeader(title: "Calendar", icon: "calendar", theme: theme)
     }
 
     // MARK: Day cell
@@ -393,7 +301,7 @@ private struct MonthCalendarCardView: View {
                        stroke: Color.orange.opacity(0.5))
             legendItem("Day off", fill: theme.bgDark.opacity(0.7), stroke: theme.cardBorder, dashed: true)
             legendItem("Upcoming", fill: .clear, stroke: theme.cardBorder, dashed: true)
-            Text("— no work").foregroundColor(theme.warningText)
+            Text("— no work")
         }
         .font(.system(size: 10, weight: .medium, design: .rounded))
         .foregroundColor(theme.textSecondary)
@@ -422,7 +330,7 @@ private struct MonthWorkedCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            MonthCardTitle(title: "WORKED", icon: "clock.fill", theme: theme)
+            DashboardCardHeader(title: "Worked", icon: "clock.fill", theme: theme)
             VStack(alignment: .leading, spacing: 3) {
                 Text(summary.formattedTotalHours)
                     .font(.system(size: 28, weight: .bold, design: .monospaced))
@@ -491,20 +399,18 @@ private struct MonthPaceCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                MonthCardTitle(title: "PACE", icon: "speedometer", theme: theme)
-                Spacer()
+            DashboardCardHeader(title: "Pace", icon: "speedometer", theme: theme) {
                 statusPill
             }
 
             MonthSectionLabel(text: "SCHEDULE TO DATE", theme: theme)
-            MonthFactRow(label: "Expected by today", value: catchUp.expectedLabel, theme: theme)
-            MonthFactRow(label: "Clocked", value: catchUp.clockedLabel, theme: theme)
+            DashboardFactRow(label: "Expected by today", value: catchUp.expectedLabel, theme: theme)
+            DashboardFactRow(label: "Worked", value: catchUp.clockedLabel, theme: theme)
             if catchUp.isBehind {
-                MonthFactRow(label: "Behind", value: monthDuration(catchUp.remainingSeconds),
+                DashboardFactRow(label: "Behind", value: monthDuration(catchUp.remainingSeconds),
                              valueColor: theme.warningText, theme: theme)
             } else if catchUp.aheadSeconds > 0 {
-                MonthFactRow(label: "Ahead", value: monthDuration(catchUp.aheadSeconds),
+                DashboardFactRow(label: "Ahead", value: monthDuration(catchUp.aheadSeconds),
                              valueColor: theme.successText, theme: theme)
             }
 
@@ -516,15 +422,15 @@ private struct MonthPaceCardView: View {
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(theme.successText)
             } else {
-                MonthFactRow(label: "Left", value: monthDuration(pace.remainingSeconds), theme: theme)
-                MonthFactRow(label: "Workdays left",
+                DashboardFactRow(label: "Left", value: monthDuration(pace.remainingSeconds), theme: theme)
+                DashboardFactRow(label: "Workdays left",
                              value: "\(pace.remainingWorkingDays)",
                              detail: pace.remainingWorkingDays > 0
                                 ? (pace.includesToday ? "including today" : "from tomorrow") : nil,
                              theme: theme)
                 if let perDay = pace.secondsPerWorkingDay {
                     let extra = pace.extraSecondsPerWorkingDay ?? 0
-                    MonthFactRow(label: "Needed per workday", value: monthDuration(perDay),
+                    DashboardFactRow(label: "Needed per workday", value: monthDuration(perDay),
                                  valueColor: theme.accentText, emphasized: true,
                                  detail: extra > 0
                                     ? "\(monthDuration(extra)) more than your \(goal.goalLabel) day"
@@ -547,7 +453,7 @@ private struct MonthPaceCardView: View {
 
             Divider().overlay(theme.cardBorder)
 
-            MonthFactRow(label: "Workdays met",
+            DashboardFactRow(label: "Workdays met",
                          value: "\(calendar.metWorkdays) of \(calendar.finishedWorkdays)",
                          detail: "Finished workdays at \(goal.goalLabel) or more",
                          theme: theme)
@@ -581,23 +487,21 @@ private struct MonthResultCardView: View {
     var body: some View {
         let difference = summary.totalSeconds - summary.monthlyGoalSeconds
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                MonthCardTitle(title: "RESULT", icon: "flag.checkered", theme: theme)
-                Spacer()
+            DashboardCardHeader(title: "Result", icon: "checkmark.seal", theme: theme) {
                 MonthStatusPill(text: difference >= 0 ? "Goal reached" : "Goal missed",
                                 color: difference >= 0 ? theme.successText : theme.warningText)
             }
-            MonthFactRow(label: "Monthly goal", value: goal.monthlyGoalLabel, theme: theme)
-            MonthFactRow(label: "Worked", value: summary.formattedTotalHours, theme: theme)
-            MonthFactRow(label: difference >= 0 ? "Over goal" : "Short of goal",
+            DashboardFactRow(label: "Monthly goal", value: goal.monthlyGoalLabel, theme: theme)
+            DashboardFactRow(label: "Worked", value: summary.formattedTotalHours, theme: theme)
+            DashboardFactRow(label: difference >= 0 ? "Over goal" : "Short of goal",
                          value: monthDuration(abs(difference)),
                          valueColor: difference >= 0 ? theme.successText : theme.warningText,
                          emphasized: true, theme: theme)
             Divider().overlay(theme.cardBorder)
-            MonthFactRow(label: "Workdays met",
+            DashboardFactRow(label: "Workdays met",
                          value: "\(calendar.metWorkdays) of \(calendar.finishedWorkdays)",
                          detail: "Scheduled workdays that reached \(goal.goalLabel)", theme: theme)
-            MonthFactRow(label: "Average per worked day", value: summary.formattedDailyAverage, theme: theme)
+            DashboardFactRow(label: "Average per worked day", value: summary.formattedDailyAverage, theme: theme)
         }
         .monthCard(theme)
     }
@@ -611,9 +515,7 @@ private struct MonthTagCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                MonthCardTitle(title: "TIME BY TAG", icon: "tag.fill", theme: theme)
-                Spacer()
+            DashboardCardHeader(title: "Time by tag", icon: "tag.fill", theme: theme) {
                 Text("\(summary.tagBreakdowns.count) tag\(summary.tagBreakdowns.count == 1 ? "" : "s")")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundColor(theme.textSecondary)
