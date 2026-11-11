@@ -157,7 +157,7 @@ struct SprintLogTableView: View {
             }
         } message: { sprint in
             let dateStr = Self.tableDateFormatter.string(from: sprint.startTime)
-            Text("Are you sure you want to delete the sprint on \(dateStr) (\(sprint.startLabel) – \(sprint.endLabel))? This cannot be undone.")
+            Text("Are you sure you want to delete the sprint on \(dateStr) (\(sprint.startDisplayLabel) – \(sprint.endDisplayLabel))? This cannot be undone.")
         }
     }
 
@@ -225,7 +225,7 @@ struct SprintLogTableView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Add Sprint")
+                        Text("Add sprint")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                     }
                     .padding(.horizontal, 10)
@@ -419,25 +419,25 @@ struct SprintLogTableView: View {
             }
 
             // Start Time
-            Text(sprint.startLabel)
+            Text(sprint.startDisplayLabel)
                 .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .regular, design: .monospaced))
                 .foregroundColor(usesTimesheetStyle ? theme.textPrimary : theme.textSecondary)
                 .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
 
             // End Time
-            Text(sprint.endLabel)
+            Text(sprint.endDisplayLabel)
                 .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .regular, design: .monospaced))
                 .foregroundColor(usesTimesheetStyle ? theme.textPrimary : theme.textSecondary)
                 .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
 
             // Paused Duration
-            Text(sprint.hasPause ? sprint.pausedLabel : "—")
+            Text(sprint.hasPause ? sprint.pausedDisplayLabel : "—")
                 .font(.system(size: usesTimesheetStyle ? 12 : 10, weight: .regular, design: .monospaced))
-                .foregroundColor(sprint.hasPause ? theme.accentText : theme.textSecondary.opacity(0.6))
+                .foregroundColor(sprint.hasPause ? theme.warningText : theme.textSecondary.opacity(0.6))
                 .frame(minWidth: 65, maxWidth: usesTimesheetStyle ? .infinity : 65, alignment: .leading)
 
             // Net Duration
-            Text(sprint.durationLabel)
+            Text(sprint.durationDisplayLabel)
                 .font(.system(size: usesTimesheetStyle ? 12 : 11, weight: .bold, design: .monospaced))
                 .foregroundColor(theme.textPrimary)
                 .frame(minWidth: 90, maxWidth: usesTimesheetStyle ? .infinity : 90, alignment: .leading)
@@ -476,7 +476,7 @@ struct SprintLogTableView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Copy sprint starting at \(sprint.startLabel)")
+                .accessibilityLabel("Copy sprint starting at \(sprint.startDisplayLabel)")
                 .help("Copy start and effective end times")
 
                 // Edit button
@@ -489,7 +489,7 @@ struct SprintLogTableView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Edit sprint starting at \(sprint.startLabel)")
+                .accessibilityLabel("Edit sprint starting at \(sprint.startDisplayLabel)")
                 .help("Edit sprint timestamps and tag")
 
                 // Delete button
@@ -505,7 +505,7 @@ struct SprintLogTableView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Delete sprint starting at \(sprint.startLabel)")
+                .accessibilityLabel("Delete sprint starting at \(sprint.startDisplayLabel)")
                 .help("Delete sprint log")
             }
             .frame(width: 100, alignment: .trailing)
@@ -531,10 +531,15 @@ struct SprintLogTableView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 10) {
-            Image(systemName: allSprints.isEmpty ? "calendar.badge.clock" : "magnifyingglass")
-                .font(.system(size: 26))
-                .foregroundColor(theme.neonTeal.opacity(0.6))
-                .padding(.top, 10)
+            if allSprints.isEmpty, ThemeArt.mug.image(for: theme) != nil {
+                ThemeArtView(art: .mug, theme: theme, size: 72)
+                    .padding(.top, 4)
+            } else {
+                Image(systemName: allSprints.isEmpty ? "calendar.badge.clock" : "magnifyingglass")
+                    .font(.system(size: 26))
+                    .foregroundColor(theme.accentIcon)
+                    .padding(.top, 10)
+            }
 
             Text(allSprints.isEmpty ? "No Sprints Recorded" : "No Sprints Found")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -796,7 +801,7 @@ struct AddSprintModalView: View {
                 Spacer()
 
                 Button(action: saveSprint) {
-                    Text("Add Sprint")
+                    Text("Add sprint")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)

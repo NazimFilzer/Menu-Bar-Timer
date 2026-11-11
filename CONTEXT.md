@@ -123,7 +123,7 @@ and synchronizing with engine ticks.
 
 ## Daily totals and reports
 
-Daily totals include completed sprints plus the active sprint when its start day is today. Historical daily totals and weekly, monthly, and analytics reports use completed sprints. Earnings use the configured currency and hourly rate. A sprint belongs to its start day even when it crosses midnight.
+Every on-screen period total (Today, Week, Month, Analytics, pace and catch-up) counts completed sprints plus the active sprint's net work, credited to the sprint's start day. Month and Analytics refresh that live share at most once a minute. Sprint lists, tag shares, sprint patterns, timesheet rows, Copy All, and CSV use completed sprints only. Earnings use the configured currency and hourly rate. A sprint belongs to its start day even when it crosses midnight.
 
 ## Sleep decision hold
 

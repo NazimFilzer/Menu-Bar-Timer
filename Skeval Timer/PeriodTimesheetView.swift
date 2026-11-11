@@ -189,7 +189,8 @@ struct PeriodTimesheetView: View {
                 .frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
             Text(summary.map { TimeFormatter.format(time: $0.logout) } ?? "—")
                 .frame(minWidth: 90, maxWidth: .infinity, alignment: .leading)
-            Text(summary == nil ? "—" : TimeFormatter.format(clock: day.totalSeconds))
+            // The timesheet row uses completed sprints only, so it matches the Login and Logout beside it.
+            Text(summary == nil ? "—" : TimeFormatter.format(clock: DayLog(sprints: day.completedSprints).accumulatedTotal))
                 .frame(minWidth: 100, maxWidth: .infinity, alignment: .trailing)
             Text(summary == nil ? "—" : TimeFormatter.format(shortDuration: day.completedSprints.reduce(0) { $0 + $1.pausedDuration }))
                 .foregroundStyle(theme.textSecondary)

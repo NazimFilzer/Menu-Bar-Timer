@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor
 final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     private let vm: TimerViewModel
+    private let setActivationPolicy: @MainActor (NSApplication.ActivationPolicy) -> Void
+    private let activateApplication: @MainActor () -> Void
 
     var onActivationPolicyChanged: ((NSApplication.ActivationPolicy) -> Void)? = nil
     /// Builds the window's SwiftUI content. It exists only while the window is shown,
@@ -15,8 +17,18 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
         window?.isVisible ?? false
     }
 
-    init(vm: TimerViewModel) {
+    init(
+        vm: TimerViewModel,
+        setActivationPolicy: @escaping @MainActor (NSApplication.ActivationPolicy) -> Void = {
+            NSApplication.shared.setActivationPolicy($0)
+        },
+        activateApplication: @escaping @MainActor () -> Void = {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+    ) {
         self.vm = vm
+        self.setActivationPolicy = setActivationPolicy
+        self.activateApplication = activateApplication
 
         let contentRect = NSRect(x: 0, y: 0, width: 1140, height: 780)
         let window = NSWindow(
@@ -42,21 +54,21 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func showDashboard() {
-        NSApp.setActivationPolicy(.regular)
+        setActivationPolicy(.regular)
         onActivationPolicyChanged?(.regular)
         if content == nil {
             content = makeContent()
             window?.contentView = content
         }
         window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        activateApplication()
     }
 
     func hideDashboard() {
         window?.orderOut(nil)
         content = nil
         window?.contentView = nil
-        NSApp.setActivationPolicy(.accessory)
+        setActivationPolicy(.accessory)
         onActivationPolicyChanged?(.accessory)
     }
 

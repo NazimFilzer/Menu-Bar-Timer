@@ -52,6 +52,7 @@ struct DashboardFactRow: View {
     var valueColor: Color? = nil
     var emphasized = false
     var detail: String? = nil
+    var detailColor: Color? = nil
     let theme: PopoverTheme
 
     var body: some View {
@@ -67,7 +68,9 @@ struct DashboardFactRow: View {
                 if let detail {
                     Text(detail)
                         .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(theme.textSecondary)
+                        .foregroundStyle(detailColor ?? theme.textSecondary)
+                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -126,6 +129,21 @@ struct DashboardInfoButton: View {
                 .frame(width: 280, alignment: .leading)
                 .padding(14)
         }
+    }
+}
+
+/// The period name between the navigator's chevrons, in a bordered chip like Today's date field.
+struct DashboardPeriodLabel: View {
+    let text: String
+    let theme: PopoverTheme
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+            .lineLimit(1)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(theme.cardBg, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.cardBorder, lineWidth: 1))
     }
 }
 

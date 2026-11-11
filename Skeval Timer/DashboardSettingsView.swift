@@ -41,6 +41,7 @@ struct DashboardSettingsView: View {
                 // 4. System & Integration
                 SystemCard(
                     launchAtLogin: $launchAtLogin,
+                    goal: vm.goal,
                     theme: theme
                 )
             }
@@ -405,6 +406,7 @@ private struct ThemeCard: View {
 
 private struct SystemCard: View {
     @Binding var launchAtLogin: Bool
+    @Bindable var goal: GoalSettings
     let theme: PopoverTheme
     @State private var loginError: String?
 
@@ -437,6 +439,25 @@ private struct SystemCard: View {
                 }
 
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(theme.warningText) }
+
+                Divider().background(theme.dividerColor)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Daily goal ring in the menu bar")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundColor(theme.textPrimary)
+                        Text("Replaces the dot in the menu bar timer with a ring that fills toward today's goal")
+                            .font(.system(size: 11, weight: .regular, design: .rounded))
+                            .foregroundColor(theme.textSecondary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $goal.showsMenuBarProgress)
+                        .accessibilityLabel("Daily goal ring in the menu bar")
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .tint(theme.neonTeal)
+                }
 
                 Divider().background(theme.dividerColor)
 

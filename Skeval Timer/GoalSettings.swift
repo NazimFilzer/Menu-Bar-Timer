@@ -61,6 +61,11 @@ class GoalSettings {
         didSet { userDefaults.set(currencySymbol, forKey: "skevalCurrencySymbol") }
     }
 
+    /// Draws today's daily-goal progress as a ring in the menu bar pill. Off by default.
+    var showsMenuBarProgress = false {
+        didSet { userDefaults.set(showsMenuBarProgress, forKey: "skevalMenuBarProgressRing") }
+    }
+
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
         timelineHours = TimelineHours(
@@ -85,6 +90,7 @@ class GoalSettings {
 
         let storedCurrency = userDefaults.string(forKey: "skevalCurrencySymbol")
         currencySymbol = (storedCurrency != nil && !storedCurrency!.isEmpty) ? storedCurrency! : "₹"
+        showsMenuBarProgress = userDefaults.bool(forKey: "skevalMenuBarProgressRing")
     }
 
     private static func validGoal(_ hours: Double, maximum: Double) -> Bool {

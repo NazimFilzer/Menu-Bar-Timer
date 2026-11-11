@@ -118,13 +118,13 @@ struct WeekLedgerView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(theme.successText)
             }
-            Button(copiedScope == "all" ? "Copied" : "Copy All",
+            Button(copiedScope == "all" ? "Copied" : "Copy all",
                    systemImage: copiedScope == "all" ? "checkmark" : "doc.on.doc") {
                 if vm.copyTimesheet(days: summary.days) { copiedScope = "all" }
             }
             .disabled(!summary.days.contains { !$0.completedSprints.isEmpty })
             .help("Copies every day of \(summary.weekRangeLabel), earliest first: Login, Logout, blank Lunch, Break in minutes. Empty days paste as blank rows. Completed sprints only; Break includes pauses and gaps between sprints.")
-            Button("Add Sprint", systemImage: "plus") { addSprintDate = defaultDate }
+            Button("Add sprint", systemImage: "plus") { addSprintDate = defaultDate }
         }
     }
 
@@ -297,7 +297,7 @@ struct WeekLedgerView: View {
             }
             .disabled(!hasSprints)
             Button("Details…", systemImage: "list.bullet") { detailsDay = day }
-            Button("Add Sprint on \(name)…", systemImage: "plus") { addSprintDate = day.date }
+            Button("Add sprint on \(name)…", systemImage: "plus") { addSprintDate = day.date }
             Divider()
             Button("Delete \(name) Sprints…", systemImage: "trash", role: .destructive) {
                 dayToDelete = day

@@ -772,7 +772,17 @@ func testDashboardWindowControllerLifecycle() {
     let engine = SprintEngine(store: store, observeWorkspace: false)
     let vm = TimerViewModel(engine: engine, store: store)
 
-    let controller = DashboardWindowController(vm: vm)
+    let app = NSApplication.shared
+    let initialPolicy = app.activationPolicy()
+    assertEqual(initialPolicy, .accessory, "The test process must stay out of the Dock")
+    var requestedPolicies: [NSApplication.ActivationPolicy] = []
+    var activationCount = 0
+    // Check policy requests without registering this temporary executable in the Dock.
+    let controller = DashboardWindowController(
+        vm: vm,
+        setActivationPolicy: { requestedPolicies.append($0) },
+        activateApplication: { activationCount += 1 }
+    )
     assertTrue(controller.window != nil, "Dashboard window should be created")
     assertFalse(controller.isWindowVisible, "Dashboard window should initially be hidden")
     let hasDashboardContent = { controller.window?.contentView is NSHostingView<DashboardView> }
@@ -788,14 +798,14 @@ func testDashboardWindowControllerLifecycle() {
     assertTrue(controller.isWindowVisible, "Window should be visible after showDashboard")
     assertTrue(hasDashboardContent(), "Shown dashboard builds its SwiftUI content")
     assertEqual(recordedPolicy, .regular, "Activation policy should transition to .regular")
-    assertEqual(NSApp.activationPolicy(), .regular, "NSApp activation policy should be .regular")
+    assertEqual(app.activationPolicy(), initialPolicy, "Dashboard tests must not change the test process activation policy")
 
     // Hide dashboard -> transitions back to accessory policy and hides window
     controller.hideDashboard()
     assertFalse(controller.isWindowVisible, "Window should be hidden after hideDashboard")
     assertFalse(hasDashboardContent(), "Hiding the dashboard drops its SwiftUI content")
     assertEqual(recordedPolicy, .accessory, "Activation policy should transition to .accessory")
-    assertEqual(NSApp.activationPolicy(), .accessory, "NSApp activation policy should be .accessory")
+    assertEqual(app.activationPolicy(), initialPolicy, "Hiding the test dashboard must preserve the process policy")
 
     // Show again and trigger windowShouldClose -> resets to accessory and keeps window alive
     controller.showDashboard()
@@ -804,7 +814,10 @@ func testDashboardWindowControllerLifecycle() {
     assertFalse(shouldClose, "windowShouldClose should return false to prevent window destruction")
     assertFalse(controller.isWindowVisible, "Window should be ordered out on close request")
     assertEqual(recordedPolicy, .accessory, "Activation policy should return to .accessory on window close")
-    assertEqual(NSApp.activationPolicy(), .accessory, "NSApp policy should return to .accessory")
+    assertEqual(app.activationPolicy(), initialPolicy, "Closing the test dashboard must preserve the process policy")
+    assertEqual(requestedPolicies, [.regular, .accessory, .regular, .accessory],
+                "Dashboard visibility must request the production Dock policy sequence")
+    assertEqual(activationCount, 2, "Each dashboard opening must request application activation")
 }
 
 func testWeeklyAnalytics() {
@@ -2079,6 +2092,10 @@ func testSleepDecisionDelayAndRecoveryRetry() {
 @main
 struct TestMain {
     static func main() async {
+        // Test executables must stay out of the Dock, including while windows are tested.
+        await MainActor.run {
+            NSApplication.shared.setActivationPolicy(.accessory)
+        }
         defer { cleanUpAuditSettings() }
         testTimeFormatter()
         testDayLogStoreWithInMemoryStorage()
@@ -2100,6 +2117,11 @@ struct TestMain {
         testTagBreakdownAndAttribution()
         testMonthOverMonthComparison()
         testAnalyticsReport()
+        testLiveWorkTotals()
+        testDayRibbon()
+        testEarningsTrend()
+        testMenuBarProgressRing()
+        testThemeArtCoverage()
         testAnalyticsCustomRangeFiltering()
         testRFC4180CSVExport()
         testTagFilterMatching()

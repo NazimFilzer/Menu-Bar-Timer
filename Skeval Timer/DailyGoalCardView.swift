@@ -91,11 +91,17 @@ struct DailyGoalCardView: View {
                         .font(.dashboardCaption).foregroundStyle(theme.warningText)
                 }
             } else if forecast.status == .goalReached {
-                Label("Daily goal reached", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundStyle(theme.successText)
-                Text("No more work is needed today.")
-                    .font(.dashboardCaption).foregroundStyle(theme.textSecondary)
+                HStack(alignment: .center, spacing: 12) {
+                    ThemeArtView(art: .trophy, theme: theme, size: 72)
+                        .padding(.vertical, -8)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Daily goal reached", systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                            .foregroundStyle(theme.successText)
+                        Text("No more work is needed today.")
+                            .font(.dashboardCaption).foregroundStyle(theme.textSecondary)
+                    }
+                }
             } else {
                 Text(headline(for: forecast.status))
                     .font(.system(size: 15, weight: .semibold, design: .rounded))

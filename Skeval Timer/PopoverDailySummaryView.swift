@@ -16,11 +16,8 @@ struct PopoverDailySummaryView: View {
             }
             Live { figures }
             Live { goalProgress }
+            PopoverDayRibbonView(vm: vm, theme: theme)
             PopoverFinishForecastView(vm: vm, theme: theme)
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(theme.bgDark.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
             PopoverTimesheetCopyButton(vm: vm, date: Calendar.current.startOfDay(for: Date()), theme: theme)
             Text("Timesheet uses completed sprints only.")
                 .font(.system(size: 11, design: .rounded))
@@ -93,9 +90,17 @@ private struct PopoverFinishForecastView: View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             Live {
                 let forecast = vm.finishForecast()
-                VStack(alignment: .leading, spacing: 6) {
-                    projection(forecast)
-                    if forecast.finishDate != nil { upcomingBreaks }
+                // Once the goal is reached, the progress row already shows the result.
+                // Keep the decoration with the content so no empty box remains.
+                if forecast.status != .goalReached {
+                    VStack(alignment: .leading, spacing: 6) {
+                        projection(forecast)
+                        if forecast.finishDate != nil { upcomingBreaks }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.bgDark.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.cardBorder, lineWidth: 1))
                 }
             }
         }
@@ -112,10 +117,13 @@ private struct PopoverFinishForecastView: View {
             }
             .font(.system(size: 12, weight: .medium, design: .rounded))
             if forecast.finishesAfterToday {
-                Text("\(finish.formatted(.dateTime.month(.abbreviated).day())). The sprint stays on its start day.")
+                // Same words as Today's forecast card.
+                Text("\(finish.formatted(.dateTime.month(.abbreviated).day())). Crosses midnight. A sprint stays credited to its start day.")
                     .font(.system(size: 11, design: .rounded)).foregroundStyle(theme.warningText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text(assumption(for: forecast.status) + " Includes \(vm.plannedBreakMinutes) min of upcoming breaks.")
+            Text(assumption(for: forecast.status)
+                 + (vm.plannedBreakMinutes > 0 ? " Includes \(vm.plannedBreakMinutes) min of upcoming breaks." : ""))
                 .font(.system(size: 11, design: .rounded)).foregroundStyle(theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else if forecast.status != .goalReached {

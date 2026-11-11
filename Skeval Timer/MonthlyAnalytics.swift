@@ -72,7 +72,8 @@ enum MonthlyAnalytics {
         monthOffset: Int = 0,
         referenceDate: Date = Date(),
         settings: GoalSettings = .shared,
-        calendar: Calendar? = nil
+        calendar: Calendar? = nil,
+        live: LiveWork? = nil
     ) -> MonthlySummary {
         var cal = calendar ?? Calendar(identifier: .gregorian)
         cal.firstWeekday = 2 // Monday start
@@ -84,7 +85,7 @@ enum MonthlyAnalytics {
         let monthTitle = AnalyticsMetrics.label(firstOfMonth, format: "MMMM yyyy", calendar: cal)
         let isCurrentMonth = cal.isDate(firstOfMonth, equalTo: referenceDate, toGranularity: .month)
         let dayBuckets = dates.map {
-            AnalyticsMetrics.day($0, logs: logs, referenceDate: referenceDate, settings: settings, calendar: cal)
+            AnalyticsMetrics.day($0, logs: logs, referenceDate: referenceDate, settings: settings, calendar: cal, live: live)
         }
         let totalMonthlySeconds = dayBuckets.reduce(0) { $0 + $1.totalSeconds }
         let allCompletedSprintsInMonth = dayBuckets.flatMap(\.completedSprints)
@@ -109,7 +110,9 @@ enum MonthlyAnalytics {
         let earningsProgress = "\(formattedEarn) / \(formattedTargetEarn)"
 
         // Tag attribution breakdown
-        let tagBreakdowns = calculateTagBreakdown(sprints: allCompletedSprintsInMonth, totalSeconds: totalMonthlySeconds, hourlyRate: settings.hourlyRate, currencySymbol: settings.currencySymbol)
+        // Tag shares use completed sprints only; a running sprint's tag can still change.
+        let completedMonthlySeconds = DayLog(sprints: allCompletedSprintsInMonth).accumulatedTotal
+        let tagBreakdowns = calculateTagBreakdown(sprints: allCompletedSprintsInMonth, totalSeconds: completedMonthlySeconds, hourlyRate: settings.hourlyRate, currencySymbol: settings.currencySymbol)
 
         // Month-over-month comparison. The current month is compared with the same
         // number of days at the start of last month, like the Week page does.

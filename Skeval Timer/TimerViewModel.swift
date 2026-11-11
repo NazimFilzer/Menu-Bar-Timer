@@ -64,6 +64,19 @@ class TimerViewModel {
         guard key != timelineMinuteKey else { return }
         timelineMinuteKey = key
         timelineRevision += 1
+        refreshReportLiveWork()
+    }
+
+    /// The running sprint's net work for period totals (Month, Analytics). It changes at most
+    /// once a minute, so those pages stay off the 1-second tick yet agree with Today and Week.
+    private(set) var reportLiveWork: LiveWork?
+
+    private func refreshReportLiveWork() {
+        let next: LiveWork? = {
+            guard state.isRunning, let sprint = state.currentSprint, currentElapsed.isFinite else { return nil }
+            return LiveWork(day: Calendar.current.startOfDay(for: sprint.startTime), seconds: max(0, currentElapsed))
+        }()
+        if next != reportLiveWork { reportLiveWork = next }
     }
 
     private(set) var notifiedMilestones: Set<Int> = []
@@ -114,6 +127,7 @@ class TimerViewModel {
 
         eyeBreakReminder.restart(at: currentElapsed, settings: self.eyeBreakSettings)
         setupEngineCallbacks()
+        refreshReportLiveWork()
     }
 
     private func setupEngineCallbacks() {
@@ -171,6 +185,7 @@ class TimerViewModel {
         currentElapsed = newState.currentElapsed
         if !newState.isPaused { currentPauseElapsed = 0 }
         if sprintChanged { refreshLogs() }
+        if activityChanged || sprintChanged { refreshReportLiveWork() }
         if !newState.isRecovery {
             recoveryEndText = ""
             recoveryEndError = nil
@@ -231,10 +246,12 @@ class TimerViewModel {
         )
     }
 
-    func dailyTimeline(hours: TimelineHours? = nil, fitsToWork: Bool = false, now: Date = Date(),
+    /// - Parameter date: the day to draw; the selected history day when nil.
+    func dailyTimeline(for date: Date? = nil, hours: TimelineHours? = nil, fitsToWork: Bool = false, now: Date = Date(),
                        calendar: Calendar = .current) -> DailyTimeline {
         _ = logRevision
         _ = timelineRevision
+        let selectedDate = date.map { calendar.startOfDay(for: $0) } ?? self.selectedDate
         let live = timelineLiveSprint()
         // A sprint belongs to its start day, so only the selected day and the day before
         // (overnight sprints) can appear. Shortcut: a completed sprint longer than 24 hours
@@ -262,6 +279,17 @@ class TimerViewModel {
         let paused = unresolved == nil ? engine.totalCurrentSprintPaused : sprint.pausedDuration
         return TimelineLiveSprint(sprint: sprint, status: status, netWork: state.currentElapsed,
                                   paused: paused, unresolvedStart: unresolved)
+    }
+
+    /// Today's ribbon for the popover. It follows the minute-level timeline revision, not the tick,
+    /// and always shows today whatever day the history picker shows.
+    func todayRibbon(now: Date = Date(), calendar: Calendar = .current) -> DayRibbon {
+        let timeline = dailyTimeline(for: now, now: now, calendar: calendar)
+        let pauseStart = state.isPaused && !state.isRecovery ? currentSprint?.pauseStartedAt : nil
+        let forecast = finishForecast(now: now)
+        return DayRibbon.make(sprints: timeline.segments.map(\.interval), pauseStart: pauseStart,
+                              finish: forecast.status == .goalReached ? nil : forecast.finishDate,
+                              now: now, day: timeline.day, calendar: calendar)
     }
 
     func finishForecast(now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)) -> FinishForecast {
