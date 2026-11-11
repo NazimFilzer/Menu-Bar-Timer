@@ -80,7 +80,7 @@ BUILT_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUILT_APP/Co
   echo "Refusing to install unexpected bundle identifier '$BUILT_ID' (expected '$BUNDLE_ID')." >&2
   exit 1
 }
-printf 'Preserving user data at: %s\\n' "$DATA_DIR"
+printf 'Preserving user data at: %s\n' "$DATA_DIR"
 shopt -s nullglob
 LIVE_LOGS=("$DATA_DIR"/Profiles/*/logs.json)
 shopt -u nullglob
