@@ -185,6 +185,9 @@ struct ManualSprintSheetView: View {
                 .buttonStyle(.plain)
             }
 
+            QuickSlotPickerView(theme: theme) { vm.fillManualQuickSlot(minutes: $0) }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             DualClockTimePickerView(
                 startTime: $vm.manualStartDate,
                 endTime: $vm.manualEndDate,

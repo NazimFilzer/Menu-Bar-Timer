@@ -767,6 +767,9 @@ struct AddSprintModalView: View {
 
             Divider().background(theme.dividerColor)
 
+            QuickSlotPickerView(theme: theme, onPick: fillQuickSlot)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             SprintFormFieldsView(
                 selectedDate: $draft.selectedDate,
                 startTime: $draft.startTime,
@@ -818,6 +821,16 @@ struct AddSprintModalView: View {
         .padding(20)
         .frame(width: 380)
         .background(theme.bgDark)
+    }
+
+    private func fillQuickSlot(minutes: Int) -> Bool {
+        guard let slot = vm.quickSlot(minutes: minutes, on: draft.selectedDate) else { return false }
+        draft.startTime = slot.start
+        draft.endTime = slot.end
+        draft.endDayOffset = 0
+        draft.pausedDuration = 0
+        saveError = nil
+        return true
     }
 
     private func saveSprint() {

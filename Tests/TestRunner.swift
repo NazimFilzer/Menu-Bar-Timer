@@ -2128,6 +2128,7 @@ struct TestMain {
         testAppVersion()
         testSprintEntryValidation()
         testSprintOverlaps()
+        testQuickSlotFinder()
         testCatchUpAnalytics()
         testFinishForecast()
         testDailyTimeline()

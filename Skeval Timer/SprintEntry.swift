@@ -112,3 +112,26 @@ struct SprintDraft {
         tagText = sprint.tag ?? ""
     }
 }
+
+extension SprintEntry {
+    /// The latest free gap of `minutes` on `day`, ending no later than now (floored to the
+    /// minute) or 23:59 for a past day. Occupancy follows `findOverlaps`, so a slot found
+    /// here never triggers the overlap warning. Returns nil when the day has no such gap.
+    static func latestFreeSlot(minutes: Int, on day: Date, in logs: [String: [Sprint]],
+                               now: Date = Date(), calendar: Calendar = .current) -> SprintEntry? {
+        guard minutes > 0 else { return nil }
+        let duration = TimeInterval(minutes * 60)
+        let dayStart = calendar.startOfDay(for: day)
+        guard let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart),
+              let nowMinute = calendar.dateInterval(of: .minute, for: now)?.start else { return nil }
+        var end = min(nowMinute, nextDay.addingTimeInterval(-60))
+        while end.addingTimeInterval(-duration) >= dayStart {
+            guard let candidate = try? SprintEntry(start: end.addingTimeInterval(-duration), end: end,
+                                                   pausedDuration: 0) else { return nil }
+            let conflicts = findOverlaps(with: candidate, in: logs, now: now)
+            guard let earliest = conflicts.map(\.startTime).min() else { return candidate }
+            end = earliest
+        }
+        return nil
+    }
+}

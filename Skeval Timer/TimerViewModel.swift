@@ -853,6 +853,22 @@ class TimerViewModel {
         try? manualEntry().netDuration
     }
 
+    /// Latest free slot of `minutes` on `date`, before now for today.
+    func quickSlot(minutes: Int, on date: Date) -> SprintEntry? {
+        SprintEntry.latestFreeSlot(minutes: minutes, on: date, in: store.allLogs())
+    }
+
+    /// Fills the menu bar form with the latest free slot; false when none fits.
+    @discardableResult
+    func fillManualQuickSlot(minutes: Int) -> Bool {
+        guard let slot = quickSlot(minutes: minutes, on: selectedDate) else { return false }
+        manualStartText = TimeFormatter.format(time: slot.start)
+        manualEndText = TimeFormatter.format(time: slot.end)
+        manualBreakMinutesText = "0"
+        manualEntryError = nil
+        return true
+    }
+
     var manualComputedEarningsDelta: Double {
         EarningsCalculator.calculate(durationInSeconds: manualComputedNetDuration ?? 0, hourlyRate: goal.hourlyRate)
     }
